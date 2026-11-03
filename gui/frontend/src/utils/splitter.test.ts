@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { cardSize } from "./nodeOrigin";
 import {
+	referenceInUse,
 	resolvedFractions,
+	SPLITTER_WIDTH,
 	splitterHeight,
 	splitterReference,
 	validateSplitter,
@@ -29,7 +31,6 @@ describe("flow splitter data (#903)", () => {
 		[{ fractions: [0.5, 0.5, null] }, "nothing left"],
 		[{ fractions: [null, null] }, "at most one"],
 		[{ fractions: [0, null] }, "in (0, 1)"],
-		[{ fractions: [0.5, 0.5] }, "choose the reference"],
 		[{ fractions: [0.5, null], reference: 5 }, "does not exist"],
 	])("refuses %j", (data, match) => {
 		expect(validateSplitter(data).join("; ")).toContain(match);
@@ -56,6 +57,19 @@ describe("flow splitter data (#903)", () => {
 			position: { x: 0, y: 0 },
 			data: { fractions: [0.1, 0.1, 0.1, 0.1, null] },
 		};
-		expect(cardSize(node)).toEqual([140, splitterHeight(5)]);
+		expect(cardSize(node)).toEqual([SPLITTER_WIDTH, splitterHeight(5)]);
+	});
+});
+
+describe("the reference in use (#903)", () => {
+	it("is the solved one, counted from 1 in the result", () => {
+		expect(
+			referenceInUse({
+				fractions: [0.5, null],
+				reference: 0,
+				result: { reference_outlet: 2, reference_swapped: 1 },
+			}),
+		).toBe(1);
+		expect(referenceInUse({ fractions: [0.5, null] })).toBe(1);
 	});
 });

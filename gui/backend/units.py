@@ -189,6 +189,9 @@ UNIT_MAP: dict[str, str] = {
     "valve_needs_pump": "-",
     "n_outlets": "-",
     "reference_outlet": "-",
+    "reference_start": "-",
+    "reference_swapped": "-",
+    "reference_swaps": "-",
     "n_needs_pump": "-",
     "valve_dPt_max": "Pa",
     "fraction_error_max": "-",
@@ -538,6 +541,7 @@ INPUT_UNIT_MAP: dict[str, str] = {
     # Flow splitter (#903): fractions[i], the reference outlet's index, areas[i]
     "fractions": "-",
     "reference": "-",
+    "auto_reference": "-",
     "areas": "m^2",
 }
 

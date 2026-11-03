@@ -189,6 +189,7 @@ _SPECS: dict[str, DiagnosticSpec] = {
             "valve_choked",
             "valve_Cd",
             "valve_zeta",
+            "reference_swaps",
         ),
     ),
     # -- Nodes --

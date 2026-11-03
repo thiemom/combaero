@@ -400,6 +400,8 @@
 			"n_needs_pump",
 			"n_outlets",
 			"reference_outlet",
+			"reference_start",
+			"reference_swapped",
 			"valve_dPt_max"
 		],
 		"fuel_boundary": [
@@ -1175,6 +1177,8 @@
 		"rayleigh_in_momentum": "-",
 		"recovery_in_range": "-",
 		"reference_outlet": "-",
+		"reference_start": "-",
+		"reference_swapped": "-",
 		"regime_incompressible": "-",
 		"rho": "kg/m\u00b3",
 		"rho_ref": "kg/m\u00b3",

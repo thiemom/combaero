@@ -691,15 +691,29 @@ const Inspector = () => {
 						};
 						const r = d.result;
 						const errors = validateSplitter(d);
+						const auto = d.auto_reference ?? true;
+						// The outlet whose valve the solve left open (1-based in the
+						// result), and the one it started from.
+						const inUse =
+							typeof r?.reference_outlet === "number"
+								? r.reference_outlet - 1
+								: null;
+						const started =
+							typeof r?.reference_start === "number"
+								? r.reference_start - 1
+								: null;
+						const { unitPreferences } = useStore.getState();
+						const mm2 = unitPreferences.area === "mm²";
+						const aScale = mm2 ? 1e6 : 1;
 						return (
 							<div className="flex flex-col gap-3">
 								<div className="text-[10px] text-stone-500 leading-snug">
 									Each outlet takes its fraction of the inlet flow, a mass-flow
 									controller: its valve takes whatever drop the path downstream
-									leaves (reported after a solve). Fractions sum to 1; "rest"
-									takes what the others leave. The reference outlet's valve is
-									open: make it the path that needs the most pressure, or the
-									solve is refused (another outlet would need a pump).
+									leaves (shown after a solve). Fractions sum to 1; "Rest" takes
+									what the others leave. One valve stays open: it has to be on
+									the path that needs the most pressure, and the solve moves it
+									there when it starts elsewhere.
 								</div>
 								<table className="text-[11px]">
 									<thead>
@@ -707,8 +721,12 @@ const Inspector = () => {
 											<th className="text-left">#</th>
 											<th className="text-left">Fraction</th>
 											<th>Rest</th>
-											<th>Ref</th>
-											<th className="text-left">Valve area</th>
+											<th title="The outlet whose valve is open; the solve starts here">
+												Open
+											</th>
+											<th className="text-left">
+												Valve area {mm2 ? "mm²" : "m²"}
+											</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -744,7 +762,7 @@ const Inspector = () => {
 													<input
 														type="radio"
 														name={`fs_ref_${selectedNode.id}`}
-														aria-label={`Outlet ${i + 1} is the reference`}
+														aria-label={`Outlet ${i + 1} starts with its valve open`}
 														checked={ref === i}
 														onChange={() => set({ reference: i })}
 													/>
@@ -752,12 +770,14 @@ const Inspector = () => {
 												<td>
 													<NumericInput
 														id={`fs_a_${selectedNode.id}_${i}`}
-														value={areas[i]}
+														value={areas[i] == null ? null : areas[i] * aScale}
 														min={0}
 														placeholder="CdA only"
 														onChange={(val) =>
 															set({
-																areas: areas.map((a, j) => (j === i ? val : a)),
+																areas: areas.map((a, j) =>
+																	j === i ? val / aScale : a,
+																),
 															})
 														}
 														onClear={() =>
@@ -793,9 +813,32 @@ const Inspector = () => {
 										- Last outlet
 									</button>
 								</div>
+								<label className="flex items-center gap-2 text-[11px] text-stone-600">
+									<input
+										type="checkbox"
+										checked={auto}
+										onChange={(e) => set({ auto_reference: e.target.checked })}
+									/>
+									Move the open valve to the path needing the most pressure
+								</label>
 								{errors.length > 0 && (
 									<div className="text-[10px] text-red-600 leading-snug">
 										{errors.join("; ")}
+									</div>
+								)}
+								{inUse != null && started != null && inUse !== started && (
+									<div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 leading-snug flex flex-col gap-1">
+										<span>
+											The solve moved the open valve from outlet {started + 1}{" "}
+											to outlet {inUse + 1}: its path needs the most pressure.
+										</span>
+										<button
+											type="button"
+											className="self-start px-2 py-0.5 border rounded bg-white hover:bg-stone-50"
+											onClick={() => set({ reference: inUse })}
+										>
+											Start from outlet {inUse + 1}
+										</button>
 									</div>
 								)}
 								{r && Array.isArray(r.rows_m_dot) && (
@@ -830,7 +873,7 @@ const Inspector = () => {
 																)}
 															</td>
 															<td className="text-right">
-																{i === r.reference_outlet
+																{i === inUse
 																	? "open"
 																	: (
 																			Number(r.rows_valve_dPt?.[i]) / 1000
@@ -853,8 +896,8 @@ const Inspector = () => {
 										</table>
 										{r.n_needs_pump > 0 && (
 											<div className="text-[10px] text-red-600">
-												An outlet needs more pressure than the reference gets:
-												make the most resistive path the reference.
+												An outlet needs more pressure than the open one gets:
+												open the valve on the most demanding path instead.
 											</div>
 										)}
 									</div>

@@ -1,9 +1,12 @@
 // The flow splitter's data (#903): one inlet to N outlets, outlet i at
 // fractions[i] of the throughput. At most one fraction is null, the
 // remainder (1 minus the others). `reference` is the index of the outlet
-// whose valve is open (Pt_out = Pt_in); null means the remainder. The
-// backend's FlowSplitter refuses a set that does not sum to 1, never
-// renormalising; validateSplitter says so before a solve.
+// whose valve is open (Pt_out = Pt_in) to START from; null means the
+// remainder, else the backend's first guess. With `auto_reference` (default
+// true) the solve moves it to the outlet needing the most pressure; the
+// result's `reference_outlet` is the one in use. The backend's FlowSplitter
+// refuses a set that does not sum to 1, never renormalising;
+// validateSplitter says so before a solve.
 
 /** |sum - 1| allowed, the round-off of typed decimals:
  *  combaero.network.components.SPLITTER_FRACTION_SUM_TOL. */
@@ -13,13 +16,15 @@ export const SPLITTER_FRACTION_SUM_TOL = 1e-9;
 export const SPLITTER_MAX_OUTLETS = 32;
 
 /** Card width and the height per outlet row [px]. */
-export const SPLITTER_WIDTH = 140;
+export const SPLITTER_WIDTH = 168;
 export const SPLITTER_ROW_PX = 22;
 
 export interface SplitterData {
 	fractions?: (number | null)[];
 	reference?: number | null;
 	areas?: (number | null)[] | null;
+	auto_reference?: boolean;
+	result?: { reference_outlet?: number; reference_swapped?: number } | null;
 }
 
 export const DEFAULT_FRACTIONS: (number | null)[] = [0.5, null];
@@ -42,13 +47,20 @@ export function resolvedFractions(fractions: (number | null)[]): number[] {
 	return fractions.map((f) => (f == null ? 1 - given : f));
 }
 
-/** The reference outlet's index: the one chosen, else the remainder, else
- *  null (none: the solve is refused). */
+/** The reference outlet to start from: the one chosen, else the
+ *  remainder, else null (the backend's first guess). */
 export function splitterReference(data: SplitterData): number | null {
 	const fractions = splitterFractions(data);
 	if (data.reference != null) return data.reference;
 	const rest = fractions.indexOf(null);
 	return rest >= 0 ? rest : null;
+}
+
+/** The reference in use (0-based): the solved one when there is a result
+ *  (its reference_outlet counts from 1, as the card does), else the start. */
+export function referenceInUse(data: SplitterData): number | null {
+	const solved = data.result?.reference_outlet;
+	return typeof solved === "number" ? solved - 1 : splitterReference(data);
 }
 
 /** Why the backend would refuse this splitter, one message per cause. */
@@ -74,9 +86,7 @@ export function validateSplitter(data: SplitterData): string[] {
 			`fractions sum to ${given.toPrecision(6)}, not 1 (make one outlet the remainder)`,
 		);
 	const ref = splitterReference(data);
-	if (ref == null)
-		errors.push("choose the reference outlet (its valve open), or a remainder");
-	else if (!(ref >= 0 && ref < n))
+	if (ref != null && !(ref >= 0 && ref < n))
 		errors.push(`reference outlet ${ref + 1} does not exist`);
 	return errors;
 }

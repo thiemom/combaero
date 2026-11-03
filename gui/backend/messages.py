@@ -87,9 +87,13 @@ def humanize(message: str, schema: NetworkGraphSchema) -> str:
     """Rewrite internal ids in a solver message into what the canvas shows."""
     if not message:
         return message
+    splitters = {n.id for n in schema.nodes if n.type == "flow_splitter"}
     out = _PORT_ID.sub(
         lambda m: (
-            ("the area step at " if m[1] == "step" else "")
+            # A flow splitter's ports are drawn unlabelled: "<node> outlet 2".
+            f"{node_name(schema, m[2])} {PORT_TAG[m[3]]}"
+            if m[2] in splitters
+            else ("the area step at " if m[1] == "step" else "")
             + f"{node_name(schema, m[2])} port {m[3]} ({PORT_TAG[m[3]]})"
         ),
         message,

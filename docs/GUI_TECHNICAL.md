@@ -112,10 +112,15 @@ outlet (with its connection). No surface, so no thermal handles.
   remainder (1 minus the others). Without a remainder they must sum to 1
   within 1e-9; the solve is refused otherwise, never renormalised.
   (Default: `[0.5, null]`.)
-- `reference`: the index of the outlet whose valve is open (Pt_out = Pt_in),
-  `null` for the remainder. Make it the path that needs the most pressure: a
-  metered outlet that would need a pump is refused by the second-law check,
-  and the message names the outlet to make the reference.
+- `reference`: the index of the outlet whose valve is open (Pt_out = Pt_in)
+  to START from, `null` for the remainder (else the first guess).
+- `auto_reference`: `true` (default): when the start is not the path needing
+  the most pressure (a metered outlet would need a pump), the solve moves
+  the reference there and solves again; the result's `reference_outlet` is
+  the one in use, `reference_start` the start, `reference_swapped` 1 when
+  they differ (both counted from 1, as the card numbers the outlets), and
+  the solver message says so. `false` keeps the start, and
+  such a solve is refused with a message naming the outlet to use.
 - `areas`: optional valve reference area [m^2] per outlet, for `valve_Cd`
   and `valve_zeta`.
 
@@ -124,7 +129,7 @@ effusion liner's; a plenum or boundary wired straight to a port is used as
 it is; a momentum chamber at the inlet feeds an inserted plenum through a
 lossless link (it refuses a split). Each outlet carries the inlet's Tt and
 composition. The result carries `m_dot` (the throughput), `n_outlets`,
-`reference_outlet`, `n_needs_pump`, `valve_dPt_max`, `fraction_error_max`
+`reference_outlet`, `reference_start`, `reference_swapped`, `n_needs_pump`, `valve_dPt_max`, `fraction_error_max`
 and per outlet the lists `rows_m_dot`, `rows_fraction`,
 `rows_fraction_achieved`, `rows_valve_dPt`, `rows_valve_CdA`, `rows_valve_Cd`,
 `rows_valve_zeta`, `rows_valve_needs_pump` (`null` where an outlet has no

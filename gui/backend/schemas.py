@@ -590,7 +590,9 @@ class FlowSplitterData(BaseModel):
     are in (0, 1) and, without a remainder, sum to 1 within
     SPLITTER_FRACTION_SUM_TOL; FlowSplitter refuses anything else, never
     renormalising. ``reference`` is the index of the outlet whose valve is
-    open (Pt_out = Pt_in): the remainder when None. ``areas[i]`` is outlet
+    open (Pt_out = Pt_in) to start from: the remainder when None, else the
+    first guess. With ``auto_reference`` (default) the solve moves it to the
+    outlet needing the most pressure when the start is infeasible. ``areas[i]`` is outlet
     i's valve reference area [m^2] for the reported Cd and zeta (None: the
     effective area CdA only).
     """
@@ -601,6 +603,7 @@ class FlowSplitterData(BaseModel):
     )
     reference: int | None = Field(default=None, ge=0)
     areas: list[float | None] | None = None
+    auto_reference: bool = True
     label: str | None = None
 
     @model_validator(mode="after")

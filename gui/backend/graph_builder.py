@@ -137,8 +137,8 @@ SPLITTER_ROW_KEYS = (
 
 class GuiFlowSplitter:
     """A ``FlowSplitter`` as one canvas node (#903): ``summarize`` gives the
-    runner its result, scalars plus a ``rows_<key>`` list per outlet in port
-    order, None where an outlet has no such value (the open reference has no
+    runner its result, scalars (the reference in use and the one started
+    from) plus a ``rows_<key>`` list per outlet in port order, None where an outlet has no such value (the open reference has no
     metering; Cd and zeta need a reference area)."""
 
     def __init__(self, splitter: FlowSplitter) -> None:
@@ -151,7 +151,12 @@ class GuiFlowSplitter:
         out: dict = {
             "m_dot": float(s["m_dot"]),
             "n_outlets": float(len(outs)),
-            "reference_outlet": float(outs.index(s["reference"])),
+            # The reference the solve ended with, and the one it started from
+            # (they differ when it was moved, #903). Counted from 1, as the
+            # card and Inspector number the outlets (port out<i> is i + 1).
+            "reference_outlet": float(outs.index(s["reference"]) + 1),
+            "reference_start": float(outs.index(s["reference_start"]) + 1),
+            "reference_swapped": float(s["reference"] != s["reference_start"]),
             "n_needs_pump": float(len(s["needs_pump"])),
         }
         for key in SPLITTER_ROW_KEYS:
@@ -1317,11 +1322,6 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     "the same node; give each outlet its own node."
                 )
             _ref = _sd.reference
-            if _ref is None and None not in _sd.fractions:
-                raise ValueError(
-                    f"Flow splitter '{elem_id}': choose the reference outlet (its valve "
-                    "open), or make one outlet the remainder."
-                )
             try:
                 splitter = FlowSplitter(
                     elem_id,
@@ -1331,6 +1331,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     areas={
                         o: a for o, a in zip(_outs, _sd.areas or [], strict=False) if a is not None
                     },
+                    auto_reference=_sd.auto_reference,
                 )
             except ValueError as exc:
                 raise ValueError(

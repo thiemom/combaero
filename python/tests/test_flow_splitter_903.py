@@ -83,6 +83,7 @@ def _network(
     outlets: dict[str, float | None] | None = None,
     reference: str | None = REFERENCE,
     m_supply: float = M_SUPPLY,
+    auto_reference: bool = True,
 ) -> tuple[FlowNetwork, FlowSplitter]:
     """supply -> splitter -> o_i -> head loss -> sink_i (one per outlet)."""
     net = FlowNetwork()
@@ -101,6 +102,7 @@ def _network(
         outlets if outlets is not None else {o: f for o, (f, _, _) in PATHS.items()},
         reference=reference,
         areas=dict.fromkeys(PATHS, VALVE_AREA),
+        auto_reference=auto_reference,
     )
     sp.add_to(net)
     return net, sp
@@ -304,7 +306,6 @@ def test_a_fraction_row_is_the_linear_controller() -> None:
         ({"o1": 0.0, "o2": 0.5, "o3": None}, None, r"in \(0, 1\)"),
         ({"o1": 1.0, "o2": 0.5, "o3": None}, None, r"in \(0, 1\)"),
         ({"o1": -0.2, "o2": 0.5, "o3": None}, None, r"in \(0, 1\)"),
-        ({"o1": 0.2, "o2": 0.3, "o3": 0.5}, None, "name the reference"),
         ({"o1": 0.2, "o2": 0.3, "o3": 0.5}, "o9", "not one of its outlets"),
         ({"o1": 1.0}, "o1", "at least two outlets"),
     ],
@@ -350,16 +351,77 @@ def test_hand_built_outlets_are_checked_as_one_splitter(fractions, refs, match) 
         _hand_built(fractions, refs).resolve_all_topology()
 
 
-def test_a_reference_that_is_not_the_most_resistive_path_is_refused_by_name() -> None:
-    """o3 (the remainder, the least resistive path) as the reference: o1 and
-    o2 would need their Pt raised, a pump. The second-law check refuses the
-    root, and the message names the outlet that should be the reference."""
-    _, r = _solve(_network("mass", reference="o3")[0])
+@pytest.mark.parametrize("kind", ["mass", "pressure"])
+@pytest.mark.parametrize("start", ["o2", "o3"])
+def test_a_wrong_reference_is_swapped_to_the_right_one(kind: str, start: str) -> None:
+    """Started from a less resistive path, the first root is refused (o1
+    would need a pump); the solve moves the reference to o1, the outlet
+    needing the most pressure, and ends at the root a correct pick gives:
+    the same flows, fractions and valve drops, in two solves."""
+    _, good = _solve(_network(kind, reference="o1")[0])
+    _, r = _solve(_network(kind, reference=start)[0])
+    assert good["__success__"] and r["__success__"], r["__message__"]
+    assert good["__reference_swap_solves__"] == 1
+    assert good["__reference_swaps__"]["sp"]["swapped_from"] == []
+    assert r["__reference_swaps__"]["sp"] == {
+        "reference": "o1",
+        "start": start,
+        "swapped_from": [start],
+    }
+    assert r["__reference_swap_solves__"] == 2
+    assert f"reference moved from '{start}' to 'o1'" in r["__message__"]
+    d, dg = r["__element_diag__"], good["__element_diag__"]
+    for o in PATHS:
+        e = f"sp__{o}"
+        assert r[f"{e}.m_dot"] == pytest.approx(good[f"{e}.m_dot"], rel=1e-9)
+        assert d[e]["fraction_achieved"] == pytest.approx(dg[e]["fraction_achieved"], abs=1e-13)
+        assert d[e]["valve_dPt"] == pytest.approx(dg[e]["valve_dPt"], rel=1e-7, abs=1e-4)
+        assert d[e]["is_reference"] == (1.0 if o == "o1" else 0.0)
+        assert d[e]["reference_swaps"] == 1.0
+    assert r["__second_law_failures__"] == []
+
+
+def test_the_first_guess_without_a_remainder_or_reference() -> None:
+    """No remainder, no reference: the start is the path with the largest
+    seed resistance at its fraction, here o1, so no swap is needed."""
+    net, sp = _network("mass", outlets={"o1": 0.2, "o2": 0.3, "o3": 0.5}, reference=None)
+    assert sp.reference == "o1"
+    _, r = _solve(net)
+    assert r["__success__"], r["__message__"]
+    assert r["__reference_swap_solves__"] == 1
+
+
+def test_opting_out_keeps_the_refusal_and_its_message() -> None:
+    """auto_reference=False: o3 as given, the root refused, the message
+    naming the outlet that should be the reference."""
+    _, r = _solve(_network("mass", reference="o3", auto_reference=False)[0])
     assert not r["__success__"]
     assert "make 'o1' the reference" in r["__message__"]
+    assert "__reference_swaps__" not in r
     d = r["__element_diag__"]
     assert d["sp__o1"]["valve_needs_pump"] == 1.0
     assert d["sp__o1"]["valve_dPt"] < 0.0
+
+
+def test_no_feasible_reference_is_refused_with_the_swaps_tried() -> None:
+    """One outlet ends above the supply's pressure: with it as the reference
+    the supply runs backwards and the other valve pumps; with the other, it
+    pumps. The first refusal is returned, its reference restored, the swap
+    tried listed, and the outlet to make the reference still named."""
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("res", Pt=1.5e5, Tt=300.0, Y=AIR))
+    net.add_node(PlenumNode("in"))
+    net.add_element(OrificeElement("feed", "res", "in", diameter=0.02, Cd=0.8, correlation="fixed"))
+    net.add_node(PressureBoundary("hi", Pt=2.0e5, Tt=300.0, Y=AIR))
+    net.add_node(PressureBoundary("lo", Pt=1.0e5, Tt=300.0, Y=AIR))
+    FlowSplitter("sp", "in", {"hi": 0.5, "lo": None}).add_to(net)
+    _, r = _solve(net)
+    assert not r["__success__"]
+    assert "found no feasible reference (tried 'sp': lo -> hi)" in r["__message__"]
+    assert "make 'hi' the reference" in r["__message__"]
+    assert r["__reference_swaps__"]["sp"]["reference"] == "lo"
+    assert r["__reference_swap_solves__"] >= 2
+    assert net.elements["sp__lo"].reference and not net.elements["sp__hi"].reference
 
 
 # --- the network round trip --------------------------------------------------
@@ -446,6 +508,16 @@ def test_the_c3x_coolant_through_one_splitter_gives_the_per_hole_flows() -> None
     worst = max(flows, key=lambda c: a[f"{c}_in.Pt"])
     _, b = _solve(_c3x_coolant(mod, worst)[0])
     assert b["__success__"], b["__message__"]
+    assert b["__reference_swap_solves__"] == 1
+    # Started from the least demanding path instead, the solve finds the same
+    # reference in one swap, and the same root.
+    easiest = min(flows, key=lambda c: a[f"{c}_in.Pt"])
+    _, w = _solve(_c3x_coolant(mod, easiest)[0])
+    assert w["__success__"], w["__message__"]
+    assert w["__reference_swaps__"]["split"]["reference"] == f"{worst}_in"
+    assert w["__reference_swap_solves__"] == 2
+    for c in flows:
+        assert w[f"{c}_in.Pt"] == pytest.approx(b[f"{c}_in.Pt"], rel=1e-8), c
     assert len(flows) == 19
     for c, m in flows.items():
         assert a[f"{c}.m_dot"] == pytest.approx(m, rel=1e-12), c
@@ -524,3 +596,34 @@ def test_a_many_inlet_collector_closes_a_hand_energy_and_species_balance(collect
     led = r["__ledger__"]
     assert abs(led["energy_closure_rel"]) < 1e-10
     assert abs(led["mass_closure_rel"]) < 1e-12
+
+
+def test_a_stalled_first_solve_also_moves_the_reference() -> None:
+    """A wrong reference can stall the cold start before it reaches the
+    refused root (stress splitter seed 9, incompressible, fixed supply flow,
+    started from the least demanding path). The best iterate already shows
+    the metered outlets flowing against their drop; the reference moves as
+    at a root, and the second solve succeeds."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "stress"))
+    from networks import FAMILIES
+
+    net, _ = FAMILIES["splitter"](9)
+    outs = [e for e in net.elements.values() if isinstance(e, SplitterOutletElement)]
+    need = {
+        e.id: net.get_downstream_elements(e.to_node)[0]._seed_resistance(1.2, 1e5, 0.1)
+        * e.fraction**2
+        for e in outs
+    }
+    easiest = min(need, key=lambda k: need[k])
+    for e in outs:
+        e.reference = e.id == easiest
+    s = NetworkSolver(net)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        s._in_reference_swap = True  # the plain solve, no swap: it stalls
+        stalled = s.solve()
+        s._in_reference_swap = False
+        r = s.solve()
+    assert not stalled["__converged__"]
+    assert r["__success__"], r["__message__"]
+    assert r["__reference_swaps__"]["sp"]["swapped_from"] == [net.elements[easiest].to_node]

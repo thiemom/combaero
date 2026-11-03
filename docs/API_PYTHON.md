@@ -1656,13 +1656,28 @@ turb = TurbineElement("turb", "burner", "turbine_exit", pressure_ratio=4.0, eta_
 # reported as the valve the rig would need; the REFERENCE outlet Pt_out = Pt_in,
 # its valve open (only N - 1 fractions are independent: with a valve on every
 # outlet the total flow, or the inlet pressure at a fixed supply, would have
-# no equation). Make the reference the path needing the most pressure: a
-# metered outlet needing more would need a pump, the second-law check refuses
-# that root and the message names the outlet to make the reference. Each
-# outlet carries the inlet's Tt and Y; Pt follows its own path. One outlet may
-# be the remainder (None, 1 - the others; the default reference); fractions
-# must lie in (0, 1) and sum to 1 within SPLITTER_FRACTION_SUM_TOL (1e-9),
-# never renormalised. Without a remainder, reference= is required.
+# no equation). The reference must be the path needing the most pressure (a
+# metered outlet needing more would need a pump, a root the second-law check
+# refuses), and the SOLVE FINDS IT (auto_reference=True, default): it starts
+# from reference=, else the remainder, else first_guess (the largest seed
+# resistance K f^2 among the paths); after a root refused for pumps at
+# metered outlets (or a stalled iterate showing them) it moves the reference
+# to the outlet whose node needs the most Pt there and solves again from that
+# root, inlet raised to the new reference's Pt. An outer loop, never a switch
+# inside Newton; at most N - 1 swaps per splitter, never back to one tried.
+# At a fixed supply flow one swap is exact. Reported: __reference_swaps__ =
+# {splitter: {"reference", "start", "swapped_from": [...]}},
+# __reference_swap_solves__, __reference_swap_time__ [s], each outlet's
+# diagnostics "reference_swaps", and a sentence in __message__. The swap stays
+# on the network (the elements' reference flags). With no feasible reference
+# the first refusal is returned (flags restored, the swaps tried listed, the
+# outlet to make the reference named); auto_reference=False keeps the given
+# reference and the refusal. Cost (stress splitter family, seeds 0-99, started
+# from the LEAST demanding path): 98/100 solve, 1 swap each, 2 solves, wall
+# time x3.4 (median) against a right start. Each outlet carries the inlet's Tt
+# and Y; Pt follows its own path. One outlet may be the remainder (None, 1 -
+# the others); fractions must lie in (0, 1) and sum to 1 within
+# SPLITTER_FRACTION_SUM_TOL (1e-9), never renormalised.
 # Diagnostics per outlet: fraction, fraction_achieved, m_dot_splitter (the
 # throughput), is_reference, valve_dPt [Pa], valve_needs_pump (dPt below
 # -SIGMA_TOL Pt_in), and through a positive drop valve_CdA [m^2] (an
@@ -1673,12 +1688,14 @@ from combaero.network import FlowSplitter
 split = FlowSplitter(
     "split", inlet="coolant_supply",
     outlets={"hole1": 0.2, "hole2": 0.3, "hole3": None},   # hole3: the remainder
-    reference="hole1",                    # default: the remainder
+    reference="hole1",                    # the start; default: the remainder
+    auto_reference=True,                  # move it if infeasible (default)
     areas={"hole2": 2e-4, "hole3": 2e-4},  # optional, for valve_Cd / valve_zeta
 )
 split.add_to(net)                          # the nodes must be in net already
-# split.summarize(result["__element_diag__"]) -> {"m_dot", "reference",
-# "needs_pump", "outlets": {node: {m_dot, fraction, valve_dPt, valve_CdA, ...}}}
+# split.summarize(result["__element_diag__"]) -> {"m_dot", "reference" (in
+# use), "reference_start", "needs_pump", "outlets": {node: {m_dot, fraction,
+# valve_dPt, valve_CdA, ...}}}
 
 # Three-port tee junction (Unified0D compressible model, Mynard & Valen-Sendstad 2015)
 import math

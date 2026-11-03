@@ -4341,6 +4341,30 @@ class NetworkSolver:
         retries and nested solves included: each cold rung then runs to its
         own share of the budget (#864).
         """
+        if not getattr(self, "_in_reference_swap", False):
+            # Flow splitters whose reference the solve finds (#903): an outer
+            # loop around this whole solve, see solve_with_reference_swaps.
+            from .flow_splitter import auto_reference_groups, solve_with_reference_swaps
+
+            if auto_reference_groups(self.network):
+                self._in_reference_swap = True
+                try:
+                    return solve_with_reference_swaps(
+                        self,
+                        {
+                            "method": method,
+                            "timeout": timeout,
+                            "options": options,
+                            "use_jac": use_jac,
+                            "x0": x0,
+                            "init_strategy": init_strategy,
+                            "lambda_steps": lambda_steps,
+                            "auto_retry": auto_retry,
+                            "stall_handover": stall_handover,
+                        },
+                    )
+                finally:
+                    self._in_reference_swap = False
         if not stall_handover and self._stall_handover:
             self._stall_handover = False
             try:

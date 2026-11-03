@@ -7,11 +7,11 @@ import {
 } from "reactflow";
 import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import {
+	referenceInUse,
 	resolvedFractions,
 	SPLITTER_WIDTH,
 	splitterFractions,
 	splitterHeight,
-	splitterReference,
 } from "../../utils/splitter";
 import NodeIcon from "../NodeIcon";
 
@@ -21,7 +21,8 @@ const OUTLET = "#22c55e";
  * A flow splitter (#903): one inlet (left) to N outlets (right), each at a
  * given fraction of the throughput, a mass-flow controller per outlet. The
  * card grows with its outlets; each outlet's fraction is drawn at its
- * handle, the remainder as "rest", the reference (valve open) with "open".
+ * handle, the remainder as "rest", the open valve (the reference in use)
+ * with "open", in amber when the solve moved it there.
  * After a solve each metered outlet shows the drop its valve takes. No
  * surface: no thermal handles.
  */
@@ -32,8 +33,10 @@ const FlowSplitterNode = ({ id, data, selected }: NodeProps) => {
 	const fractions = splitterFractions(data);
 	const n = fractions.length;
 	const shown = resolvedFractions(fractions);
-	const ref = splitterReference(data);
+	const ref = referenceInUse(data);
 	const dPt: (number | null)[] | undefined = data.result?.rows_valve_dPt;
+	// The solve moved the open valve here (amber; the Inspector says from where).
+	const moved = data.result?.reference_swapped === 1;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: rotation and the outlet count move the handles
 	useEffect(() => {
@@ -43,7 +46,7 @@ const FlowSplitterNode = ({ id, data, selected }: NodeProps) => {
 	const top = (i: number) => `calc(${(100 * (i + 0.5)) / n}% - 6px)`;
 	return (
 		<div
-			className={`shadow-sm rounded bg-stone-50 border-2 flex items-center gap-2 pl-3 pr-12 py-1 ${
+			className={`shadow-sm rounded bg-stone-50 border-2 flex items-center gap-1.5 pl-2 pr-14 py-1 ${
 				selected
 					? "border-blue-500 shadow-blue-100"
 					: data.result
@@ -69,7 +72,7 @@ const FlowSplitterNode = ({ id, data, selected }: NodeProps) => {
 				</div>
 				<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap truncate max-w-full">
 					{typeof data.result?.m_dot === "number"
-						? `${Number(data.result.m_dot).toPrecision(4)} kg/s`
+						? `${Number(data.result.m_dot).toPrecision(3)} kg/s`
 						: `${n} outlets`}
 				</div>
 			</div>
@@ -90,16 +93,19 @@ const FlowSplitterNode = ({ id, data, selected }: NodeProps) => {
 							top: `calc(${(100 * (i + 0.5)) / n}% - 8px)`,
 							transform: `rotate(${textRotation}deg)`,
 						}}
-						title={
-							i === ref
-								? "The reference outlet: its valve is open (Pt out = Pt in)"
-								: "The drop this outlet's valve takes"
-						}
 					>
 						<div style={{ color: OUTLET }} className="font-bold">
 							{f == null ? "rest" : `${(100 * shown[i]).toPrecision(3)}%`}
 						</div>
-						<div className="text-gray-500">{text}</div>
+						<div
+							className={
+								i === ref && moved
+									? "text-amber-600 font-bold"
+									: "text-gray-500"
+							}
+						>
+							{text}
+						</div>
 					</div>
 				);
 			})}

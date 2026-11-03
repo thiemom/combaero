@@ -299,6 +299,7 @@ def _splitters(
         data: dict[str, Any] = {
             "fractions": [float(m.fraction) for m in members],
             "reference": refs[0] if len(refs) == 1 else None,
+            "auto_reference": bool(el.auto_reference),
         }
         if any(a is not None for a in areas):
             data["areas"] = areas

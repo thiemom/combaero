@@ -7646,10 +7646,12 @@ class SplitterOutletElement(NetworkElement):
       Of N fractions summing to 1 only N - 1 are independent; with a valve on
       every outlet the total flow (or, fed at a fixed flow, the inlet
       pressure) would have no equation. The reference's own fraction follows
-      from the others. It should be the most resistive path: a metered outlet
+      from the others. It must be the most resistive path: a metered outlet
       that needs MORE total pressure than the reference delivers needs a pump
-      (``valve_dPt < 0``), and the second-law check refuses that root; the
-      refusal names the outlet to make the reference instead.
+      (``valve_dPt < 0``), and the second-law check refuses that root. With
+      ``auto_reference`` the solve then moves the reference
+      (``flow_splitter.solve_with_reference_swaps``); without, or when no
+      reference works, the refusal names the outlet to make the reference.
 
     Each outlet carries the inlet's Tt and composition (a two-port moves its
     upstream state); Pt follows each outlet's own path.
@@ -7664,6 +7666,10 @@ class SplitterOutletElement(NetworkElement):
         area: Valve reference area [m^2] for ``valve_Cd`` and ``valve_zeta``;
             None reports the effective area ``valve_CdA`` only.
         splitter: The splitter's id, for messages and reports.
+        auto_reference: Let ``NetworkSolver.solve`` move the reference to the
+            outlet that needs the most pressure when a solve is refused for a
+            pump at a metered outlet (``flow_splitter.solve_with_reference_swaps``).
+            The same for every outlet of one splitter.
     """
 
     def __init__(
@@ -7676,8 +7682,10 @@ class SplitterOutletElement(NetworkElement):
         reference: bool = False,
         area: float | None = None,
         splitter: str | None = None,
+        auto_reference: bool = True,
     ):
         super().__init__(id, from_node, to_node)
+        self.auto_reference = bool(auto_reference)
         self.fraction = float(fraction)
         self.outlets = list(outlets)
         self.reference = bool(reference)
@@ -7738,10 +7746,14 @@ class SplitterOutletElement(NetworkElement):
                     f"{where}: outlet element '{eid}' is not in the network as a "
                     "SplitterOutletElement."
                 )
-            if e.from_node != self.from_node or e.outlets != self.outlets:
+            if (
+                e.from_node != self.from_node
+                or e.outlets != self.outlets
+                or e.auto_reference != self.auto_reference
+            ):
                 raise ValueError(
-                    f"{where}: outlet '{eid}' does not share the inlet '{self.from_node}' "
-                    "and the outlet list of the others."
+                    f"{where}: outlet '{eid}' does not share the inlet '{self.from_node}', "
+                    "the outlet list and the auto_reference setting of the others."
                 )
             members.append(e)
         refs = [e.id for e in members if e.reference]

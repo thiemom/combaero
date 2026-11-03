@@ -60,7 +60,7 @@ def test_the_result_is_one_node_with_rows_per_outlet() -> None:
     res = _solve(_graph(fractions=[0.3, None], areas=[1e-4, None]))
     assert res.success, res.message
     r = res._element_results["x"].model_dump()
-    assert r["n_outlets"] == 2.0 and r["reference_outlet"] == 1.0
+    assert r["n_outlets"] == 2.0 and r["reference_outlet"] == 2.0  # 1-based
     assert r["rows_fraction"] == [pytest.approx(0.3), pytest.approx(0.7)]
     assert r["rows_fraction_achieved"] == [
         pytest.approx(0.3, abs=1e-12),
@@ -76,19 +76,28 @@ def test_the_result_is_one_node_with_rows_per_outlet() -> None:
     assert r["n_needs_pump"] == 0.0
 
 
-def test_a_reference_chosen_away_from_the_remainder() -> None:
-    """The explicit reference wins; a wrong one (the wide path) is refused,
-    naming the outlet the GUI draws, not the inserted node."""
+def test_a_wrong_reference_is_moved_and_shown() -> None:
+    """Outlet 1 (the wide path) given as the reference: the solve moves it
+    to outlet 2, and the node reports both and says so in plain words."""
     res = _solve(_graph(fractions=[0.5, None], reference=0))
-    assert not res.success
+    assert res.success, res.message
+    r = res._element_results["x"].model_dump()
+    assert (r["reference_start"], r["reference_outlet"], r["reference_swapped"]) == (1, 2, 1)
+    assert r["n_needs_pump"] == 0.0
     text = humanize(res.message, NetworkGraphSchema(**_graph()))
     assert "outlet 2" in text and "__tee_jct__" not in text
+
+
+def test_opting_out_refuses_and_names_the_outlet() -> None:
+    res = _solve(_graph(fractions=[0.5, None], reference=0, auto_reference=False))
+    assert not res.success
+    text = humanize(res.message, NetworkGraphSchema(**_graph()))
+    assert "make " in text and "outlet 2" in text and "__tee_jct__" not in text
 
 
 @pytest.mark.parametrize(
     ("data", "match"),
     [
-        ({"fractions": [0.5, 0.4]}, "choose the reference"),
         ({"fractions": [0.5, 0.4], "reference": 0}, "not renormalised"),
         ({"fractions": [None, None]}, "at most one remainder"),
         ({"fractions": [0.5]}, "at least 2"),
