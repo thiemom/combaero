@@ -2886,6 +2886,10 @@ class NetworkSolver:
                 self._relay_film(
                     out, _wall, ch_a, dTt_mix_dQ * sign * wall_result.dQ_dT_aw_a, relay, up
                 )
+                # and the film's own h on that side (#962)
+                self._relay_film_h(
+                    out, _wall, ch_a, dTt_mix_dQ * sign * wall_result.dQ_dh_a, relay, up
+                )
                 # A reference temperature on neighbours' flows and T (#467)
                 self._relay_reference_inputs(
                     out, obj_a, ch_a, dTt_mix_dQ * sign * wall_result.dQ_dT_aw_a, relay, up
@@ -2967,6 +2971,10 @@ class NetworkSolver:
                 self._relay_flow_inputs(out, obj_b, ch_b, dTt_mix_dQ * sign * wall_result.dQ_dh_b)
                 self._relay_film(
                     out, _wall, ch_b, dTt_mix_dQ * sign * wall_result.dQ_dT_aw_b, relay, up
+                )
+                # and the film's own h on that side (#962)
+                self._relay_film_h(
+                    out, _wall, ch_b, dTt_mix_dQ * sign * wall_result.dQ_dh_b, relay, up
                 )
                 # A reference temperature on neighbours' flows and T (#467)
                 self._relay_reference_inputs(
@@ -3626,6 +3634,27 @@ class NetworkSolver:
             for idx, sens_up in up(f"{FILM_INF_PREFIX}{provider.id}").items():
                 nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
                 nr["T"] += factor * d_inf * sens_up["T"]
+
+    def _relay_film_h(
+        self, out: dict, wall: Any, ch: Any, factor: float, relay: dict, up: Any
+    ) -> None:
+        """Relay a filmed side's film-side h (#962) onto each source's flow
+        and its supply node's temperature, as _relay_film does its T_aw.
+        ``factor`` is dT_node/dh of that side."""
+        d_ms = getattr(ch, "dh_dfilm_mdot", None)
+        if d_ms is None or factor == 0.0:
+            return
+        provider = self.network.film_provider(wall.film)
+        n_species = self._n_species
+        for src, d_m, d_T in zip(film_sources(provider), d_ms, ch.dh_dT_coolant, strict=True):
+            ind = self._unknown_indices.get(src.element_id, [])
+            if ind and d_m != 0.0:
+                nr = out.setdefault(ind[0], {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+                nr["T"] += factor * d_m
+            if src.supply_node in relay and d_T != 0.0:
+                for idx, sens_up in up(src.supply_node).items():
+                    nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+                    nr["T"] += factor * d_T * sens_up["T"]
 
     def _relay_reference_inputs(
         self, out: dict, obj: Any, ch: Any, factor: float, relay: dict, up: Any

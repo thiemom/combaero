@@ -195,6 +195,23 @@ try:
         liner_casing_exchange_factor,
         mean_beam_length,
         elemental_fuel_air_ratio,
+        SEBAN1960_C_NEAR,
+        SEBAN1960_C_NEAR_PRINTED,
+        SEBAN1960_C_FAR,
+        SEBAN1960_C_FAR_PRINTED,
+        SLOT_FILM_HTC_HANDBACK_BAND,
+        SLOT_FILM_BRANCH_NEAR,
+        SLOT_FILM_BRANCH_BLEND,
+        SLOT_FILM_BRANCH_FAR,
+        SLOT_FILM_BRANCH_WALL_JET,
+        SLOT_FILM_BRANCH_NONE,
+        SlotFilmStanton,
+        SlotFilmNusselt,
+        SlotFilmHtc,
+        slot_film_stanton_seban_1960,
+        slot_film_nusselt_ballal_lefebvre_1973,
+        slot_film_htc_seban_1960,
+        slot_film_htc_ballal_lefebvre_1973,
         MIXER_HEAT_MDOT_FLOOR,
         mixer_heat_per_unit_flow,
         SENSIBLE_ENTHALPY_REF_T,
@@ -296,6 +313,8 @@ try:
         bilger_Z_from_equivalence_ratio_mass,
         bulk_T_from_edge_T_and_q,
         calc_T_from_cp,
+        calc_T_from_cp_roots,
+        CpRoot,
         calc_T_from_h,
         calc_T_from_h_mass,
         calc_T_from_s,
@@ -713,6 +732,8 @@ except (ModuleNotFoundError, ImportError) as e:
     calc_T_from_s = _core.calc_T_from_s
     calc_T_from_s_mass = _core.calc_T_from_s_mass
     calc_T_from_cp = _core.calc_T_from_cp
+    calc_T_from_cp_roots = _core.calc_T_from_cp_roots
+    CpRoot = _core.CpRoot
     calc_T_from_u = _core.calc_T_from_u
     calc_T_from_u_mass = _core.calc_T_from_u_mass
     calc_T_from_sv_mass = _core.calc_T_from_sv_mass
@@ -855,6 +876,23 @@ except (ModuleNotFoundError, ImportError) as e:
     liner_casing_exchange_factor = _core.liner_casing_exchange_factor
     mean_beam_length = _core.mean_beam_length
     elemental_fuel_air_ratio = _core.elemental_fuel_air_ratio
+    SEBAN1960_C_NEAR = _core.SEBAN1960_C_NEAR
+    SEBAN1960_C_NEAR_PRINTED = _core.SEBAN1960_C_NEAR_PRINTED
+    SEBAN1960_C_FAR = _core.SEBAN1960_C_FAR
+    SEBAN1960_C_FAR_PRINTED = _core.SEBAN1960_C_FAR_PRINTED
+    SLOT_FILM_HTC_HANDBACK_BAND = _core.SLOT_FILM_HTC_HANDBACK_BAND
+    SLOT_FILM_BRANCH_NEAR = _core.SLOT_FILM_BRANCH_NEAR
+    SLOT_FILM_BRANCH_BLEND = _core.SLOT_FILM_BRANCH_BLEND
+    SLOT_FILM_BRANCH_FAR = _core.SLOT_FILM_BRANCH_FAR
+    SLOT_FILM_BRANCH_WALL_JET = _core.SLOT_FILM_BRANCH_WALL_JET
+    SLOT_FILM_BRANCH_NONE = _core.SLOT_FILM_BRANCH_NONE
+    SlotFilmStanton = _core.SlotFilmStanton
+    SlotFilmNusselt = _core.SlotFilmNusselt
+    SlotFilmHtc = _core.SlotFilmHtc
+    slot_film_stanton_seban_1960 = _core.slot_film_stanton_seban_1960
+    slot_film_nusselt_ballal_lefebvre_1973 = _core.slot_film_nusselt_ballal_lefebvre_1973
+    slot_film_htc_seban_1960 = _core.slot_film_htc_seban_1960
+    slot_film_htc_ballal_lefebvre_1973 = _core.slot_film_htc_ballal_lefebvre_1973
 
     ntu = _core.ntu
     capacity_ratio = _core.capacity_ratio
@@ -1295,6 +1333,23 @@ __all__ = [
     "liner_casing_exchange_factor",
     "mean_beam_length",
     "elemental_fuel_air_ratio",
+    "SEBAN1960_C_NEAR",
+    "SEBAN1960_C_NEAR_PRINTED",
+    "SEBAN1960_C_FAR",
+    "SEBAN1960_C_FAR_PRINTED",
+    "SLOT_FILM_HTC_HANDBACK_BAND",
+    "SLOT_FILM_BRANCH_NEAR",
+    "SLOT_FILM_BRANCH_BLEND",
+    "SLOT_FILM_BRANCH_FAR",
+    "SLOT_FILM_BRANCH_WALL_JET",
+    "SLOT_FILM_BRANCH_NONE",
+    "SlotFilmStanton",
+    "SlotFilmNusselt",
+    "SlotFilmHtc",
+    "slot_film_stanton_seban_1960",
+    "slot_film_nusselt_ballal_lefebvre_1973",
+    "slot_film_htc_seban_1960",
+    "slot_film_htc_ballal_lefebvre_1973",
     "MIXER_HEAT_MDOT_FLOOR",
     "mixer_heat_per_unit_flow",
     "SENSIBLE_ENTHALPY_REF_T",
@@ -1377,6 +1432,8 @@ __all__ = [
     "calc_T_from_s",
     "calc_T_from_s_mass",
     "calc_T_from_cp",
+    "calc_T_from_cp_roots",
+    "CpRoot",
     "calc_T_from_u",
     "calc_T_from_u_mass",
     "calc_T_from_sv_mass",

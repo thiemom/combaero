@@ -130,6 +130,8 @@ double isentropic_expansion_coefficient(double T, const std::vector<double>& X);
 double calc_T_from_h(double h_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_s(double s_target, double P, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_cp(double cp_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
+struct CpRoot { double T; double dT_dcp; bool double_root; };
+std::vector<CpRoot> calc_T_from_cp_roots(double cp_target, const std::vector<double>& X, double T_min = thermo::CP_INVERSE_T_MIN, double T_max = thermo::CP_INVERSE_T_MAX, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_u(double u_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_h_mass(double h_mass_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_s_mass(double s_mass_target, double P, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
@@ -156,6 +158,25 @@ grows as 1/T^3: at 1 K, CO's T is fixed to ~5e-7 relative, at 0.1 K only to
 ~5e-4 (see the constants' comment in `thermo.h`). No root in the range, or no
 convergence in `max_iter`, throws `std::runtime_error`; a non-finite or
 non-positive `cp_target`, `T_guess` or `tol` throws `std::invalid_argument`.
+
+`calc_T_from_cp_roots` is the opt-in alternative: every root in
+[`T_min`, `T_max`] (within [1, 6000] K), sorted, empty when there is none
+(#963). It needs no guess, so it also finds the pairs closer than a scan step
+that `calc_T_from_cp` misses (O2's cp(127 K), again at 120.8 K). dcp/dT is
+evaluated on the same scan nodes (from `T_min` up); each sign change is
+bisected to the last bit, a cp extremum, and where |dcp/dT| has a local
+minimum on the nodes without a sign change, a golden-section search
+(`thermo::CP_ROOTS_DIP_ITER` steps) looks for an extremum pair inside one step.
+Between neighbouring nodes and extrema cp is then monotone, and each sign
+change of cp - target is one root, polished as in `calc_T_from_cp`. Each
+`CpRoot` carries `dT_dcp` = 1 / (dcp/dT) at the root. An extremum whose cp is
+within `thermo::CP_ROOTS_DOUBLE_REL` = 1e-13 of the target is returned once
+as a double root (`double_root`, `dT_dcp` NaN). Not covered: three or more
+extrema within two steps. A non-finite or non-positive `cp_target` or `tol`,
+or a range outside [1, 6000] K or with `T_min >= T_max`, throws
+`std::invalid_argument`; cp equal to the target at consecutive scan points
+(argon's exactly constant cp up to ~950 K: the roots are not isolated) throws
+`std::domain_error`; no convergence in `max_iter` throws `std::runtime_error`.
 
 ### Species Thermo Beyond the Data (#606)
 Every species' NASA-9 data starts at 200 K and ends at 20 000 K (N2, O2, AR,
@@ -1396,6 +1417,40 @@ std::array<double, 4> wall_resistance_fixed_point_derivatives(
 // material_conductivity (data, #882 envelope fade, linear continuation).
 ConductivityAndSlope material_conductivity_and_slope(
     const std::string& name, double T, bool extrapolate);  // {k, dk_dT}
+```
+
+### Slot Film-Side h (`slot_film_htc.h`, #962)
+
+The heat transfer coefficient under a 2-D slot film, on the adiabatic-wall
+temperature. Default: Seban (1960) Fig. 12 as DRAWN, `St_s = 0.135 Re_s^-0.3
+(x/s)^-0.3` (curve B; Eq. 13 prints 0.10) and `0.40 Re_s^-0.3 (x/s)^-0.6`
+(curve C; printed 0.41), C1-blended over +-0.1 decade at their x/s-37
+crossing. Named option: Ballal & Lefebvre (1973) Eq. 6 = Lefebvre & Ballal
+Eq. 8.44, `Nu_x = 0.10 Re_s^0.8 (x/s)^0.44`. The constants live in
+`namespace seban1960` / `namespace ballal_lefebvre1973`, the validity box
+included. The header comment gives the derivation and the misprint
+evidence.
+
+```cpp
+#include "slot_film_htc.h"
+
+// Span means over [x_start, x_end] / s, the in-box part (x/s <= 300 / 50)
+SlotFilmStanton slot_film_stanton_seban_1960(double x_start_over_s,
+    double x_end_over_s, double Re_s, double C_near = seban1960::C_near,
+    double C_far = seban1960::C_far);   // St, dSt_dRe, fraction_in_box, branch, flags
+SlotFilmNusselt slot_film_nusselt_ballal_lefebvre_1973(double x_start_over_s,
+    double x_end_over_s, double Re_s);  // Nu_s = h s / k_s, dNu_dRe, ...
+
+// A wall side's h: h_duct + w(M) f_x (h_film - h_duct), slot-fluid properties
+// at (T_s, P_s, X_s), G_s = m_s / A_slot, M = G_s / G_gas. Hands back to the
+// duct below M_handback (1.0 / 1.3, C1 over SLOT_FILM_HTC_HANDBACK_BAND = 0.1)
+// and past x/s max.
+SlotFilmHtc slot_film_htc_seban_1960(double x_start, double x_end, double s,
+    double G_s, double M, double h_duct, double T_s, double P_s,
+    const std::vector<double>& X_s);
+SlotFilmHtc slot_film_htc_ballal_lefebvre_1973(/* same */);
+// SlotFilmHtc: h, dh_dG_s, dh_dT_s, dh_dM, dh_dh_duct (analytic), h_film,
+// Re_s, fraction_in_box, weight_M, branch, x_in_box, Re_in_box, M_in_box
 ```
 
 ### Liner Radiation (`liner_radiation.h`, #793)

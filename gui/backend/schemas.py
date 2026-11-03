@@ -485,6 +485,9 @@ class SlotFilmData(BaseModel):
         "IdelchikThick"
     )
     Cd: float = Field(default=0.6, gt=0.0, le=1.0)
+    # Film-side h on the wall the film covers (#962): "none" keeps the duct's
+    # own h; "seban1960" (recommended) or the book's wall jet.
+    film_htc: Literal["none", "seban1960", "ballal_lefebvre1973"] = "none"
     label: str | None = None
 
 
