@@ -105,6 +105,12 @@ class FlowNetwork:
                     f"Wall '{wall.id}': the film covers the GAS side downstream of "
                     f"the holes; {side!r} is the provider or its coolant supply (#386)."
                 )
+            if getattr(provider, "film_htc", "none") != "none" and not float(wall.film_end) > 0.0:
+                raise ValueError(
+                    f"Wall '{wall.id}': film {wall.film!r} carries a film-side h "
+                    f"({provider.film_htc!r}), which is infinite at the slot lip; "
+                    "give the wall a span (film_end > 0) (#962)."
+                )
 
         self.walls[wall.id] = wall
 
