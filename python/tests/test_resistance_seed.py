@@ -19,6 +19,7 @@ import pytest
 
 import combaero as cb
 from combaero.network import (
+    ChannelElement,
     FlowNetwork,
     IdealMomentumTeeElement,
     MassFlowBoundary,
@@ -28,17 +29,21 @@ from combaero.network import (
     PlenumNode,
     PressureBoundary,
 )
+from combaero.network import solver as solver_module
+from combaero.network.components import SEED_FRICTION_FACTOR
 
 Y_AIR = list(cb.mole_to_mass(cb.species.dry_air()))
 
 
-def _two_orifices() -> FlowNetwork:
+def _two_orifices(regime: str = "incompressible") -> FlowNetwork:
     g = FlowNetwork()
     g.add_node(PressureBoundary("a", Pt=2.0e5, Tt=300.0, Y=Y_AIR))
     g.add_node(PlenumNode("p"))
     g.add_node(PressureBoundary("b", Pt=1.0e5, Tt=300.0, Y=Y_AIR))
-    g.add_element(OrificeElement("o1", "a", "p", Cd=0.7, diameter=0.01, correlation="fixed"))
-    g.add_element(OrificeElement("o2", "p", "b", Cd=0.6, diameter=0.02, correlation="fixed"))
+    for eid, a, b, Cd, d in (("o1", "a", "p", 0.7, 0.01), ("o2", "p", "b", 0.6, 0.02)):
+        g.add_element(
+            OrificeElement(eid, a, b, Cd=Cd, diameter=d, correlation="fixed", regime=regime)
+        )
     return g
 
 
@@ -104,6 +109,89 @@ def test_an_element_without_a_seed_keeps_the_propagated_start() -> None:
     x_on = s._build_x0()
     s.resistance_seed = False
     assert np.array_equal(x_on, s._build_x0())
+
+
+def test_a_compressible_element_takes_its_kernels_flow(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The same orifices compressible: o1 chokes on the 2:1 drop. The seed
+    re-fits each element past the flux gate to the flow its own kernel passes
+    (#971) and lands within 1% of the solved root; the incompressible K alone
+    starts 21% high. Falsified by switching the re-fit off."""
+    root = NetworkSolver(_two_orifices("compressible")).solve()
+    assert root["__success__"]
+
+    def seed() -> float:
+        g = _two_orifices("compressible")
+        g.resolve_all_topology()
+        s = NetworkSolver(g)
+        return s._resistance_network_guess(s._infer_reference_state())[1]["o1"]
+
+    assert seed() == pytest.approx(root["o1.m_dot"], rel=1e-2)
+    monkeypatch.setattr(solver_module, "SEED_COMPRESSIBLE_PASSES", 0)
+    assert seed() > 1.1 * root["o1.m_dot"]
+
+
+def _duct_chain(n: int) -> FlowNetwork:
+    """The D-7156 hot side (#971), adiabatic and in air: 1.62 kg/s at 589 K
+    through a 6 cm lead duct, n 1.22 cm segments between plenums and a 1 cm
+    tail into 1 atm."""
+    area, dh = 0.037, 0.119
+    D = math.sqrt(4.0 * area / math.pi)
+    g = FlowNetwork()
+    g.add_node(MassFlowBoundary("in", m_dot=1.62, Tt=589.0, Y=Y_AIR))
+    g.add_node(PressureBoundary("out", Pt=101325.0, Tt=589.0, Y=Y_AIR))
+    for i in range(n + 1):
+        g.add_node(PlenumNode(f"g{i}"))
+
+    def duct(eid: str, a: str, b: str, length: float) -> ChannelElement:
+        return ChannelElement(eid, a, b, length=length, diameter=D, Dh=dh, roughness=0.0)
+
+    g.add_element(duct("lead", "in", "g0", 0.06))
+    for i in range(1, n + 1):
+        g.add_element(duct(f"h{i}", f"g{i - 1}", f"g{i}", 0.0122))
+    g.add_element(duct("tail", f"g{n}", "out", 0.01))
+    return g
+
+
+def test_a_channel_charges_its_exit_head_only_where_its_residual_does() -> None:
+    """The exit head is lost only into a static-coupled pressure boundary
+    (#360): a segment between plenums is friction alone, the tail into the
+    outlet friction plus one head (#971)."""
+    g = _duct_chain(3)
+    g.resolve_all_topology()
+    rho = 0.6
+    for eid in ("h1", "h2", "h3", "tail"):
+        el = g.elements[eid]
+        head = 1.0 if eid == "tail" else 0.0
+        K = (SEED_FRICTION_FACTOR * el.length / el.Dh + head) / (2.0 * rho * el.area**2)
+        assert el._seed_resistance(rho, 101325.0, 1.0) == pytest.approx(K, rel=1e-12)
+
+
+def test_an_unresolved_channel_charges_its_exit_head() -> None:
+    """Before topology is resolved the exit is unknown and the head is
+    charged, as before #971: an estimate made while a network is built (the
+    stress splitter sizes its supply from it) keeps its value."""
+    g = _duct_chain(3)
+    el = g.elements["h1"]
+    rho = 0.6
+    K = (SEED_FRICTION_FACTOR * el.length / el.Dh + 1.0) / (2.0 * rho * el.area**2)
+    assert el._seed_resistance(rho, 101325.0, 1.0) == pytest.approx(K, rel=1e-12)
+
+
+def test_a_chain_of_short_ducts_converges_cold() -> None:
+    """Ten short segments between plenums (#971): with an exit head charged
+    on every segment the seed started the chain 14 kPa high against a 13 Pa
+    root, the cold solve stalled and the warm-start retry converged it. Now
+    the start sits within 5% of the root's drop to the outlet (1.2% measured)
+    and the cold attempt converges, without the retry."""
+    s = NetworkSolver(_duct_chain(10))
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        r = s.solve(timeout=20.0)
+    assert r["__success__"]
+    assert not [w for w in caught if "auto-retry" in str(w.message)]
+    x0 = s._build_x0()
+    i0 = s._name_to_index["g0.P"]
+    assert abs(x0[i0] - r["g0.P"]) < 0.05 * (r["g0.P"] - 101325.0)
 
 
 @pytest.mark.slow
