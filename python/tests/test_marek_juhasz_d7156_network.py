@@ -167,7 +167,7 @@ class TestFilmSideHtcComparison:
 
 def test_the_wall_k_is_immaterial() -> None:
     """0.159 cm of stainless: k from 13.8 to 22.5 W/m K moves one combined
-    run's wall by under 1 K, so the ss316 stand-in for 304 does not matter."""
+    run's wall by under 1 K, so the wall's k(T) barely matters."""
     run = mj.runs()[30]
     lo = mj.solve(run, mj.Options(wall_k=13.8)).T_wall
     hi = mj.solve(run, mj.Options(wall_k=22.5)).T_wall
