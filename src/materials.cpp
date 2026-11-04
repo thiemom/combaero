@@ -273,6 +273,30 @@ double k_stainless_steel_310(double T) {
     return kd_stainless_steel_310(T).k;
 }
 
+static ConductivityAndSlope kd_stainless_steel_304(double T) {
+    // Ho & Chu 1977, CINDAS Report 45 (DTIC ADA129160), Table 2, AISI 304:
+    // recommended values, uncertainty about +-5% (+-15% at and above melting),
+    // from twenty 304 and seven 304L data sets ("virtually the same"). The
+    // rows from 200 K to 1672 K, the lower end of the printed melting range
+    // (1672-1727 K); the liquid rows are not used. Cross-checks (PR record):
+    // NIST's cryogenic fit -2.0% to +2.8% at 200-300 K, the Cleveland-Cliffs
+    // 304/304L bulletin +0.2% at 100 C and -3.7% at 500 C.
+    validate_temperature("Stainless Steel 304", T, 200.0, 1672.0);
+    static constexpr std::array<double, 20> T_K = {200.0, 250.0, 273.0, 293.0, 300.0,
+                                                   350.0, 400.0, 500.0, 600.0, 700.0,
+                                                   800.0, 900.0, 1000.0, 1100.0, 1200.0,
+                                                   1300.0, 1400.0, 1500.0, 1600.0, 1672.0};
+    static constexpr std::array<double, 20> k = {12.89, 13.90, 14.39, 14.76, 14.89,
+                                                 15.79, 16.61, 18.28, 19.77, 21.21,
+                                                 22.59, 23.99, 25.33, 26.58, 27.81,
+                                                 29.18, 30.34, 31.55, 32.70, 33.53};
+    return table_kd(T_K, k, T);
+}
+
+double k_stainless_steel_304(double T) {
+    return kd_stainless_steel_304(T).k;
+}
+
 static ConductivityAndSlope kd_aluminum_6061(double T) {
     constexpr double T_min = 200.0;
     constexpr double T_max = 600.0;
@@ -470,6 +494,16 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "Austenitic 25Cr-20Ni heat-resisting stainless steel (cascade vanes, furnace parts)",
         (2470.0 - 32.0) / 1.8 + 273.15,
         "Rolled Alloys 310 data sheet, melting range 2470-2555 F",
+        false
+    }},
+    {"ss304", {
+        "ss304",
+        kd_stainless_steel_304,
+        200.0, 1672.0,
+        "Ho & Chu 1977, CINDAS Report 45 (DTIC ADA129160) Table 2, 200-1672 K",
+        "Austenitic 18-8 stainless steel (304 and 304L); recommended values, +-5%",
+        1672.0,
+        "CINDAS Report 45 Table 2, melting range 1672-1727 K (Cleveland-Cliffs 304/304L bulletin: 1399-1454 C)",
         false
     }},
     {"al6061", {

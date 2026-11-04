@@ -156,6 +156,13 @@ double k_stainless_steel_316(double T);
 // Valid: 533-1073 K (the measured range)
 double k_stainless_steel_310(double T);
 
+// Stainless Steel 304 (austenitic 18-8; 304L the same)
+// Source: Ho & Chu 1977, CINDAS Report 45 (DTIC ADA129160), Table 2: the
+// recommended values (uncertainty about +-5%) from twenty 304 and seven 304L
+// data sets, interpolated linearly. Solidus 1672 K, the table's melting range.
+// Valid: 200-1672 K (the table from 200 K to the solidus)
+double k_stainless_steel_304(double T);
+
 // Aluminum 6061-T6
 // Source: ASM Handbook, Aluminum Association
 // Valid: 200-600 K (limited by T6 temper stability)

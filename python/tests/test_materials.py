@@ -111,6 +111,58 @@ class TestStructuralAlloys:
         with pytest.raises(ValueError):
             cb.k_stainless_steel_310(800.0 + 273.15 + 1.0)
 
+    # Ho & Chu 1977, CINDAS Report 45 Table 2 (AISI 304), 200 K to the solidus.
+    SS304_TABLE = [
+        (200, 12.89), (250, 13.90), (273, 14.39), (293, 14.76), (300, 14.89),
+        (350, 15.79), (400, 16.61), (500, 18.28), (600, 19.77), (700, 21.21),
+        (800, 22.59), (900, 23.99), (1000, 25.33), (1100, 26.58), (1200, 27.81),
+        (1300, 29.18), (1400, 30.34), (1500, 31.55), (1600, 32.70), (1672, 33.53),
+    ]  # fmt: skip
+
+    def test_ss304_is_the_cindas_table(self):
+        """Exact at every printed point, linear between, refused outside."""
+        for T, k in self.SS304_TABLE:
+            assert cb.k_stainless_steel_304(float(T)) == pytest.approx(k, rel=1e-12), T
+            assert cb.get_material_conductivity("ss304", float(T)) == pytest.approx(k, rel=1e-12)
+        assert cb.k_stainless_steel_304(450.0) == pytest.approx(0.5 * (16.61 + 18.28), rel=1e-12)
+        k, dk_dT = cb.get_material_conductivity_and_slope("ss304", 450.0)
+        assert dk_dT == pytest.approx((18.28 - 16.61) / 100.0, rel=1e-12)
+        with pytest.raises(ValueError):
+            cb.k_stainless_steel_304(199.0)
+        with pytest.raises(ValueError):
+            cb.k_stainless_steel_304(1673.0)
+
+    def test_ss304_record_and_envelope(self):
+        """#882: the data run from the envelope's low end (200 K) to the
+        solidus, so the default lookup holds the end values beyond them; the
+        opt-in continuation follows the end slopes."""
+        info = cb.get_material_info("ss304")
+        assert info["T_min"] == pytest.approx(200.0)
+        assert info["T_max"] == pytest.approx(1672.0)
+        assert info["T_solidus"] == pytest.approx(1672.0)
+        assert "1672-1727 K" in info["solidus_source"]
+        assert "CINDAS" in info["source"]
+        assert info["T_envelope_min"] == pytest.approx(200.0)
+        assert info["T_envelope_max"] == pytest.approx(1672.0)
+        assert cb.material_in_range("ss304", 200.0)
+        assert cb.material_in_range("ss304", 1672.0)
+        assert not cb.material_in_range("ss304", 199.9)
+        assert not cb.material_in_range("ss304", 1672.1)
+        for T, k_end in ((150.0, 12.89), (1800.0, 33.53)):
+            k, dk_dT = cb.get_material_conductivity_and_slope("ss304", T)
+            assert k == pytest.approx(k_end, rel=1e-12) and dk_dT == 0.0, T
+        lo = (13.90 - 12.89) / 50.0
+        hi = (33.53 - 32.70) / 72.0
+        assert cb.get_material_conductivity("ss304", 150.0, extrapolate=True) == pytest.approx(
+            12.89 - 50.0 * lo, rel=1e-9
+        )
+        assert cb.get_material_conductivity("ss304", 1700.0, extrapolate=True) == pytest.approx(
+            33.53 + 28.0 * hi, rel=1e-9
+        )
+        assert cb.k_stainless_steel_304(1700.0, extrapolate=True) == pytest.approx(
+            33.53 + 28.0 * hi, rel=1e-9
+        )
+
     def test_aluminum_6061_is_deprecated_but_still_answers(self):
         """No cited source (#761): warns, removed in 0.9.0, unchanged until then."""
         with pytest.warns(DeprecationWarning, match="0.9.0"):
@@ -194,6 +246,7 @@ class TestMaterialDatabase:
     assert "haynes230" in materials
     assert "ss316" in materials
     assert "ss310" in materials
+    assert "ss304" in materials
     assert "al6061" in materials
     assert "ysz" in materials
 
@@ -590,6 +643,7 @@ class TestSolidus:
         "inconel718": 1260.0,
         "nimonic75": 1340.0,
         "ss310": (2470.0 - 32.0) / 1.8,
+        "ss304": 1672.0 - 273.15,
         "copper": 1083.0,
     }
     UNPRINTED = ("ss316", "x22crmov12_1", "nicocraly", "alumina", "ysz", "al6061")
@@ -610,9 +664,10 @@ class TestSolidus:
         assert set(self.SOURCED) | set(self.UNPRINTED) == set(cb.list_materials())
 
     def test_solidus_lies_above_the_sourced_range(self) -> None:
+        # ss304: CINDAS 45 Table 2 prints the solid k at the solidus itself.
         for name in self.SOURCED:
             info = cb.get_material_info(name)
-            assert info["T_max"] < info["T_solidus"], name
+            assert info["T_max"] <= info["T_solidus"], name
 
     def test_info_carries_the_conductivity_range(self) -> None:
         info = cb.get_material_info("ss310")
