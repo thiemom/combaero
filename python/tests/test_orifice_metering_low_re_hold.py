@@ -6,10 +6,6 @@ without bound as Re_D falls, so a 4 mm, beta 0.5 plate read Cd 1.16 at Re_D
 Both were derivative kinks. Below the bound Re_b = metering_cd_re_min the Cd
 is now HELD, entered C1 in ln Re_D over w = 0.1 just below Re_b, and
 metering_cd_in_range keeps flagging it.
-
-Stolz has NO hold: ISO 5167:1980's lower bound is not held as a source
-(validation/sources.yaml, wanted; follow-up of #873). It is pinned here to
-its pre-#873 values, floor and cap included.
 """
 
 from __future__ import annotations
@@ -21,9 +17,6 @@ import pytest
 
 import combaero as cb
 from combaero.network import FlowNetwork, NetworkSolver, OrificeElement, PressureBoundary
-
-# Stolz is deprecated (#876); its unchanged values are still pinned here.
-pytestmark = pytest.mark.filterwarnings("ignore:.*Stolz.*:DeprecationWarning")
 
 M = cb.MeteringCdCorrelation
 T = cb.OrificeTap
@@ -60,14 +53,6 @@ def test_the_lower_bounds_are_the_standards() -> None:
     assert cb.metering_cd_re_min(rhg, _geom(0.7, 0.5, T.Flange)) == pytest.approx(170 * 0.49 * 500)
     with pytest.raises(ValueError, match="Reynolds range"):
         cb.metering_cd_re_min(M.Constant, _geom(0.5, 0.1, T.Corner))
-
-
-@pytest.mark.parametrize("tap", [T.Corner, T.D_D2, T.Flange])
-def test_stolz_has_no_encoded_bound(tap: object) -> None:
-    """ISO 5167:1980 is not held, so no bound is encoded: asking for one is
-    an error, not a number from memory."""
-    with pytest.raises(ValueError, match="Stolz has no encoded Reynolds range"):
-        cb.metering_cd_re_min(M.Stolz, _geom(0.5, 0.1, tap))
 
 
 @pytest.mark.parametrize(("corr", "tap", "beta", "D"), CASES)
@@ -192,35 +177,6 @@ def test_the_flag_still_says_out_of_range_below_the_bound() -> None:
         assert cb.metering_cd_in_range(corr, g, Rb)
         assert not cb.metering_cd_in_range(corr, g, Rb * 0.999)
         assert not cb.metering_cd_in_range(corr, g, 0.0)
-        # Stolz's 1980 limits are not encoded: the flag stays True.
-        assert cb.metering_cd_in_range(M.Stolz, g, 0.0)
-
-
-# metering_cd_and_dRe(Stolz, ...) on main before #873 (af22aedc), repr'd:
-# the Re_D < 1 floor (value of Re_D = 1, slope 0), the 1.5 cap, and the
-# equation itself, unchanged. (tap, beta, D, Re_D, Cd, dCd/dRe_D)
-STOLZ_PRE_873 = [
-    (T.Corner, 0.1, 0.1, 0.0, 0.886160312783276, 0.0),
-    (T.Corner, 0.1, 0.1, 0.5, 0.886160312783276, 0.0),
-    (T.Corner, 0.1, 0.1, 1.0, 0.886160312783276, -0.21750936316053165),
-    (T.Corner, 0.1, 0.1, 10.0, 0.6477201515024408, -0.0038679242199905197),
-    (T.Corner, 0.1, 0.1, 1000.0, 0.5977786886161806, -1.2231450352100224e-06),
-    (T.Corner, 0.5, 0.1, 10.0, 1.5, 0.0),
-    (T.Corner, 0.5, 0.1, 100.0, 1.1151333928752514, -0.0038450586415594823),
-    (T.Corner, 0.5, 0.1, 1000.0, 0.6936267555030199, -6.837588612677457e-05),
-    (T.Corner, 0.5, 0.1, 100000.0, 0.6053418878298926, -2.1622353719291627e-08),
-    (T.D_D2, 0.5, 0.004, 1000.0, 0.69424688050302, -6.837588612677457e-05),
-    (T.D_D2, 0.5, 0.004, 100000.0, 0.6059620128298927, -2.1622353719291627e-08),
-    (T.Flange, 0.6, 0.05, 1000.0, 0.7494032055346991, -0.00010785892383659225),
-    (T.Flange, 0.6, 0.05, 100000.0, 0.6101390386232195, -3.410798652982583e-08),
-]
-
-
-@pytest.mark.parametrize(("tap", "beta", "D", "Re", "cd", "dcd"), STOLZ_PRE_873)
-def test_stolz_is_unchanged(
-    tap: object, beta: float, D: float, Re: float, cd: float, dcd: float
-) -> None:
-    assert _cd(M.Stolz, _geom(beta, D, tap), Re) == (cd, dcd)
 
 
 def test_a_low_flow_orifice_reads_the_held_cd() -> None:

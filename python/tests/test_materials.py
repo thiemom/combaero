@@ -163,14 +163,12 @@ class TestStructuralAlloys:
             33.53 + 28.0 * hi, rel=1e-9
         )
 
-    def test_aluminum_6061_is_deprecated_but_still_answers(self):
-        """No cited source (#761): warns, removed in 0.9.0, unchanged until then."""
-        with pytest.warns(DeprecationWarning, match="0.9.0"):
-            assert cb.k_aluminum_6061(300.0) == pytest.approx(167.0 - 0.012 * 26.85, rel=1e-12)
-        with pytest.warns(DeprecationWarning, match="al6061"):
-            assert cb.get_material_conductivity("al6061", 300.0) > 0
-        with pytest.warns(DeprecationWarning), pytest.raises(ValueError):
-            cb.k_aluminum_6061(700.0)
+    def test_aluminum_6061_is_gone(self):
+        """No cited source (#761): deprecated in 0.8.0, removed in 0.9.0."""
+        assert not hasattr(cb, "k_aluminum_6061")
+        assert "al6061" not in cb.list_materials()
+        with pytest.raises(ValueError):
+            cb.get_material_conductivity("al6061", 300.0)
 
 
 class TestThermalBarrierCoatings:
@@ -247,7 +245,7 @@ class TestMaterialDatabase:
     assert "ss316" in materials
     assert "ss310" in materials
     assert "ss304" in materials
-    assert "al6061" in materials
+    assert "al6061" not in materials
     assert "ysz" in materials
 
     # Should have at least 5 materials
@@ -646,7 +644,7 @@ class TestSolidus:
         "ss304": 1672.0 - 273.15,
         "copper": 1083.0,
     }
-    UNPRINTED = ("ss316", "x22crmov12_1", "nicocraly", "alumina", "ysz", "al6061")
+    UNPRINTED = ("ss316", "x22crmov12_1", "nicocraly", "alumina", "ysz")
 
     def test_sourced_solidus_is_the_printed_value(self) -> None:
         for name, t_c in self.SOURCED.items():
@@ -684,7 +682,7 @@ class TestEnvelope:
 
     W = 100.0
 
-    @pytest.mark.parametrize("name", [n for n in cb.list_materials() if n != "al6061"])
+    @pytest.mark.parametrize("name", cb.list_materials())
     def test_c1_at_the_data_ends_and_bounded(self, name: str) -> None:
         info = cb.get_material_info(name)
         for T_end, sign in ((info["T_min"], -1.0), (info["T_max"], 1.0)):
@@ -725,8 +723,6 @@ class TestEnvelope:
 
     def test_every_material_stays_positive_everywhere(self) -> None:
         for name in cb.list_materials():
-            if name == "al6061":
-                continue
             for T in (1.0, 150.0, 250.0, 2500.0, 1e4):
                 assert cb.get_material_conductivity(name, T) > 0.0, (name, T)
 

@@ -32,10 +32,6 @@ from combaero.network import (
     PressureBoundary,
 )
 
-# Stolz is deprecated (#876): its DeprecationWarning is tested in
-# test_stolz_deprecation_876.py; here Stolz is exercised for its values.
-pytestmark = pytest.mark.filterwarnings("ignore:.*Stolz.*:DeprecationWarning")
-
 Y_AIR = list(cb.mole_to_mass(cb.species.dry_air()))
 X_AIR = list(cb.species.dry_air())
 CI_SLIT = math.pi / (math.pi + 2.0)
@@ -279,7 +275,7 @@ def _solve(net: FlowNetwork) -> tuple[NetworkSolver, dict]:
 
 
 def test_the_nozzle_reports_nothing_new() -> None:
-    """The nozzle (explicit here; the default for 'fixed' and Stolz, #861)
+    """The nozzle (explicit here; the default for 'fixed', #861)
     reports no model diagnostics."""
     o = OrificeElement("x", "a", "b", Cd=0.6, diameter=0.01, correlation="fixed")
     assert o.compressible_model == "nozzle" and o.Cv == 1.0
@@ -306,7 +302,7 @@ def test_refusals() -> None:
         OrificeElement("x", "a", "b", diameter=0.01, compressible_model="iso")
     with pytest.raises(ValueError, match="ReaderHarrisGallagher"):
         OrificeElement(
-            "x", "a", "b", diameter=0.01, compressible_model="iso5167", correlation="Stolz"
+            "x", "a", "b", diameter=0.01, compressible_model="iso5167", correlation="fixed", Cd=0.6
         )
     with pytest.raises(ValueError, match="Cv"):
         OrificeElement("x", "a", "b", diameter=0.01, Cv=0.98)

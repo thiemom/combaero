@@ -1,6 +1,6 @@
 """The metering orifice's own flow column carries dCd/dm (through Re_D).
 
-ReaderHarrisGallagher (the default) and Stolz read the pipe Reynolds
+ReaderHarrisGallagher (the default) reads the pipe Reynolds
 number Re_D = 4 |m| / (pi D mu), so the row m - Cd(Re_D(m)) K has slope
 1 - K dCd/dm. The Jacobian gave 1: 1.0% off on a 2 cm orifice at 1600 K,
 found by the FD check behind #636's tests.
@@ -21,10 +21,6 @@ from combaero.network import (
     PlenumNode,
     PressureBoundary,
 )
-
-# Stolz is deprecated (#876): its DeprecationWarning is tested in
-# test_stolz_deprecation_876.py; here Stolz is exercised for its values.
-pytestmark = pytest.mark.filterwarnings("ignore:.*Stolz.*:DeprecationWarning")
 
 
 # 5.5e3, not 5e3: Re_D 5000 is the lower bound of this plate, a C1 point
@@ -60,7 +56,7 @@ def _net(regime: str, correlation: str) -> FlowNetwork:
 
 
 @pytest.mark.parametrize("regime", ["compressible", "incompressible"])
-@pytest.mark.parametrize("correlation", ["ReaderHarrisGallagher", "Stolz"])
+@pytest.mark.parametrize("correlation", ["ReaderHarrisGallagher"])
 def test_the_orifice_rows_flow_column_is_exact(regime: str, correlation: str) -> None:
     s = NetworkSolver(_net(regime, correlation))
     with warnings.catch_warnings():
@@ -86,10 +82,9 @@ def test_the_orifice_rows_flow_column_is_exact(regime: str, correlation: str) ->
         geom = s.network.elements[eid]._orifice_geom
         sel = getattr(cb.MeteringCdCorrelation, correlation)
         Re_D = 4.0 * abs(r[f"{eid}.m_dot"]) / (np.pi * geom.D * r[f"{eid}.mu_ref"])
-        if sel == cb.MeteringCdCorrelation.Stolz or Re_D >= cb.metering_cd_re_min(sel, geom):
-            # The column really carries dCd/dm. Stolz's Re term (0.0029
-            # b^2.5 (1e6/Re)^0.75) is the weaker one; a missing derivative
-            # gives exactly 0. Stolz has no low-Re hold.
+        if Re_D >= cb.metering_cd_re_min(sel, geom):
+            # The column really carries dCd/dm; a missing derivative gives
+            # exactly 1.
             assert abs(J[i, j] - 1.0) > 1e-5
         else:
             # Below RHG's lower Re_D bound Cd is held (#873): no dCd/dm.

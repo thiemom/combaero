@@ -5,6 +5,9 @@ until 0.7; they are static now, as ``P``/``P_in`` already were, and the
 stagnation value is ``<node>.Tt``/``Tt_in``. The static T is regime-aware:
 an incompressible node's is its ``Tt`` (the low-Mach limit its closure
 solves), a compressible one's lies on the isentrope through (Tt, Pt) at P.
+
+0.8 warned once on the first read of such a key and kept a deprecated
+``<chamber>.T_static`` alias; both went in 0.9.0.
 """
 
 from __future__ import annotations
@@ -49,15 +52,11 @@ def _chamber_network(regime: str) -> FlowNetwork:
     return g
 
 
-@pytest.fixture
-def fresh_warning(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(solver_module, "_STATIC_T_WARNED", False)
-
-
-def test_a_moving_compressible_node_reports_a_static_T_below_its_Tt(fresh_warning: None) -> None:
+def test_a_moving_compressible_node_reports_a_static_T_below_its_Tt() -> None:
     sol = NetworkSolver(_chamber_network("compressible")).solve()
     assert sol["__success__"]
-    with pytest.warns(FutureWarning, match="STATIC temperature since combaero 0.8"):
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
         T = sol["chamber.T"]
     Tt, P, Pt = sol["chamber.Tt"], sol["chamber.P"], sol["chamber.Pt"]
     assert Tt - 1.0 > T
@@ -69,24 +68,18 @@ def test_a_moving_compressible_node_reports_a_static_T_below_its_Tt(fresh_warnin
     assert diag["Tt_in"] == Tt
 
 
-def test_the_warning_is_shown_once(fresh_warning: None) -> None:
+def test_the_result_is_a_plain_dict_without_the_old_T_static_key() -> None:
+    """0.9.0: no read-time warning and no "<chamber>.T_static" alias."""
     sol = NetworkSolver(_chamber_network("compressible")).solve()
-    with pytest.warns(FutureWarning):
-        sol["chamber.T"]
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", FutureWarning)
-        sol["chamber.T"]
-        sol["__element_diag__"]["orf2"]["T_in"]
+    assert type(sol) is dict
+    assert type(sol["__element_diag__"]["orf2"]) is dict
+    assert "chamber.T_static" not in sol
+    assert "chamber.T" in sol
+    for name in ("_STATIC_T_WARNED", "_StaticTResult", "_warn_static_t", "_warn_jacobian_T_key"):
+        assert not hasattr(solver_module, name)
 
 
-def test_the_old_T_static_key_is_the_new_T_with_a_deprecation(fresh_warning: None) -> None:
-    sol = NetworkSolver(_chamber_network("compressible")).solve()
-    with pytest.warns(DeprecationWarning, match=r"result\['chamber.T'\]"):
-        T_static = sol["chamber.T_static"]
-    assert T_static == dict.__getitem__(sol, "chamber.T")
-
-
-def test_an_incompressible_node_and_a_plenum_report_T_equal_to_Tt(fresh_warning: None) -> None:
+def test_an_incompressible_node_and_a_plenum_report_T_equal_to_Tt() -> None:
     sol = NetworkSolver(_chamber_network("incompressible")).solve()
     assert sol["__success__"]
     with warnings.catch_warnings():
@@ -106,25 +99,28 @@ def test_the_state_computes_its_static_T() -> None:
     assert low_mach.T == 600.0
 
 
-def test_the_0_7_constructor_and_setter_still_work_and_say_so() -> None:
-    with pytest.warns(DeprecationWarning, match="0.9.0"):
-        old = NetworkMixtureState(2.0e5, 2.0e5, 600.0, 600.0, 0.1, Y_AIR)
-    assert (old.P, old.Pt, old.Tt, old.m_dot) == (2.0e5, 2.0e5, 600.0, 0.1)
-    with pytest.warns(DeprecationWarning, match="0.9.0"):
-        only_T = NetworkMixtureState(P=2.0e5, Pt=2.0e5, T=650.0, Y=Y_AIR)
-    assert only_T.Tt == 650.0
-    with pytest.warns(DeprecationWarning, match="0.9.0"):
-        old.T = 610.0
-    assert old.Tt == 610.0
+def test_the_0_7_constructor_and_setter_are_refused() -> None:
+    """0.9.0: the 0.7 signature (P, Pt, T, Tt, m_dot, Y) and the T setter
+    are gone. Tt, m_dot and Y are keyword-only, so a positional 0.7 call
+    fails instead of shifting its arguments."""
+    with pytest.raises(TypeError):
+        NetworkMixtureState(2.0e5, 2.0e5, 600.0, 600.0, 0.1, Y_AIR)  # type: ignore[misc]
+    with pytest.raises(TypeError):
+        NetworkMixtureState(P=2.0e5, Pt=2.0e5, T=650.0, Y=Y_AIR)  # type: ignore[call-arg]
+    state = NetworkMixtureState(P=2.0e5, Pt=2.0e5, Tt=600.0, m_dot=0.1, Y=Y_AIR)
+    with pytest.raises(AttributeError):
+        state.T = 610.0  # type: ignore[misc]
+    assert state.Tt == 600.0
     with pytest.raises(TypeError, match="Tt"):
-        NetworkMixtureState(P=2.0e5, Pt=2.0e5, Y=Y_AIR)
+        NetworkMixtureState(P=2.0e5, Pt=2.0e5, Y=Y_AIR)  # type: ignore[call-arg]
 
 
-def test_a_custom_element_still_keyed_by_the_0_7_name_gets_the_same_jacobian(
+def test_a_custom_element_keyed_by_the_0_7_name_is_refused(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A residual Jacobian keyed "<node>.T" (0.7) is relayed as "<node>.Tt",
-    with one DeprecationWarning, so a user's element keeps its T column."""
+    """A residual Jacobian keyed "<node>.T" (the 0.7 name of the stagnation-T
+    column) was relayed as "<node>.Tt" with a warning in 0.8; since 0.9.0 it
+    raises, naming the new key, rather than dropping the column silently."""
     # Two streams of different Tt mix in the chamber, so its Tt moves with
     # the flow split and the element leaving it has a live Tt column.
     g = FlowNetwork()
@@ -140,7 +136,7 @@ def test_a_custom_element_still_keyed_by_the_0_7_name_gets_the_same_jacobian(
         g.add_element(OrificeElement(eid, a, b, Cd=0.6, diameter=d, correlation="fixed"))
     solver = NetworkSolver(g)
     x0 = np.array(solver._build_x0(), dtype=float)
-    F_new, J_new = solver._residuals_and_jacobian(x0)
+    solver._residuals_and_jacobian(x0)  # the 0.9 names assemble
 
     def old_names(jac: dict) -> dict:
         return {
@@ -159,26 +155,9 @@ def test_a_custom_element_still_keyed_by_the_0_7_name_gets_the_same_jacobian(
             return res, old_names(jac)
 
         monkeypatch.setattr(el, "residuals", residuals)
-    monkeypatch.setattr(solver_module, "_JACOBIAN_T_KEY_WARNED", False)
-    with pytest.warns(DeprecationWarning, match=r"Jacobian key '.*\.T'"):
-        F_old, J_old = solver._residuals_and_jacobian(x0)
+    with pytest.raises(KeyError, match=r"(?s)Jacobian key '.*\.T'.*\.Tt"):
+        solver._residuals_and_jacobian(x0)
     assert renamed > 0  # the network has a T column to rename
-    assert np.array_equal(F_old, F_new)
-    assert np.array_equal(J_old.toarray(), J_new.toarray())
-
-    # And the column matters: dropped, the Jacobian differs.
-    for el in g.elements.values():
-        inner = el.residuals
-
-        def dropped(*args: Any, _inner: Any = inner, **kwargs: Any) -> Any:
-            res, jac = _inner(*args, **kwargs)
-            return res, {
-                r: {k: v for k, v in c.items() if not k.endswith(".T")} for r, c in jac.items()
-            }
-
-        monkeypatch.setattr(el, "residuals", dropped)
-    _, J_dropped = solver._residuals_and_jacobian(x0)
-    assert not np.array_equal(J_dropped.toarray(), J_new.toarray())
 
 
 def _tee3(seed: int) -> tuple[Any, dict, str]:
@@ -192,7 +171,6 @@ def _tee3(seed: int) -> tuple[Any, dict, str]:
     return net, sol, eid
 
 
-@pytest.mark.filterwarnings("ignore:.*STATIC temperature:FutureWarning")
 def test_a_junction_reports_each_port_static_and_total_T() -> None:
     """#824: a junction's port_<i>_T is the port's static T (it was the
     total), port_<i>_Tt the total -- the port nodes' own .T and .Tt."""
@@ -206,12 +184,6 @@ def test_a_junction_reports_each_port_static_and_total_T() -> None:
         assert d[f"port_{i}_T"] < d[f"port_{i}_Tt"]
 
 
-def test_a_changed_port_T_warns_like_the_node_keys(fresh_warning: None) -> None:
-    _, sol, eid = _tee3(2)
-    with pytest.warns(FutureWarning, match="port_0_T"):
-        sol["__element_diag__"][eid]["port_0_T"]
-
-
 def test_an_incompressible_junction_port_T_is_its_Tt() -> None:
     net, sol, eid = _tee3(5)
     d = sol["__element_diag__"][eid]
@@ -219,7 +191,6 @@ def test_an_incompressible_junction_port_T_is_its_Tt() -> None:
         assert dict.__getitem__(d, f"port_{i}_T") == dict.__getitem__(d, f"port_{i}_Tt")
 
 
-@pytest.mark.filterwarnings("ignore:.*STATIC temperature:FutureWarning")
 def test_an_element_reports_its_outlet_flow_at_the_static_state() -> None:
     """#824: the outlet Mach an element reports is formed at its outlet
     node's static state, not at (Tt, P)."""
@@ -241,7 +212,6 @@ def _stress(family: str, seed: int) -> tuple[Any, dict]:
     return net, sol
 
 
-@pytest.mark.filterwarnings("ignore:.*STATIC temperature:FutureWarning")
 def test_a_crossflow_station_reports_its_moving_state() -> None:
     """A crossflow station holds Pt = P (its node is the static P at the
     middle of the station) while its gas moves at the station's mean flow
@@ -270,7 +240,6 @@ def test_a_crossflow_station_reports_its_moving_state() -> None:
             assert diag[pl.id]["Pt_out"] == sol[f"{pl.to_node}.P"]
 
 
-@pytest.mark.filterwarnings("ignore:.*STATIC temperature:FutureWarning")
 def test_an_area_combustor_reports_its_static_T() -> None:
     """A combustor with an area holds Pt = P but its gas moves through the
     area: it reports the duct closure's static T at G = m / area (#782

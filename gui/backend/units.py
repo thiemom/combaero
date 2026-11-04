@@ -223,8 +223,6 @@ UNIT_MAP: dict[str, str] = {
     "sigma_norm_low": "-",
     "incompressible_mach": "-",
     "incompressible_mach_limit": "-",
-    # Node states
-    "T_static": "K",
     # Channel / Fanno-Rayleigh duct (#551, #636)
     "M_in_duct": "-",
     "M_exit_duct": "-",

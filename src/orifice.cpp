@@ -140,29 +140,6 @@ std::tuple<double, double> rhg_raw_and_dRe(double beta, double Re, double D,
     return {C, dC};
 }
 
-// Stolz, ISO 5167:1980, and its exact d/dRe_D. Below the Re_D floor of 1
-// the value is held and the derivative is 0. No #873 hold: ISO 5167:1980's
-// lower Re_D bound is not held as a source (validation/sources.yaml, wanted).
-std::tuple<double, double> stolz_and_dRe(double beta, double Re_D, double D,
-                                         OrificeTap tap) {
-    namespace S = stolz;
-    const bool floored = Re_D < 1.0;
-    const double Re = floored ? 1.0 : Re_D;
-    const double b = clamp_beta(beta);
-    const double b4 = std::pow(b, 4.0);
-
-    const auto [L1, L2] = tap_positions(tap, D);
-    const double up = (L1 >= S::L1_sat) ? S::C4_sat : S::C4 * L1;
-
-    const double t3 = S::C3 * std::pow(b, S::C3_beta) / std::pow(Re, S::C3_re);
-    const double C = S::C0 + S::C1 * std::pow(b, S::C1_exp) - S::C2 * std::pow(b, S::C2_exp) +
-                     t3 + up * b4 / (1.0 - b4) - S::C5 * L2 * std::pow(b, S::C5_beta);
-    if (C >= 1.5) {
-        return {1.5, 0.0};
-    }
-    return {C, floored ? 0.0 : -S::C3_re * t3 / Re};
-}
-
 // Lower Re_D bound of Reader-Harris/Gallagher, ISO 5167-2:2003 5.3.1.
 double rhg_re_min(double beta, double D, OrificeTap tap) {
     namespace R = reader_harris;
@@ -212,10 +189,6 @@ std::tuple<double, double> rhg_and_dRe(double beta, double Re_D, double D, Orifi
 
 double Cd_ReaderHarrisGallagher(double beta, double Re_D, double D, OrificeTap tap) {
     return std::get<0>(rhg_and_dRe(beta, Re_D, D, tap));
-}
-
-double Cd_Stolz(double beta, double Re_D, double D, OrificeTap tap) {
-    return std::get<0>(stolz_and_dRe(beta, Re_D, D, tap));
 }
 
 // Convert between Cd and loss coefficient K
@@ -483,14 +456,12 @@ std::tuple<double, double> metering_cd_and_dRe(MeteringCdCorrelation id,
     switch (id) {
         case MeteringCdCorrelation::ReaderHarrisGallagher:
             return orifice::rhg_and_dRe(geom.beta(), Re_D, geom.D, geom.tap);
-        case MeteringCdCorrelation::Stolz:
-            return orifice::stolz_and_dRe(geom.beta(), Re_D, geom.D, geom.tap);
         case MeteringCdCorrelation::Constant:
         case MeteringCdCorrelation::UserFunction:
             break;
     }
     throw std::invalid_argument(
-        "metering_cd_and_dRe: only ReaderHarrisGallagher and Stolz carry a "
+        "metering_cd_and_dRe: only ReaderHarrisGallagher carries a "
         "formula; a Constant or UserFunction Cd belongs to the caller");
 }
 
@@ -501,10 +472,6 @@ double metering_cd_re_min(MeteringCdCorrelation id, const OrificeGeometry& geom)
     switch (id) {
         case MeteringCdCorrelation::ReaderHarrisGallagher:
             return orifice::rhg_re_min(geom.beta(), geom.D, geom.tap);
-        case MeteringCdCorrelation::Stolz:
-            throw std::invalid_argument(
-                "metering_cd_re_min: Stolz has no encoded Reynolds range (ISO "
-                "5167:1980 is not held, #873) and no low-Re hold");
         case MeteringCdCorrelation::Constant:
         case MeteringCdCorrelation::UserFunction:
             break;
@@ -518,7 +485,7 @@ bool metering_cd_in_range(MeteringCdCorrelation id, const OrificeGeometry& geom,
                           double Re_D) {
     namespace R = orifice::reader_harris;
     if (id != MeteringCdCorrelation::ReaderHarrisGallagher) {
-        return true;  // Stolz: ISO 5167:1980's limits are not encoded
+        return true;  // Constant / UserFunction: the caller's Cd
     }
     if (!geom.is_valid()) {
         return false;
@@ -575,14 +542,6 @@ public:
         return Cd_sharp_thin_plate(geom, state);
     }
     std::string name() const override { return "Reader-Harris/Gallagher (ISO 5167-2)"; }
-};
-
-class StolzCorrelation : public OrificeCorrelationBase {
-public:
-    double Cd(const OrificeGeometry& geom, const OrificeState& state) const override {
-        return std::get<0>(metering_cd_and_dRe(MeteringCdCorrelation::Stolz, geom, state.Re_D));
-    }
-    std::string name() const override { return "Stolz (ISO 5167:1980)"; }
 };
 
 class ConstantCdCorrelation : public OrificeCorrelationBase {
@@ -1151,8 +1110,6 @@ std::unique_ptr<OrificeCorrelationBase> make_correlation(MeteringCdCorrelation i
     switch (id) {
         case MeteringCdCorrelation::ReaderHarrisGallagher:
             return std::make_unique<ReaderHarrisGallagherCorrelation>();
-        case MeteringCdCorrelation::Stolz:
-            return std::make_unique<StolzCorrelation>();
         case MeteringCdCorrelation::Constant:
             return std::make_unique<ConstantCdCorrelation>();
         case MeteringCdCorrelation::UserFunction:
@@ -1647,7 +1604,7 @@ OrificeFlowResult orifice_flow(
     // Third dispatch site, now the same factory as the other two. The
     // `default: auto-select by geometry` arm this replaces is deliberately
     // gone: picking a correlation from r and t behind the caller's back is
-    // how a rounded-entry request came back as Stolz.
+    // how a rounded-entry request came back as the Stolz Cd (removed in 0.9.0).
     std::unique_ptr<OrificeCorrelationBase> corr = make_correlation(correlation);
     if (!corr) {
         throw std::invalid_argument(

@@ -126,7 +126,6 @@ struct OrificeState {
 enum class MeteringCdCorrelation {
     // Sharp thin-plate correlations
     ReaderHarrisGallagher,  // ISO 5167-2:2003 / ASME MFC-3M (most accurate)
-    Stolz,                  // ISO 5167:1980; DEPRECATED (#876), removed in 0.9.0
 
     // Special
     Constant,               // Fixed Cd value (for testing/simple cases)
@@ -193,7 +192,7 @@ std::tuple<double, double> Cd_sharp_thin_plate_and_dRe(const OrificeGeometry& ge
 
 // (Cd, dCd/dRe_D) of a NORMED metering correlation at the taps geom.tap: the
 // one entry point the network element calls, so no metering formula lives in
-// Python. ReaderHarrisGallagher and Stolz only; Constant and UserFunction
+// Python. ReaderHarrisGallagher only; Constant and UserFunction
 // carry no formula of their own and are refused (std::invalid_argument).
 //
 // ReaderHarrisGallagher: below its lower Re_D bound Re_b (metering_cd_re_min)
@@ -210,10 +209,8 @@ std::tuple<double, double> Cd_sharp_thin_plate_and_dRe(const OrificeGeometry& ge
 // The hold is an out-of-range placeholder; metering_cd_in_range says so.
 // The 1.5 cap stays for flange taps in pipes below D ~32 mm.
 //
-// Stolz: NO hold. ISO 5167:1980's lower Re_D bound is not held as a source
-// (validation/sources.yaml, wanted; follow-up of #873), so the equation is
-// evaluated as before: held at its Re_D = 1 value below Re_D 1 (derivative
-// 0) and capped at 1.5.
+// Stolz (ISO 5167:1980) was removed in 0.9.0 (#876): ISO replaced it with
+// Reader-Harris/Gallagher (ISO 5167-1:1991/Amd 1:1998, ISO 5167-2:2003).
 std::tuple<double, double> metering_cd_and_dRe(MeteringCdCorrelation id,
                                                const OrificeGeometry& geom,
                                                double Re_D);
@@ -224,8 +221,7 @@ std::tuple<double, double> metering_cd_and_dRe(MeteringCdCorrelation id,
 //   corner / D-D/2 taps: 5000 (beta <= 0.56), 16000 beta^2 (beta > 0.56);
 //   flange taps:         max(5000, 170 beta^2 D[mm]).
 // Refuses (std::invalid_argument) an invalid geometry and every other
-// correlation: Stolz, whose ISO 5167:1980 bound is not encoded (no source
-// held, no hold), and Constant / UserFunction, whose Cd is the caller's.
+// correlation: Constant / UserFunction, whose Cd is the caller's.
 double metering_cd_re_min(MeteringCdCorrelation id, const OrificeGeometry& geom);
 
 // Is the plate inside the correlation's stated range? A diagnostic flag,
@@ -233,7 +229,7 @@ double metering_cd_re_min(MeteringCdCorrelation id, const OrificeGeometry& geom)
 //   ReaderHarrisGallagher, ISO 5167-2:2003 5.3.1: d >= 12.5 mm,
 //     50 <= D <= 1000 mm, 0.1 <= beta <= 0.75, and
 //     Re_D >= metering_cd_re_min.
-//   Stolz: ISO 5167:1980's limits are not encoded, so this returns true.
+//   Constant / UserFunction: the Cd is the caller's, so this returns true.
 bool metering_cd_in_range(MeteringCdCorrelation id, const OrificeGeometry& geom,
                           double Re_D);
 
@@ -322,28 +318,6 @@ constexpr double range_beta_split = 0.56;     // corner, D-D/2: above, 16000 bet
 constexpr double range_re_beta2   = 16000.0;
 constexpr double range_re_flange  = 170.0;    // flange: Re_D >= 170 beta^2 D[mm]
 } // namespace reader_harris
-
-// Stolz (1978) - ISO 5167:1980:
-// C = 0.5959 + 0.0312 b^2.1 - 0.184 b^8 + 0.0029 b^2.5 (1e6/Re_D)^0.75
-//     + 0.09 L1 b^4/(1 - b^4) - 0.0337 L2' b^3,
-// where 0.09 L1 is replaced by 0.039 once L1 >= 0.4333. C3 = 0.0029 * 1e6^0.75.
-namespace stolz {
-constexpr double C0      = 0.5959;
-constexpr double C1      = 0.0312;
-constexpr double C1_exp  = 2.1;
-constexpr double C2      = 0.184;
-constexpr double C2_exp  = 8.0;
-constexpr double C3      = 91.71;
-constexpr double C3_beta = 2.5;
-constexpr double C3_re   = 0.75;
-constexpr double C4      = 0.09;     // upstream tap: C4 L1 b^4 / (1 - b^4)
-constexpr double C4_sat  = 0.039;    // ... with C4 L1 held at this for L1 >= L1_sat
-constexpr double L1_sat  = 0.4333;
-constexpr double C5      = 0.0337;   // downstream tap: C5 L2' b^3
-constexpr double C5_beta = 3.0;
-// ISO 5167:1980's limits of use (d, D, beta, Re_D) are not encoded: the text
-// is not held (validation/sources.yaml, wanted), so Stolz has no #873 hold.
-} // namespace stolz
 
 // The C1 hold of the RHG Cd below its lower Re_D bound (#873); the form
 // is in metering_cd_and_dRe. blend_ln_re is the width w in ln Re_D over
@@ -826,15 +800,6 @@ std::tuple<double, double> tap_positions(OrificeTap tap, double D);
 // orifices. Held below its lower Re_D bound (metering_cd_and_dRe, #873).
 double Cd_ReaderHarrisGallagher(double beta, double Re_D, double D,
                                 OrificeTap tap = OrificeTap::Flange);
-
-// Stolz (1978) - ISO 5167:1980. Corner taps by default, which need no D.
-// Deprecated in 0.8.0, removed in 0.9.0 (#876): ISO replaced Stolz with
-// Reader-Harris/Gallagher (ISO 5167-1:1991/Amd 1:1998, ISO 5167-2:2003).
-// Use Cd_ReaderHarrisGallagher.
-[[deprecated("Stolz (ISO 5167:1980) is deprecated, removed in 0.9.0 (#876): "
-             "use Cd_ReaderHarrisGallagher")]]
-double Cd_Stolz(double beta, double Re_D, double D = 0.0,
-                OrificeTap tap = OrificeTap::Corner);
 
 // McGreehan and Schotsch (1988) - the full chain, Eqs. (8) through (17).
 // Convenience wrapper over orifice::mcgreehan_schotsch::cd; see that

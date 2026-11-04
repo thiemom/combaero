@@ -82,7 +82,7 @@ def test_fanno_max_length_rejects_invalid(args: tuple[float, ...]) -> None:
         (500.0, 1e-6),
     ],
 )
-def test_solve_P0_from_mdot_round_trip(mdot: float, rel: float) -> None:
+def test_solve_Pt_from_mdot_round_trip(mdot: float, rel: float) -> None:
     """Small flows need P0 within 0.1% of P_back; the bracket must reach them."""
     X = cb.species.dry_air()
     T0, P_back, A = 600.0, 1.0e5, 2.0e-4

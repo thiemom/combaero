@@ -4481,7 +4481,8 @@ documents:
     136 W/m K at 200 K and 155 at 300 K, where the line gives 168 and 167 -- 23% and 7% high, and the line falls
     with T where the fit rises. Outcome (#761): 4-300 K is outside
     combaero''s range, and no sourced elevated-temperature table was found (ASM Vol. 2 gives 25 C only;
-    the MIL-HDBK-5H change notice we hold lacks Fig. 3.6.2.0), so k_aluminum_6061 is deprecated for 0.9.0.'
+    the MIL-HDBK-5H change notice we hold lacks Fig. 3.6.2.0), so k_aluminum_6061 was deprecated in 0.8.0
+    and removed in 0.9.0.'
   read_for: ['Al 6061 conductivity provenance']
   issues: [761]
   records: []
@@ -4577,7 +4578,7 @@ documents:
     tempers, typical physical properties (thermal conductivity mostly at a single temperature), mechanical data.
   status: screened
   verdict: 'Settles 6061 at 25 C only: O temper 180, T4 154, T6 167 W/m K. No k(T), so it cannot source a
-    temperature-dependent k_aluminum_6061, which is deprecated (#761). Kept as the reference for room-temperature
+    temperature-dependent k_aluminum_6061, which was removed in 0.9.0 (#761). Kept as the reference for room-temperature
     conductivity of nonferrous alloys (copper alloys, titanium, nickel) if one is needed.'
   read_for: ['Al 6061 conductivity provenance']
   issues: [761, 882]
@@ -4722,8 +4723,8 @@ documents:
     metering_cd_in_range (which follows ISO 5167-2:2003 5.3.1).'
   read_for: ['#876 Stolz deprecation']
   issues: [876]
-  records: [python/tests/test_stolz_deprecation_876.py]
-  code: [python/combaero/network/components.py, python/combaero/_core.cpp, include/orifice.h]
+  records: [python/tests/test_deprecations.py]
+  code: [python/combaero/network/components.py, gui/backend/schemas.py]
   notes: Its ref. [1], Stolz 1988, is now held (next entry).
 - file: sources/orifices/stolz_1988_NSFMW_paper_3.1_first_revision_of_ISO_5167.pdf
   citation: Stolz, J. (1988). The first revision of ISO 5167. North Sea Flow Measurement Workshop 1988, 18-20
@@ -4749,8 +4750,7 @@ documents:
     (orifice.h: "ISO 5167:1980"; Reader-Harris 2022 calls the 1991 change to the equation minor). So it can
     source a Stolz lower Re_D hold and metering_cd_in_range limits for an ISO 5167-1:1991 Stolz, but the
     ISO 5167:1980 limits (separate per tapping, with an upper Re_D limit) remain unsourced. Moot for the code
-    path: Stolz is deprecated in 0.8.0 and removed in 0.9.0 (#876), so the recommendation is to cite these
-    limits in the deprecation note rather than implement a hold. The 1 - beta^1.9 loss is an older, simpler
+    path: Stolz was deprecated in 0.8.0 and removed in 0.9.0 (#876), so no hold was implemented. The 1 - beta^1.9 loss is an older, simpler
     form than the ISO 5167-2:2003 Eq. (7) combaero ships (not compared). Not implemented.'
   read_for: ['#876 Stolz limits of use', '#873 Stolz low-Re hold']
   issues: [873, 876]
@@ -5537,21 +5537,6 @@ wanted:
     it in favour of the book''s 0.069. Moved from now to later (user, 2026-11-02): obtain when the Ballal-Lefebvre slot-film
     branches are implemented.'
   where: ASME Digital Collection (DOI verified by the user, 2026-10-29; paywalled; the user can obtain it).
-- citation: ISO 5167:1980 (or its restatement ISO 5167-1:1991). Measurement of fluid flow by means of
-    orifice plates, nozzles and Venturi tubes inserted in circular cross-section conduits running full.
-    International Organization for Standardization. (citation as recalled)
-  checked: false
-  issues:
-  - 873
-  - 876
-  priority: later
-  question: 'The Stolz equation''s limits of use. #873 holds Reader-Harris/Gallagher Cd below its ISO 5167-2
-    lower Re_D bound, but Stolz has NO low-Re hold: its bound is known only from memory, so none is encoded
-    and metering_cd_re_min refuses Stolz. The text is needed to add the hold (its lower Re_D bound per tap)
-    and the d, D and beta limits that metering_cd_in_range does not encode for Stolz. Tracked in #876, which
-    deprecates Stolz instead unless this text turns up first. Stolz 1988 (held since 2026-11-02) gives
-    only the REVISED ISO 5167-1:1991 limits, not the 1980 ones.'
-  where: ISO (withdrawn standard; national-library or university copy).
 - citation: Reader-Harris, M. J. (1998). The equation for the expansibility factor for orifice plates. Proc.
     FLOMEKO 98, Lund. (citation as recalled)
   checked: false

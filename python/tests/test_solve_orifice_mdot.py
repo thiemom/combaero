@@ -8,10 +8,6 @@ import pytest
 
 import combaero as cb
 
-# Stolz is deprecated (#876): its DeprecationWarning is tested in
-# test_stolz_deprecation_876.py; here Stolz is exercised for its values.
-pytestmark = pytest.mark.filterwarnings("ignore:.*Stolz.*:DeprecationWarning")
-
 
 class TestSolveOrificeMdot:
     """Test iterative solver for orifice mass flow with Cd-Re coupling."""
@@ -111,7 +107,6 @@ class TestSolveOrificeMdot:
         # Test all supported correlations
         correlations = [
             cb.MeteringCdCorrelation.ReaderHarrisGallagher,
-            cb.MeteringCdCorrelation.Stolz,
         ]
 
         results = {}

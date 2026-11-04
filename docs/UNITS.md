@@ -182,7 +182,6 @@ All functions use consistent units to avoid conversion errors.
 | `solve_A_eff_from_mdot`    | Tt: K, Pt: Pa, P_back: Pa, mdot_target: kg/s, X: mol/mol     | m^2                      |
 | `solve_P_back_from_mdot`   | Tt: K, Pt: Pa, A_eff: m^2, mdot_target: kg/s, X: mol/mol     | Pa                       |
 | `solve_Pt_from_mdot`       | Tt: K, P_back: Pa, A_eff: m^2, mdot_target: kg/s, X: mol/mol | Pa                       |
-| `solve_P0_from_mdot`       | Tt: K, P_back: Pa, A_eff: m^2, mdot_target: kg/s, X: mol/mol | Pa                       |
 | `critical_pressure_ratio`  | Tt: K, Pt: Pa, X: mol/mol                                    | - (P*/Pt)                |
 | `mach_from_pressure_ratio` | Tt: K, Pt: Pa, P: Pa, X: mol/mol                             | - (M)                    |
 | `mass_flux_isentropic`     | Tt: K, Pt: Pa, P: Pa, X: mol/mol                             | kg/(m^2*s)               |
@@ -451,9 +450,6 @@ All functions use consistent units to avoid conversion errors.
 | `T_from_stagnation`      | Tt: K, M: -, X: mol/mol                                                                       | K                                                   |
 | `Pt_from_static`         | P: Pa, T: K, M: -, X: mol/mol                                                                 | Pa                                                  |
 | `P_from_stagnation`      | Pt: Pa, Tt: K, M: -, X: mol/mol                                                               | Pa                                                  |
-| `T0_from_static`         | T: K, M: -, X: mol/mol                                                                        | K                                                   |
-| `T0_from_static_v`       | T: K, v: m/s, X: mol/mol                                                                      | K                                                   |
-| `P0_from_static`         | P: Pa, T: K, M: -, X: mol/mol                                                                 | Pa                                                  |
 | `recovery_factor`        | Pr: -                                                                                         | - (r)                                               |
 | `T_adiabatic_wall`       | T_static: K, v: m/s, T: K, P: Pa, X: mol/mol                                                  | K                                                   |
 | `T_adiabatic_wall_mach`  | T_static: K, M: -, T: K, P: Pa, X: mol/mol                                                    | K                                                   |
@@ -492,7 +488,6 @@ All functions use consistent units to avoid conversion errors.
 | `k_stainless_steel_304`               | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
 | `k_stainless_steel_310`               | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
 | `k_stainless_steel_316`               | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
-| `k_aluminum_6061`                     | T: K                                                       | W/(m*K)                                                                                          |
 | `k_tbc_ysz`                           | T: K, hours: h (default 0), is_ebpvd: bool (default False) | W/(m*K)                                                                                          |
 | `list_materials`                      | -                                                          | list[str]                                                                                        |
 | `get_material_conductivity`           | name: str, T: K, extrapolate: bool (default False)         | W/(m*K)                                                                                          |
@@ -1633,7 +1628,6 @@ All functions use consistent units to avoid conversion errors.
 | `OrificeState::rho`                             | -                                                                                                                                  | kg/m^3                                |
 | `MeteringCdCorrelation::Constant`               | -                                                                                                                                  | -                                     |
 | `MeteringCdCorrelation::ReaderHarrisGallagher`  | -                                                                                                                                  | -                                     |
-| `MeteringCdCorrelation::Stolz`                  | -                                                                                                                                  | -                                     |
 | `MeteringCdCorrelation::name`                   | -                                                                                                                                  | -                                     |
 | `MeteringCdCorrelation::value`                  | -                                                                                                                                  | -                                     |
 | `MeteringCdCorrelation::UserFunction`           | -                                                                                                                                  | -                                     |
@@ -1695,19 +1689,6 @@ All functions use consistent units to avoid conversion errors.
 | `OrificeTapPressure::floored`                   | -                                                                                                                                  | - (bool)                              |
 | `OrificeTapPressure::in_range`                  | -                                                                                                                                  | - (bool)                              |
 | `orifice_flow_state`                            | geom: OrificeGeometry, dP: Pa, T: K, P: Pa, X: mol/mol, Z: -, kappa: -, correlation: -                                             | OrificeFlowResult struct              |
-| `DuctStaticState::dT_dT0`                       | -                                                                                                                                  | -                                     |
-| `DuctStaticState::dT_dP0`                       | K/Pa                                                                                                                               | K/Pa                                  |
-| `DuctStaticState::dP_dT0`                       | Pa/K                                                                                                                               | Pa/K                                  |
-| `DuctStaticState::dP_dP0`                       | -                                                                                                                                  | -                                     |
-| `DuctStaticState::drho_dT0`                     | kg/(m^3*K)                                                                                                                         | kg/(m^3*K)                            |
-| `DuctStaticState::drho_dP0`                     | kg/(m^3*Pa)                                                                                                                        | kg/(m^3*Pa)                           |
-| `DuctStaticState::dGeff_dT0`                    | kg/(m^2*s*K)                                                                                                                       | kg/(m^2*s*K)                          |
-| `DuctStaticState::dGeff_dP0`                    | kg/(m^2*s*Pa)                                                                                                                      | kg/(m^2*s*Pa)                         |
-| `NozzleSolution::P0`                            | -                                                                                                                                  | Pa                                    |
-| `NozzleSolution::T0`                            | -                                                                                                                                  | K                                     |
-| `SonicStatic::dP_dT0`                           | -                                                                                                                                  | Pa/K                                  |
-| `CombustorLossResult::dxi_dT_in`                | 1/K                                                                                                                                | 1/K                                   |
-| `CombustorLossResult::dxi_dP_in`                | 1/Pa                                                                                                                               | 1/Pa                                  |
 | `FlowSolution::Cd`                              | -                                                                                                                                  | -                                     |
 | `FlowSolution::L_choke`                         | -                                                                                                                                  | m                                     |
 | `FlowSolution::M`                               | -                                                                                                                                  | -                                     |

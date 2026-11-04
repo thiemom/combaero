@@ -648,8 +648,7 @@ TEST_F(OrificeTest, KFromCdHighBeta) {
 // RHG was evaluated far below its Re_D range, where the Re terms grow
 // without bound: a 4 mm, beta 0.5 plate hit the 1.5 cap below Re_D ~ 40. It
 // is now held below Re_b = metering_cd_re_min, entered C1 in ln Re_D over
-// orifice::metering_hold::blend_ln_re. Stolz has no hold (ISO 5167:1980 is
-// not held as a source) and is pinned to its pre-#873 values.
+// orifice::metering_hold::blend_ln_re.
 
 namespace {
 
@@ -742,41 +741,12 @@ TEST(MeteringCdHold, BoundsAreTheStandardsAndTheFlagSaysBelowThem) {
     EXPECT_NEAR(metering_cd_re_min(M::ReaderHarrisGallagher, metering_plate(0.7, 0.5, OrificeTap::Flange)), 41650.0, 1e-9);
     EXPECT_THROW(metering_cd_re_min(M::Constant, metering_plate(0.5, 0.1, OrificeTap::Corner)),
                  std::invalid_argument);
-    // Stolz: ISO 5167:1980 is not held, so no bound is encoded.
-    for (OrificeTap tap : {OrificeTap::Corner, OrificeTap::D_D2, OrificeTap::Flange}) {
-        EXPECT_THROW(metering_cd_re_min(M::Stolz, metering_plate(0.5, 0.1, tap)),
-                     std::invalid_argument);
-    }
     const auto g = metering_plate(0.5, 0.1, OrificeTap::D_D2);
     const double Rb = metering_cd_re_min(M::ReaderHarrisGallagher, g);
     EXPECT_TRUE(metering_cd_in_range(M::ReaderHarrisGallagher, g, Rb));
     EXPECT_FALSE(metering_cd_in_range(M::ReaderHarrisGallagher, g, 0.999 * Rb));
     EXPECT_FALSE(metering_cd_in_range(M::ReaderHarrisGallagher, g, 0.0));
-    EXPECT_TRUE(metering_cd_in_range(M::Stolz, g, 0.0));  // 1980 limits not encoded
-}
-
-TEST(MeteringCdHold, StolzIsUnchanged) {
-    // metering_cd_and_dRe(Stolz) before #873 (af22aedc): the Re_D < 1 floor,
-    // the 1.5 cap and the equation, to the last bit.
-    struct Ref {
-        OrificeTap tap;
-        double beta, D, Re, C, dC;
-    };
-    const Ref refs[] = {
-        {OrificeTap::Corner, 0.1, 0.1, 0.0, 0.886160312783276, 0.0},
-        {OrificeTap::Corner, 0.1, 0.1, 0.5, 0.886160312783276, 0.0},
-        {OrificeTap::Corner, 0.1, 0.1, 1.0, 0.886160312783276, -0.21750936316053165},
-        {OrificeTap::Corner, 0.5, 0.1, 10.0, 1.5, 0.0},
-        {OrificeTap::Corner, 0.5, 0.1, 100.0, 1.1151333928752514, -0.0038450586415594823},
-        {OrificeTap::D_D2, 0.5, 0.004, 1000.0, 0.69424688050302, -6.837588612677457e-05},
-        {OrificeTap::Flange, 0.6, 0.05, 1e5, 0.6101390386232195, -3.410798652982583e-08},
-    };
-    for (const Ref& r : refs) {
-        const auto [C, dC] = metering_cd_and_dRe(MeteringCdCorrelation::Stolz,
-                                                 metering_plate(r.beta, r.D, r.tap), r.Re);
-        EXPECT_EQ(C, r.C) << "Re_D " << r.Re;
-        EXPECT_EQ(dC, r.dC) << "Re_D " << r.Re;
-    }
+    EXPECT_TRUE(metering_cd_in_range(M::Constant, g, 0.0));  // the caller's Cd
 }
 
 TEST(IdelchikWallOrifice, DegenerateGeometryStaysFinite) {

@@ -35,15 +35,13 @@ Theta = T_ad / Tt_in - 1  (dimensionless temperature-rise ratio).
 
 THE CONTEXT (``PressureLossContext``) carries the inlet's stagnation state as
 ``Tt_in``/``Pt_in``. Until 0.8 these were ``T_in``/``P_in`` (``P_in`` the
-inlet's STATIC pressure); the old names still read, with a
-``DeprecationWarning``, until 0.9.0.
+inlet's STATIC pressure); the old names were removed in 0.9.0.
 """
 
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Protocol, runtime_checkable
 
-from .. import _renamed
 from .._core import (
     CombustorLossResult,
     combustor_fraction_loss,
@@ -66,39 +64,20 @@ class PressureLossContext(SimpleNamespace):
     """What a loss correlation is evaluated at: ``theta``, ``mdot_total``,
     the inlet stagnation state ``Tt_in``/``Pt_in``, ``X_in``, ``T_ad``, ...
 
-    ``T_in``/``P_in`` are the 0.7 names (``P_in`` was the inlet's static
-    pressure); they read and write ``Tt_in``/``Pt_in`` with a
-    ``DeprecationWarning`` and are removed in 0.9.0.
+    ``T_in``/``P_in`` were the 0.7 names (``P_in`` was the inlet's static
+    pressure), removed in 0.9.0.
     """
-
-    @property
-    def T_in(self) -> float:
-        _renamed._warn("PressureLossContext.T_in", "PressureLossContext.Tt_in")
-        return self.Tt_in  # type: ignore[no-any-return]
-
-    @T_in.setter
-    def T_in(self, value: float) -> None:
-        _renamed._warn("PressureLossContext.T_in", "PressureLossContext.Tt_in")
-        self.Tt_in = value
-
-    @property
-    def P_in(self) -> float:
-        _renamed._warn("PressureLossContext.P_in", "PressureLossContext.Pt_in")
-        return self.Pt_in  # type: ignore[no-any-return]
-
-    @P_in.setter
-    def P_in(self, value: float) -> None:
-        _renamed._warn("PressureLossContext.P_in", "PressureLossContext.Pt_in")
-        self.Pt_in = value
 
 
 def _ctx_inlet(ctx: object) -> tuple[float, float]:
-    """(Tt_in, Pt_in) of a context; a hand-built 0.7 context with only
-    ``T_in``/``P_in`` still works, with a ``DeprecationWarning``."""
-    if hasattr(ctx, "Tt_in") or hasattr(ctx, "Pt_in"):
-        return float(ctx.Tt_in), float(ctx.Pt_in)  # type: ignore[attr-defined]
-    _renamed._warn("a loss context's T_in/P_in", "Tt_in/Pt_in", stacklevel=4)
-    return float(ctx.T_in), float(ctx.P_in)  # type: ignore[attr-defined]
+    """(Tt_in, Pt_in) of a context. A hand-built 0.7 context with only
+    ``T_in``/``P_in`` is refused with a message naming the new fields."""
+    if not (hasattr(ctx, "Tt_in") and hasattr(ctx, "Pt_in")):
+        raise AttributeError(
+            "a pressure-loss context needs Tt_in and Pt_in (the inlet stagnation "
+            "state); T_in/P_in were removed in 0.9.0 (#782)"
+        )
+    return float(ctx.Tt_in), float(ctx.Pt_in)  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------

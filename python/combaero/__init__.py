@@ -32,16 +32,9 @@ def _load_version() -> str:
 __version__: str = _load_version()
 
 
-from ._renamed import install as _install_renamed
-
 try:
     # Preferred: local extension in the same package (installed wheel or
     # in-tree build where _core was successfully built next to this file).
-    # The deprecated stagnation spellings (#782) are patched into the
-    # compiled module first, so every re-export below sees them.
-    from . import _core as _core_ext
-
-    _install_renamed(_core_ext)
     from ._core import (
         AccuracyProvenance,
         RibCorrelationSet,
@@ -435,7 +428,6 @@ try:
         input_units,
         is_whistling_risk,
         isentropic_expansion_coefficient,
-        k_aluminum_6061,
         k_bondcoat_nicocraly,
         k_hastelloy_x,
         k_haynes188,
@@ -536,7 +528,6 @@ try:
         oxygen_required_per_mol_fuel,
         oxygen_required_per_mol_mixture,
         particle_velocity,
-        P0_from_static,  # deprecated (#782), removed in 0.9.0
         Pt_from_static,
         P_from_stagnation,
         peclet,
@@ -577,7 +568,6 @@ try:
         set_oxidizer_stream_for_Tad,
         solve_A_eff_from_mdot,
         solve_orifice_mdot,
-        solve_P0_from_mdot,  # deprecated (#782), removed in 0.9.0
         solve_Pt_from_mdot,
         solve_P_back_from_mdot,
         sound_pressure_level,
@@ -590,8 +580,6 @@ try:
         strouhal,
         sweep_liner_2dof_serial_absorption,
         sweep_liner_sdof_absorption,
-        T0_from_static,  # deprecated (#782), removed in 0.9.0
-        T0_from_static_v,  # deprecated (#782), removed in 0.9.0
         Tt_from_static,
         Tt_from_static_v,
         T_adiabatic_wall,
@@ -674,7 +662,6 @@ except (ModuleNotFoundError, ImportError) as e:
     # Fallback: attempt to import from an installed combaero package that
     # already has _core available, then re-export the symbols.
     _core = _import_module("combaero._core")
-    _install_renamed(_core)
     mixture_h = _core.mixture_h
     adiabatic_T_wgs = _core.adiabatic_T_wgs
     cp = _core.cp
@@ -816,7 +803,6 @@ except (ModuleNotFoundError, ImportError) as e:
     nozzle_flow = _core.nozzle_flow
     solve_A_eff_from_mdot = _core.solve_A_eff_from_mdot
     solve_P_back_from_mdot = _core.solve_P_back_from_mdot
-    solve_P0_from_mdot = _core.solve_P0_from_mdot
     solve_Pt_from_mdot = _core.solve_Pt_from_mdot
     critical_pressure_ratio = _core.critical_pressure_ratio
     mach_from_pressure_ratio = _core.mach_from_pressure_ratio
@@ -1482,7 +1468,6 @@ __all__ = [
     "k_stainless_steel_304",
     "k_stainless_steel_310",
     "k_stainless_steel_316",
-    "k_aluminum_6061",
     "k_tbc_ysz",
     "list_materials",
     # Advanced cooling correlations
@@ -1547,7 +1532,6 @@ __all__ = [
     "nozzle_flow",
     "solve_A_eff_from_mdot",
     "solve_P_back_from_mdot",
-    "solve_P0_from_mdot",
     "solve_Pt_from_mdot",
     "critical_pressure_ratio",
     "mach_from_pressure_ratio",
@@ -1802,12 +1786,9 @@ __all__ = [
     "MomentumChamberResult",
     "OrificeResult",
     "OrificeTapPressure",
-    "P0_from_static",
     "Pt_from_static",
     "P_from_stagnation",
     "Registry",
-    "T0_from_static",
-    "T0_from_static_v",
     "Tt_from_static",
     "Tt_from_static_v",
     "T_adiabatic_wall",

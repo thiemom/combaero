@@ -1,5 +1,4 @@
 import contextlib
-import functools
 import math
 import os
 import time
@@ -14,7 +13,7 @@ import scipy.sparse as sp
 from scipy.optimize import root
 
 import combaero as cb
-from combaero import _renamed, _solver_tools
+from combaero import _solver_tools
 
 from .components import (
     FLOW_REVERSAL_M_SCALE,
@@ -44,111 +43,6 @@ from .graph import FlowNetwork
 # Relay key of the gas a film's holes discharge into, before their coolant
 # mixes in (#694): FILM_INF_PREFIX + provider id.
 FILM_INF_PREFIX = "__film_inf__"
-
-
-# 0.8 changed what "<node>.T" and an element's "T_in"/"T_out" mean (#782):
-# STATIC temperature, as P/P_in already were; until 0.7 they held the
-# stagnation T, now "<node>.Tt"/"Tt_in". The first read of such a key
-# whose value differs from its Tt says so, once per process. Removed with
-# the deprecated "<chamber>.T_static" key in 0.9.0.
-_STATIC_T_WARNED = False
-
-
-def _warn_static_t(key: str) -> None:
-    global _STATIC_T_WARNED
-    if _STATIC_T_WARNED:
-        return
-    _STATIC_T_WARNED = True
-    warnings.warn(
-        f"result[{key!r}] is the STATIC temperature since combaero 0.8; until 0.7 it was "
-        "the stagnation temperature, now under the Tt key (e.g. '<node>.Tt', 'Tt_in'). "
-        "This warning is shown once and removed in 0.9.0.",
-        FutureWarning,
-        stacklevel=4,
-    )
-
-
-_JACOBIAN_T_KEY_WARNED = False
-
-
-def _warn_jacobian_T_key(key: str) -> None:
-    """A residual Jacobian keyed by "<node>.T": the 0.7 name of the node's
-    stagnation T column, "<node>.Tt" since 0.8 (#782). Still relayed, with
-    one DeprecationWarning per process; removed in 0.9.0."""
-    global _JACOBIAN_T_KEY_WARNED
-    if _JACOBIAN_T_KEY_WARNED:
-        return
-    _JACOBIAN_T_KEY_WARNED = True
-    node = key.rsplit(".", 1)[0]
-    _renamed._warn(f"the Jacobian key {key!r}", f"{node + '.Tt'!r}", stacklevel=2)
-
-
-class _ElementDiag(dict):
-    """An element's diagnostics; ``T_in``/``T_out`` and a junction's
-    ``port_<i>_T`` warn as ``_StaticTResult``."""
-
-    def _check(self, key: Any) -> None:
-        if not isinstance(key, str) or key not in self:
-            return
-        if key in ("T_in", "T_out"):
-            tt = dict.get(self, "Tt" + key[1:])
-        elif key.startswith("port_") and key.endswith("_T"):
-            tt = dict.get(self, key + "t")
-        else:
-            return
-        if tt is not None and dict.__getitem__(self, key) != tt:
-            _warn_static_t(key)
-
-    def __getitem__(self, key: Any) -> Any:
-        self._check(key)
-        return dict.__getitem__(self, key)
-
-    def get(self, key: Any, default: Any = None) -> Any:
-        self._check(key)
-        return dict.get(self, key, default)
-
-
-class _StaticTResult(dict):
-    """``solve()``'s result: a plain dict that, for 0.8, warns on the keys
-    whose meaning changed (see ``_warn_static_t``) and on the deprecated
-    ``"<chamber>.T_static"`` (now ``"<chamber>.T"``)."""
-
-    def __init__(self, sol: dict[str, Any]) -> None:
-        super().__init__(sol)
-        diag = dict.get(self, "__element_diag__")
-        if isinstance(diag, dict):
-            dict.__setitem__(
-                self,
-                "__element_diag__",
-                {k: _ElementDiag(v) if isinstance(v, dict) else v for k, v in diag.items()},
-            )
-
-    def _check(self, key: Any) -> None:
-        if not isinstance(key, str) or key not in self:
-            return
-        if key.endswith(".T_static"):
-            _renamed._warn(f"result[{key!r}]", f"result[{key[: -len('_static')]!r}]")
-        elif key.endswith(".T"):
-            tt = dict.get(self, key + "t")
-            if tt is not None and dict.__getitem__(self, key) != tt:
-                _warn_static_t(key)
-
-    def __getitem__(self, key: Any) -> Any:
-        self._check(key)
-        return dict.__getitem__(self, key)
-
-    def get(self, key: Any, default: Any = None) -> Any:
-        self._check(key)
-        return dict.get(self, key, default)
-
-
-def _static_t_result(solve: Callable[..., Any]) -> Callable[..., Any]:
-    @functools.wraps(solve)
-    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-        sol = solve(self, *args, **kwargs)
-        return _StaticTResult(sol) if isinstance(sol, dict) else sol
-
-    return wrapper
 
 
 def _station_ends(diag: dict[str, Any], element: Any, station_pt: dict[str, tuple]) -> None:
@@ -4142,8 +4036,13 @@ class NetworkSolver:
                             parts = unk_name.split(".")
                             nid, prop = parts[0], parts[1]
                             if prop == "T":
-                                _warn_jacobian_T_key(unk_name)
-                                prop = "Tt"
+                                # The 0.7 name of the stagnation-T column
+                                # (#782); relayed with a warning in 0.8.
+                                raise KeyError(
+                                    f"Jacobian key {unk_name!r}: the stagnation-T "
+                                    f"column is {nid + '.Tt'!r} since 0.8; the "
+                                    "'.T' spelling was removed in 0.9.0"
+                                )
                             if nid in relay:
                                 for unk_idx, sens_pkg in relay[nid].items():
                                     if prop == "Tt" and "T" in sens_pkg:
@@ -4308,7 +4207,6 @@ class NetworkSolver:
         sol["__caught_exception_count__"] = self._caught_count
         return sol
 
-    @_static_t_result
     def solve(
         self,
         method: str = "hybr",
@@ -6566,13 +6464,16 @@ class NetworkSolver:
             try:
                 state = self._report_state(node, final_x)
                 sol_dict[f"{nid}.mach"] = node.mach(state)
-                diag = node.diagnostics(state) if hasattr(node, "diagnostics") else {}
+                diag = dict(node.diagnostics(state)) if hasattr(node, "diagnostics") else {}
+                # The static T: a momentum chamber's is the one its closure
+                # solved (its diagnostics' "T_static", reported as "<node>.T"
+                # only; the "<chamber>.T_static" alias went in 0.9.0); any
+                # other node's is the state's (Tt at a plenum or
+                # incompressible node).
+                T_static = diag.pop("T_static", None)
                 for key, val in diag.items():
                     sol_dict[f"{nid}.{key}"] = val
-                # The static T: a momentum chamber's is the one its closure
-                # solved (also reported as "T_static" until 0.9.0); any other
-                # node's is the state's (Tt at a plenum or incompressible node).
-                sol_dict[f"{nid}.T"] = float(diag.get("T_static", state.T))
+                sol_dict[f"{nid}.T"] = float(state.T if T_static is None else T_static)
                 if nid in station_pt:
                     sol_dict[f"{nid}.Pt"], sol_dict[f"{nid}.mach"] = station_pt[nid]
             except (ValueError, RuntimeError) as exc:

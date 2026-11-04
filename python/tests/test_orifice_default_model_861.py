@@ -5,7 +5,7 @@ iterate: 'jobson1955' for a Cd referenced to incompressible flow
 (Reader-Harris/Gallagher, the Idelchik family, Lichtarowicz,
 McGreehan-Schotsch's baseline) on a sharp-edged bore at beta <= 0.75 in both
 directions; the nozzle for 'fixed' (the user's measurement basis is unknown),
-Stolz (ISO 5167:1980 not held), a rounded or beveled edge, and a wider bore.
+a rounded or beveled edge, and a wider bore.
 An explicit choice always wins. The cooling-plate and connection subclasses
 keep the nozzle (McGreehan-Schotsch's crossflow term is Rohde-fitted and
 nozzle-referenced).
@@ -35,10 +35,6 @@ from combaero.network import (
 from gui.backend.graph_builder import build_network_from_schema
 from gui.backend.resolve_preview import resolve_preview
 from gui.backend.schemas import NetworkGraphSchema
-
-# Stolz is deprecated (#876): its DeprecationWarning is tested in
-# test_stolz_deprecation_876.py; here Stolz is exercised for its values.
-pytestmark = pytest.mark.filterwarnings("ignore:.*Stolz.*:DeprecationWarning")
 
 INCOMPRESSIBLE_REFERENCED = {
     "ReaderHarrisGallagher": {},
@@ -88,8 +84,8 @@ def test_an_incompressible_referenced_cd_selects_jobson(corr: str) -> None:
     assert _model(_net(D_up=0.04, D_down=0.04, correlation=corr, **kw)) == "jobson1955"
 
 
-@pytest.mark.parametrize("corr", ["fixed", "Stolz"])
-def test_fixed_and_stolz_keep_the_nozzle(corr: str) -> None:
+@pytest.mark.parametrize("corr", ["fixed"])
+def test_fixed_keeps_the_nozzle(corr: str) -> None:
     assert _model(_net(correlation=corr)) == "nozzle"
     assert _model(_net(D_up=0.04, D_down=0.04, correlation=corr)) == "nozzle"
 

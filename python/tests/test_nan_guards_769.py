@@ -86,7 +86,6 @@ CASES: list[Case] = [
     ("k_stainless_steel_304", cb.k_stainless_steel_304, (800.0,), ValueError, ()),
     ("k_stainless_steel_310", cb.k_stainless_steel_310, (800.0,), ValueError, ()),
     ("k_stainless_steel_316", cb.k_stainless_steel_316, (800.0,), ValueError, ()),
-    ("k_aluminum_6061", cb.k_aluminum_6061, (400.0,), ValueError, ()),
     # hours = +inf is the fully sintered limit, so only NaN is refused there.
     ("k_tbc_ysz", cb.k_tbc_ysz, (1200.0, 100.0), ValueError, ()),
     (

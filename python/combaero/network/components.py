@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 from scipy.optimize import brentq as _brentq
 
 import combaero as cb
-from combaero import _renamed, _solver_tools
+from combaero import _solver_tools
 
 from .pressure_loss import PressureLossContext
 
@@ -2138,8 +2138,7 @@ class NetworkMixtureState:
     ``Tt`` is the node's stagnation temperature, the T the solver carries
     (the derived mixing T of an interior node, a boundary's ``Tt``). The
     solver's Jacobian keys ``f"{node}.Tt"`` are derivatives with respect to
-    this ``Tt`` (``f"{node}.T"`` until 0.7, still accepted with a
-    ``DeprecationWarning`` until 0.9.0; #782).
+    this ``Tt`` (``f"{node}.T"`` until 0.7; #782).
 
     ``T`` is the STATIC temperature, computed (#782): ``Tt`` at an
     incompressible node (the low-Mach limit its closure solves) and where
@@ -2153,9 +2152,9 @@ class NetworkMixtureState:
     static T is meant (density, cp, transport of a moving gas) that is the
     stagnation value (#824).
 
-    The constructor keeps the 0.7 signature ``(P, Pt, T, Tt, m_dot, Y)``;
-    passing ``T`` is deprecated and ignored (it was always ``Tt``) and is
-    removed in 0.9.0.
+    ``Tt``, ``m_dot`` and ``Y`` are keyword-only: the 0.7 signature
+    ``(P, Pt, T, Tt, m_dot, Y)`` took a ``T`` that was always ``Tt``, and a
+    positional call written for it now fails instead of shifting arguments.
     """
 
     P: float
@@ -2169,24 +2168,12 @@ class NetworkMixtureState:
         self,
         P: float,
         Pt: float,
-        T: float | None = None,
-        Tt: float | None = None,
-        m_dot: float = 0.0,
-        Y: list[float] | None = None,
         *,
+        Tt: float,
+        m_dot: float = 0.0,
+        Y: list[float],
         incompressible: bool = False,
     ) -> None:
-        if T is not None:
-            _renamed._warn(
-                "NetworkMixtureState(T=...)",
-                "Tt=...; T is the static temperature, computed from (P, Pt, Tt)",
-            )
-            if Tt is None:
-                Tt = T
-        if Tt is None:
-            raise TypeError("NetworkMixtureState() missing required argument: 'Tt'")
-        if Y is None:
-            raise TypeError("NetworkMixtureState() missing required argument: 'Y'")
         self.P = P
         self.Pt = Pt
         self.Tt = Tt
@@ -2208,15 +2195,6 @@ class NetworkMixtureState:
             return Tt
         X = self.X
         return float(cb.calc_T_from_s(cb.s(Tt, X, Pt), P, X, Tt, 1e-10))
-
-    @T.setter
-    def T(self, value: float) -> None:
-        # 0.7 code set T to the stagnation T it carried (#782).
-        _renamed._warn(
-            "setting NetworkMixtureState.T",
-            "NetworkMixtureState.Tt; T is the static temperature, computed from (P, Pt, Tt)",
-        )
-        self.Tt = value
 
     @property
     def X(self) -> list[float]:
@@ -4228,29 +4206,16 @@ class CombustorNode(NetworkNode):
 # no published source matched the formula it carried.
 _METERING_SELECTORS = {
     "ReaderHarrisGallagher": cb.MeteringCdCorrelation.ReaderHarrisGallagher,
-    "Stolz": cb.MeteringCdCorrelation.Stolz,
 }
 
-#: Why Stolz is deprecated (#876), for the warning and the GUI's note.
-STOLZ_DEPRECATION_REASON = (
-    "ISO replaced Stolz with Reader-Harris/Gallagher in ISO 5167-1:1991/Amd 1:1998 "
-    "(and ISO 5167-2:2003). Reader-Harris/Gallagher has a sourced range of use and "
-    "fits the EEC/API database better over Stolz's own range (Reader-Harris & "
-    "Sattary 1996, Table 10: s 0.245 % vs 0.390 %); Stolz's limits of use are not "
-    "held, so metering_cd_in_range cannot flag it."
+#: Why Stolz was removed in 0.9.0 (#876), for the refusal of a 'Stolz' Cd.
+STOLZ_REMOVAL_REASON = (
+    "the Stolz Cd (ISO 5167:1980) was removed in 0.9.0 (#876): use "
+    "'ReaderHarrisGallagher'. ISO replaced Stolz with Reader-Harris/Gallagher in "
+    "ISO 5167-1:1991/Amd 1:1998 (and ISO 5167-2:2003), which has a sourced range "
+    "of use and fits the EEC/API database better over Stolz's own range "
+    "(Reader-Harris & Sattary 1996, Table 10: s 0.245 % vs 0.390 %)."
 )
-
-
-def warn_stolz_deprecated(what: str, stacklevel: int = 2) -> None:
-    """The Stolz (ISO 5167:1980) metering Cd is deprecated in 0.8.0 and
-    removed in 0.9.0 (#876). One DeprecationWarning per use, naming the
-    replacement; results are unchanged."""
-    warnings.warn(
-        f"{what} (ISO 5167:1980) is deprecated and will be removed in "
-        f"{_renamed.REMOVAL}: use 'ReaderHarrisGallagher'. {STOLZ_DEPRECATION_REASON}",
-        DeprecationWarning,
-        stacklevel=stacklevel + 1,
-    )
 
 
 _DISCHARGE_SELECTORS = {
@@ -4280,7 +4245,7 @@ ORIFICE_COMPRESSIBLE_MODELS = ("nozzle", "jobson1955", "iso5167")
 #: compressible model is jobson1955 on a sharp-edged bore at beta <=
 #: JOBSON_1955_BETA_MAX, chosen once at build and never per iterate. Every
 #: other case keeps the nozzle: 'fixed' (the user's measurement basis is
-#: unknown), Stolz (ISO 5167:1980 not held) and McGreehan-Schotsch's
+#: unknown) and McGreehan-Schotsch's
 #: crossflow term (Rohde-fitted, nozzle-referenced), which only the duct-fed
 #: EffusionPlateElement feeds; a plain orifice is plenum-fed, U1/Vi = 0.
 _JOBSON_DEFAULT_CORRELATIONS = frozenset(
@@ -4377,8 +4342,6 @@ class OrificeElement(NetworkElement):
     The discharge coefficient Cd is determined by the 'correlation' parameter:
       - 'fixed': Uses the user-supplied Cd value directly; Cd is required.
       - 'ReaderHarrisGallagher': Sharp thin-plate (ISO 5167-2:2003 / RHG).
-      - 'Stolz': ISO 5167:1980. Deprecated (#876), removed in 0.9.0: a
-        DeprecationWarning at construction; use 'ReaderHarrisGallagher'.
       - 'IdelchikThick': Deep hole in a wall, Idelchik diagram 4-18a
         (requires plate_thickness). Valid Re 25 to 1e6.
       - 'IdelchikBeveled': Beveled-edge hole, diagram 4-18b
@@ -4438,7 +4401,7 @@ class OrificeElement(NetworkElement):
     incompressible flow (ReaderHarrisGallagher, the Idelchik family,
     Lichtarowicz, McGreehanSchotsch) on a sharp-edged bore (edge_radius = 0,
     bevel_depth = 0) at beta <= JOBSON_1955_BETA_MAX in both flow
-    directions; 'nozzle' otherwise ('fixed', Stolz, a rounded or beveled
+    directions; 'nozzle' otherwise ('fixed', a rounded or beveled
     edge, a wider bore). A Ci above Jobson's 0.7 is flagged by
     model_in_range, not refused. Before resolve_topology the attribute holds
     the selection for a plenum-fed bore (beta = 0).
@@ -4466,11 +4429,6 @@ class OrificeElement(NetworkElement):
     # and geometry (#861). The cooling and connection subclasses keep the
     # nozzle: their Cd laws are outside the #861 audit.
     _selects_compressible_model = True
-
-    # A subclass whose validate() refuses the ISO 5167 metering family (the
-    # cooling plates: no pipe, no beta) does not also warn that Stolz is
-    # deprecated (#876); the refusal is the message.
-    _refuses_metering = False
 
     # The Cd a 'fixed' correlation takes when none is given (#872). None:
     # 'fixed' requires a Cd. A subclass with a documented default (the
@@ -4561,11 +4519,11 @@ class OrificeElement(NetworkElement):
                 f"OrificeElement {id!r}: the 'Miller' correlation was removed. "
                 "No published source matched its formula (and the network's "
                 "'Miller' had been computing Stolz). Use 'ReaderHarrisGallagher' "
-                "(Stolz is deprecated, #876)."
+                "(Stolz was removed in 0.9.0, #876)."
             )
+        if correlation == "Stolz":
+            raise ValueError(f"OrificeElement {id!r}: {STOLZ_REMOVAL_REASON}")
         name = type(self).__name__
-        if correlation == "Stolz" and not type(self)._refuses_metering:
-            warn_stolz_deprecated(f"{name} {id!r}: correlation='Stolz'")
         if correlation == "fixed":
             if Cd is None:
                 Cd = type(self)._fixed_Cd_default
@@ -4876,11 +4834,7 @@ class OrificeElement(NetworkElement):
         # Correlation selection logic
         metering = _METERING_SELECTORS.get(self.correlation)
         if metering is not None:
-            return float(
-                _solver_tools.metering_cd_and_dRe_quiet(
-                    metering, self._orifice_geom, flow_state.Re_D
-                )[0]
-            )
+            return float(cb.metering_cd_and_dRe(metering, self._orifice_geom, flow_state.Re_D)[0])
         elif self.correlation in _DISCHARGE_SELECTORS:
             # The discharge-hole family: a hole in a wall, not a plate in a
             # pipe, so DischargeHoleGeometry and no pipe diameter -- the
@@ -4902,7 +4856,7 @@ class OrificeElement(NetworkElement):
                 "The 'Auto' arm was removed: it picked a correlation from the "
                 "geometry behind the caller's back, which is how a "
                 "rounded-entry request came back as Stolz. Name one of "
-                "'fixed', 'ReaderHarrisGallagher', 'Stolz', "
+                "'fixed', 'ReaderHarrisGallagher', "
                 "'IdelchikThick', 'IdelchikBeveled', 'IdelchikRounded', "
                 "'McGreehanSchotsch', 'Lichtarowicz'."
             )
@@ -5059,9 +5013,7 @@ class OrificeElement(NetworkElement):
         metering = _METERING_SELECTORS.get(self.correlation)
         if metering is None:
             return {}
-        dCd_dRe = float(
-            _solver_tools.metering_cd_and_dRe_quiet(metering, self._orifice_geom, Re)[1]
-        )
+        dCd_dRe = float(cb.metering_cd_and_dRe(metering, self._orifice_geom, Re)[1])
         out = {f"{self.id}.m_dot": dCd_dRe * Re / abs(m) * (1.0 if m > 0 else -1.0)}
         if not mu_fallback:
             for name, d in self._re_viscosity_dnames(state_in, Re).items():
@@ -5075,8 +5027,7 @@ class OrificeElement(NetworkElement):
         is the caller's). The normed metering family asks C++'s
         metering_cd_in_range at the pipe Reynolds number (ISO 5167-2:2003
         5.3.1 for Reader-Harris/Gallagher, below whose lower Re_D bound the
-        Cd is held (#873) and this reads False; Stolz's 1980 limits are not
-        encoded). A plenum-fed metering plate reads False: it has no pipe.
+        Cd is held (#873) and this reads False). A plenum-fed metering plate reads False: it has no pipe.
         """
         metering = _METERING_SELECTORS.get(self.correlation)
         if metering is not None and self._orifice_geom is not None:
@@ -5085,9 +5036,7 @@ class OrificeElement(NetworkElement):
             m = abs(float(state_in.m_dot))
             Re_D = 4.0 * m / (math.pi * D_up * mu) if (mu > 0.0 and D_up > 0.0) else 0.0
             in_pipe = bool(self.upstream_diameter)
-            return in_pipe and bool(
-                _solver_tools.metering_cd_in_range_quiet(metering, self._orifice_geom, Re_D)
-            )
+            return in_pipe and bool(cb.metering_cd_in_range(metering, self._orifice_geom, Re_D))
         selector = _DISCHARGE_SELECTORS.get(self.correlation)
         if selector is None or self._orifice_geom is None:
             return True
@@ -5815,8 +5764,8 @@ class OrificeElement(NetworkElement):
             mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
             m = abs(float(state_in.m_dot))
             Re_D = 4.0 * m / (math.pi * g.D * mu) if (mu > 0.0 and m > 1e-12) else 1e4
-            c_net = float(_solver_tools.metering_cd_and_dRe_quiet(metering, g, Re_D)[0])
-            c_tap = float(_solver_tools.metering_cd_and_dRe_quiet(metering, at_tap, Re_D)[0])
+            c_net = float(cb.metering_cd_and_dRe(metering, g, Re_D)[0])
+            c_tap = float(cb.metering_cd_and_dRe(metering, at_tap, Re_D)[0])
             dp_net *= (c_net / c_tap) ** 2
         out["dP_tap"] = dp_net
         return out
@@ -5969,7 +5918,6 @@ class EffusionPlateElement(OrificeElement):
     """
 
     _selects_compressible_model = False  # keeps the nozzle (#861)
-    _refuses_metering = True  # validate() refuses an ISO 5167 correlation
 
     def __init__(
         self,
@@ -6632,7 +6580,6 @@ class FilmCoolingElement(OrificeElement):
     """
 
     _selects_compressible_model = False  # keeps the nozzle (#861)
-    _refuses_metering = True  # validate() refuses an ISO 5167 correlation
 
     def __init__(
         self,
@@ -6846,7 +6793,6 @@ class SlotFilmElement(OrificeElement):
     """
 
     _selects_compressible_model = False  # keeps the nozzle (#861)
-    _refuses_metering = True  # validate() refuses an ISO 5167 correlation
 
     def __init__(
         self,
@@ -7477,7 +7423,6 @@ class ImpingementPlateElement(OrificeElement):
     _htc_dmdot_is_signed = True
 
     _selects_compressible_model = False  # keeps the nozzle (#861)
-    _refuses_metering = True  # validate() refuses an ISO 5167 correlation
     # Florschuetz's measured 0.79: the Cd of an unset Cd with correlation
     # 'fixed' (#872), and the start guess's Cd under a correlation, as it
     # was before 0.8.0.

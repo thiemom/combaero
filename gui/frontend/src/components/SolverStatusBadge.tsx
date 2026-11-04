@@ -32,20 +32,6 @@ const BalanceLine: React.FC<{ onOpen: () => void }> = ({ onOpen }) => {
 	);
 };
 
-/** Deprecated settings the network uses (#876). Report only: the solve is unchanged. */
-const DeprecationLines: React.FC<{ notes?: string[] }> = ({ notes }) => {
-	if (!notes || notes.length === 0) return null;
-	return (
-		<>
-			{notes.map((note) => (
-				<span key={note} className="text-[10px] text-amber-700 mt-0.5">
-					{note}
-				</span>
-			))}
-		</>
-	);
-};
-
 const SolverStatusBadge: React.FC = () => {
 	const { solveResults, dismissSolveStatus, solverSettings } = useStore();
 	const [showChart, setShowChart] = useState(false);
@@ -108,7 +94,6 @@ const SolverStatusBadge: React.FC = () => {
 								{incompressibleNote}
 							</span>
 						)}
-						<DeprecationLines notes={solveResults.deprecations} />
 					</div>
 					<button
 						type="button"
@@ -181,7 +166,6 @@ const SolverStatusBadge: React.FC = () => {
 				)}
 				<div className="px-4 pb-2 flex flex-col">
 					<BalanceLine onOpen={() => setShowBalance(true)} />
-					<DeprecationLines notes={solveResults.deprecations} />
 				</div>
 			</div>
 			{showChart && (

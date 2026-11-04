@@ -25,7 +25,7 @@ from combaero.network import (
 )
 
 AIR = list(cb.mole_to_mass(cb.species.dry_air()))
-MATERIALS = [m for m in cb.list_materials() if m != "al6061"]
+MATERIALS = list(cb.list_materials())
 
 
 def _grid(name: str) -> list[float]:
