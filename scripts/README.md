@@ -212,9 +212,12 @@ dependencies, the `examples`/`generator` extras, the GUI). The nightly
 runs the fast suite and the examples. Dependabot only ever moves the top of a
 range. `--check` fails on a requirement with no lower bound, which
 lowest-direct would resolve to the first release ever published. A floor is
-the lowest version with no known advisory that passes the suite.
+the lowest version with no known advisory that passes the suite; `--osv`
+asks OSV for advisories against every floor (nightly, and with every
+Dependabot round).
 ```bash
 uv run scripts/dependency_floors.py --check
+uv run scripts/dependency_floors.py --osv
 uv run scripts/dependency_floors.py > floors.in && uv pip install --resolution lowest-direct -r floors.in
 ```
 

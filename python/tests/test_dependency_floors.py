@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
 from packaging.requirements import Requirement
 
 REPO = Path(__file__).resolve().parents[2]
@@ -46,3 +47,27 @@ def test_the_gui_web_stack_clears_the_known_advisories() -> None:
     got = {r.name: floors.floor(r) for _, r in floors.requirements() if r.name in want}
     for name, v in want.items():
         assert Version(got[name]) >= Version(v), name
+
+
+def test_the_osv_check_queries_the_effective_floor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Offline: one query per package at its highest declared floor, and the
+    advisory ids come back keyed by that pin. (Live, the check flags
+    h11==0.14.0 and starlette==0.27.0 and clears numpy==1.26.)"""
+    import io
+    import json
+    import urllib.request
+
+    sent: list[dict] = []
+
+    def fake_urlopen(req: urllib.request.Request, timeout: float) -> io.BytesIO:
+        sent.extend(json.loads(req.data)["queries"])
+        return io.BytesIO(json.dumps({"results": [{"vulns": [{"id": "GHSA-x"}]}, {}]}).encode())
+
+    monkeypatch.setattr(floors.urllib.request, "urlopen", fake_urlopen)
+    reqs = [
+        ("a", Requirement("h11>=0.14.0")),
+        ("b", Requirement("pandas>=2.0")),
+        ("c", Requirement("pandas>=2.2.3")),
+    ]
+    assert floors.advisories(reqs) == {"h11==0.14.0": ["GHSA-x"], "pandas==2.2.3": []}
+    assert [q["version"] for q in sent] == ["0.14.0", "2.2.3"]
