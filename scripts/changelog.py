@@ -31,7 +31,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CHANGELOG = ROOT / "CHANGELOG.md"
 FRAGMENTS = ROOT / "changelog.d"
-REPO_URL = "https://github.com/thiemom/combaero"
+REPO_URL = "https://github.com/thirox-lab/combaero"
 
 # Keep a Changelog order, plus the "Documentation" section this changelog uses.
 CATEGORIES = ("added", "changed", "deprecated", "removed", "fixed", "security", "documentation")

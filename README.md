@@ -47,15 +47,15 @@ auto burned = combaero::complete_combustion(in);
 
 ## Documentation
 
-- **[API Reference (C++)](https://github.com/thiemom/combaero/blob/main/docs/API_CPP.md)**: Technical reference for C++ developers and agents.
-- **[API Reference (Python)](https://github.com/thiemom/combaero/blob/main/docs/API_PYTHON.md)**: High-level Python usage and examples.
-- **[Units Guide](https://github.com/thiemom/combaero/blob/main/docs/UNITS.md)**: SI unit system and physical constants.
+- **[API Reference (C++)](https://github.com/thirox-lab/combaero/blob/main/docs/API_CPP.md)**: Technical reference for C++ developers and agents.
+- **[API Reference (Python)](https://github.com/thirox-lab/combaero/blob/main/docs/API_PYTHON.md)**: High-level Python usage and examples.
+- **[Units Guide](https://github.com/thirox-lab/combaero/blob/main/docs/UNITS.md)**: SI unit system and physical constants.
 
 ## Technical Details
 
-- **[Building CombAero](https://github.com/thiemom/combaero/blob/main/docs/BUILDING.md)**: Prerequisites and build instructions.
-- **[Development Workflow](https://github.com/thiemom/combaero/blob/main/docs/DEVELOPMENT.md)**: Testing, styling, and contribution guide.
-- **[Packaging Strategy](https://github.com/thiemom/combaero/blob/main/docs/PACKAGING.md)**: How we decouple core physics from the GUI.
+- **[Building CombAero](https://github.com/thirox-lab/combaero/blob/main/docs/BUILDING.md)**: Prerequisites and build instructions.
+- **[Development Workflow](https://github.com/thirox-lab/combaero/blob/main/docs/DEVELOPMENT.md)**: Testing, styling, and contribution guide.
+- **[Packaging Strategy](https://github.com/thirox-lab/combaero/blob/main/docs/PACKAGING.md)**: How we decouple core physics from the GUI.
 
 ## GUI
 

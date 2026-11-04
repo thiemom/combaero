@@ -36,8 +36,8 @@ Intro.
 
 - **Released.**
 
-[Unreleased]: https://github.com/thiemom/combaero/compare/v0.6.0...HEAD
-[0.6.0]: https://github.com/thiemom/combaero/compare/v0.5.0...v0.6.0
+[Unreleased]: https://github.com/thirox-lab/combaero/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/thirox-lab/combaero/compare/v0.5.0...v0.6.0
 """
 
 
@@ -69,8 +69,8 @@ def test_release_folds_fragments_into_a_dated_block(repo: tuple[Path, Path]) -> 
     assert fixed.index("#496") < fixed.index("#463") < fixed.index("Old fix")
     assert "Old change" in block and "A second Changed section" in block
     # Compare links moved on.
-    assert "[Unreleased]: https://github.com/thiemom/combaero/compare/v0.7.0...HEAD" in text
-    assert "[0.7.0]: https://github.com/thiemom/combaero/compare/v0.6.0...v0.7.0" in text
+    assert "[Unreleased]: https://github.com/thirox-lab/combaero/compare/v0.7.0...HEAD" in text
+    assert "[0.7.0]: https://github.com/thirox-lab/combaero/compare/v0.6.0...v0.7.0" in text
     # Fragments consumed, the README kept.
     assert [p.name for p in d.iterdir()] == ["README.md"]
 

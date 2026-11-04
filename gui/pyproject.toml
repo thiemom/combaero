@@ -39,10 +39,10 @@ dependencies = [
 gui = []
 
 [project.urls]
-Homepage = "https://github.com/thiemom/combaero"
-Repository = "https://github.com/thiemom/combaero"
-"Bug Tracker" = "https://github.com/thiemom/combaero/issues"
-Changelog = "https://github.com/thiemom/combaero/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/thirox-lab/combaero"
+Repository = "https://github.com/thirox-lab/combaero"
+"Bug Tracker" = "https://github.com/thirox-lab/combaero/issues"
+Changelog = "https://github.com/thirox-lab/combaero/blob/main/CHANGELOG.md"
 
 [project.scripts]
 combaero-gui = "gui.backend.main:run_server"
