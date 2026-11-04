@@ -24,6 +24,8 @@ using combaero::luminosity_factor_hydrogen;
 using combaero::mean_beam_length;
 using combaero::STEFAN_BOLTZMANN;
 using combaero::wall_radiation_sides;
+using combaero::wall_adiabatic_face;
+using combaero::WALL_ADIABATIC_N_PARAMS;
 using combaero::WALL_RAD_N_PARAMS;
 
 namespace {
@@ -255,4 +257,58 @@ TEST(LinerRadiation, LefebvreWorkedExamples) {
   EXPECT_NEAR(tbc.T_s_a, 1304.0, 1.0);
   EXPECT_NEAR(tbc.T_s_a - tbc.q * r_tbc, 1236.0, 1.0);
   EXPECT_NEAR(tbc.T_s_b, 1220.0, 1.0);
+}
+
+// A face whose other side is adiabatic (#970): the face's own balance.
+TEST(LinerRadiation, AdiabaticFaceSatisfiesItsBalance) {
+  const double eg = gas_emissivity_luminous(2280.0, 3040e3, 0.0588, 0.0792, 1.7).eps;
+  const double k_gas = 0.5 * STEFAN_BOLTZMANN * 1.7 * eg;
+  // Gas radiation into a face at T_aw 1500 K from a 2280 K gas: the face
+  // runs hot of T_aw, and its convection hands back exactly what it absorbs.
+  const auto g = wall_adiabatic_face(1500.0, 565.0, 1, 2280.0, k_gas);
+  const double R1 = liner_gas_radiation(2280.0, g.T_s, eg, 0.7).R1;
+  EXPECT_GT(g.T_s, 1500.0);
+  EXPECT_LT(g.T_s, 2280.0);
+  EXPECT_NEAR(565.0 * (1500.0 - g.T_s) + R1, 0.0, 1e-9 * R1);
+  EXPECT_NEAR(g.q_rad, R1, 1e-9 * R1);
+  // A surface face radiating to a colder casing runs cold of T_aw.
+  const double F = liner_casing_exchange_factor(0.7, 0.4, 0.7);
+  const auto c = wall_adiabatic_face(900.0, 300.0, 2, 600.0, F);
+  const double R2 = std::get<0>(liner_casing_radiation(c.T_s, 600.0, 0.7, 0.4, 0.7));
+  EXPECT_LT(c.T_s, 900.0);
+  EXPECT_GT(c.T_s, 600.0);
+  EXPECT_NEAR(300.0 * (900.0 - c.T_s) - R2, 0.0, 1e-9 * R2);
+  // No radiation: the face sits at its adiabatic wall temperature.
+  const auto n = wall_adiabatic_face(812.5, 40.0, 0, 0.0, 0.0);
+  EXPECT_EQ(n.T_s, 812.5);
+  EXPECT_EQ(n.q_rad, 0.0);
+  EXPECT_EQ(n.dT_s[0], 1.0);
+  EXPECT_THROW(wall_adiabatic_face(800.0, 0.0, 1, 2000.0, k_gas), std::invalid_argument);
+  EXPECT_THROW(wall_adiabatic_face(800.0, 10.0, 3, 2000.0, k_gas), std::invalid_argument);
+}
+
+TEST(LinerRadiation, AdiabaticFaceDerivatives) {
+  const double eg = gas_emissivity_luminous(2280.0, 3040e3, 0.0588, 0.0792, 1.7).eps;
+  const double k_gas = 0.5 * STEFAN_BOLTZMANN * 1.7 * eg;
+  const double F = liner_casing_exchange_factor(0.7, 0.4, 0.7);
+  for (int kind : {1, 2}) {
+    const std::array<double, WALL_ADIABATIC_N_PARAMS> p =
+        kind == 1 ? std::array<double, WALL_ADIABATIC_N_PARAMS>{1500.0, 565.0, 2280.0, k_gas}
+                  : std::array<double, WALL_ADIABATIC_N_PARAMS>{900.0, 300.0, 600.0, F};
+    const auto w = wall_adiabatic_face(p[0], p[1], kind, p[2], p[3]);
+    for (int j = 0; j < WALL_ADIABATIC_N_PARAMS; ++j) {
+      // p_j dT_s/dp_j against a relative central difference (k is O(1e-8)).
+      const double e = 1e-6;
+      auto pp = p;
+      auto pm = p;
+      pp[static_cast<std::size_t>(j)] *= 1.0 + e;
+      pm[static_cast<std::size_t>(j)] *= 1.0 - e;
+      const double fd = (wall_adiabatic_face(pp[0], pp[1], kind, pp[2], pp[3]).T_s -
+                         wall_adiabatic_face(pm[0], pm[1], kind, pm[2], pm[3]).T_s) /
+                        (2.0 * e);
+      const double an = w.dT_s[static_cast<std::size_t>(j)] * p[static_cast<std::size_t>(j)];
+      EXPECT_NEAR(an, fd, 1e-6 * std::max(std::abs(fd), 1e-3 * w.T_s))
+          << "kind " << kind << " param " << j;
+    }
+  }
 }

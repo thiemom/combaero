@@ -1446,6 +1446,54 @@ def _radiation_face(
     )
 
 
+@dataclass(frozen=True)
+class HeatLoss:
+    """A ThermalWall side with no stream: a fixed external temperature behind
+    a heat transfer coefficient (#970), ``ThermalWall(element_b=None,
+    side_b=HeatLoss(T_ext=..., h=...))``.
+
+    The wall's one stream exchanges with ``T_ext`` through the series
+    resistance ``1/(h_a A_a) + sum t/(k A_m) + R_fouling/A_a + 1/(h A_b)``,
+    the epsilon-NTU integral against a reservoir: bounded by C_a (T_aw_a -
+    T_ext), none into a stream that does not flow. The heat leaves the network
+    (``{wall}.Q_loss`` [W], > 0 out) and the ledger books it so.
+
+    Attributes
+    ----------
+    T_ext : float
+        External temperature [K], > 0.
+    h : float
+        External heat transfer coefficient [W/(m^2*K)], > 0 (radiation
+        linearised into it, if any: an input the user owns).
+    """
+
+    T_ext: float
+    h: float
+
+    def __post_init__(self) -> None:
+        if not (math.isfinite(float(self.T_ext)) and float(self.T_ext) > 0.0):
+            raise ValueError(
+                f"HeatLoss: T_ext must be a positive temperature [K], not {self.T_ext}"
+            )
+        if not (math.isfinite(float(self.h)) and float(self.h) > 0.0):
+            raise ValueError(
+                f"HeatLoss: h must be > 0 [W/(m^2*K)], not {self.h}; an insulated side "
+                "with no loss is side_b='adiabatic'"
+            )
+
+
+class _AdiabaticWallResult:
+    """The coupling of a wall with an adiabatic side (#970): no heat, the
+    stream side's face at its own balance (``cb wall_adiabatic_face``)."""
+
+    def __init__(self, T_s: float, radiation: dict[str, float]) -> None:
+        self.Q = 0.0
+        self.T_hot = T_s
+        self.UA = 0.0
+        self.effectiveness = 0.0
+        self.radiation = radiation
+
+
 class _RadiativeWallCoupling:
     """A wall's coupling with radiation on a face (#793): the kernel's result
     on the effective sides, with dQ/d(T_aw, h) back in the convective inputs
@@ -1489,8 +1537,22 @@ class ThermalWall:
         Unique identifier for this wall connection.
     element_a : str
         Element ID for side A.
-    element_b : str
-        Element ID for side B.
+    element_b : str | None
+        Element ID for side B; None for a wall with no stream on side B,
+        which ``side_b`` then describes (#970).
+    side_b : "adiabatic" | HeatLoss | None
+        Side B without a stream (#970), with ``element_b=None``; None (the
+        default) for a stream on each side. ``"adiabatic"``: no heat crosses
+        the wall, which sits at side A's own balance -- its T_aw, or with
+        ``radiation_a=GasRadiation`` the face's radiation balance
+        (``wall_adiabatic_face``) -- and changes nothing in the network.
+        ``HeatLoss(T_ext, h)``: side A's stream exchanges with a fixed
+        ``T_ext`` behind ``h`` through the layers (epsilon-NTU against a
+        reservoir), and that heat leaves the network (``{wall}.Q_loss``).
+        The free side is B only: the layers run from the stream to it. Not
+        with ``radiation_b`` or a film on side B; an adiabatic wall also not
+        with ``radiation_a=CasingRadiation``, whose heat would leave to a
+        casing no stream carries (use HeatLoss).
     layers : list[WallLayer]
         Stack of wall layers ordered from side A to side B.
     contact_area : float | None
@@ -1548,7 +1610,7 @@ class ThermalWall:
 
     id: str
     element_a: str
-    element_b: str
+    element_b: str | None
     layers: list[WallLayer] = field(default_factory=list)
     contact_area: float | None = None
     area_a: float | None = None
@@ -1562,6 +1624,7 @@ class ThermalWall:
     film_end: float | None = None
     radiation_a: GasRadiation | CasingRadiation | None = None
     radiation_b: GasRadiation | CasingRadiation | None = None
+    side_b: Literal["adiabatic"] | HeatLoss | None = None
 
     # Internal cache for temperature-dependent property iteration
     _last_profile: list[float] | None = field(default=None, init=False, repr=False)
@@ -1608,6 +1671,131 @@ class ThermalWall:
                     f"ThermalWall '{self.id}': {name} must be a GasRadiation, a "
                     f"CasingRadiation or None, not {type(spec).__name__}"
                 )
+        self._check_side_b()
+
+    def _check_side_b(self) -> None:
+        """A side B with no stream (#970): what it is and what it excludes."""
+        if self.element_b is not None:
+            if self.side_b is not None:
+                raise ValueError(
+                    f"ThermalWall '{self.id}': side_b={self.side_b!r} describes a side B "
+                    f"with no stream, but element_b is {self.element_b!r}; give "
+                    "element_b=None, or drop side_b"
+                )
+            return
+        if not (self.side_b == "adiabatic" or isinstance(self.side_b, HeatLoss)):
+            raise ValueError(
+                f"ThermalWall '{self.id}': element_b=None needs side_b='adiabatic' or "
+                f"side_b=HeatLoss(T_ext=..., h=...), not {self.side_b!r}"
+            )
+        if self.radiation_b is not None:
+            raise ValueError(
+                f"ThermalWall '{self.id}': side B has no stream, so no radiation_b; "
+                "linearise any radiation from that face into HeatLoss's h"
+            )
+        if self.film is not None and self.film_side != "a":
+            raise ValueError(
+                f"ThermalWall '{self.id}': side B has no stream for a film to cover; "
+                "film_side must be 'a'"
+            )
+        if self.side_b == "adiabatic" and isinstance(self.radiation_a, CasingRadiation):
+            raise ValueError(
+                f"ThermalWall '{self.id}': an adiabatic wall with CasingRadiation on "
+                "side A would lose heat to a casing that no stream carries; use "
+                "side_b=HeatLoss(...) for a lossy wall, or a casing stream as side B"
+            )
+
+    @property
+    def one_sided(self) -> bool:
+        """True when side B has no stream (``side_b``, #970)."""
+        return self.element_b is None
+
+    @property
+    def adiabatic(self) -> bool:
+        """True for an adiabatic side B: the wall passes no heat (#970)."""
+        return self.element_b is None and self.side_b == "adiabatic"
+
+    @property
+    def heat_loss(self) -> HeatLoss | None:
+        """Side B's HeatLoss, or None (#970)."""
+        return self.side_b if isinstance(self.side_b, HeatLoss) else None
+
+    @property
+    def endpoints(self) -> tuple[str, ...]:
+        """The wall's endpoints that carry a stream: (A, B), or (A,) with a
+        side B that has none (#970)."""
+        if self.element_b is None:
+            return (self.element_a,)
+        return (self.element_a, self.element_b)
+
+    @property
+    def heated_endpoints(self) -> tuple[str, ...]:
+        """The endpoints whose stream takes or gives this wall's heat: none
+        for an adiabatic wall (#970)."""
+        return () if self.adiabatic else self.endpoints
+
+    def adiabatic_coupling(
+        self,
+        h_a: float,
+        T_aw_a: float,
+        A_conv_a: float,
+        gas_a: "tuple[float, float, Any] | None" = None,
+    ) -> _AdiabaticWallResult:
+        """An adiabatic wall's state (#970): no heat, and the wall at side A's
+        face balance, ``h (T_aw - T_s) + h_r (T_src - T_s) = 0`` (C++
+        ``wall_adiabatic_face``); without radiation T_s = T_aw_a. No heat
+        crosses the layers, so the whole stack sits at T_s."""
+        face = _radiation_face(self.radiation_a, gas_a, 1.0)
+        h_p = max(float(h_a), cb.WALL_HTC_KNEE)
+        r = _solver_tools.wall_adiabatic_face(float(T_aw_a), h_p, face.kind, face.T_src, face.k)
+        T_s = float(r.T_s)
+        for layer in self.layers:
+            if layer.material.lower() not in ("generic", "custom"):
+                layer.update_conductivity(T_s)
+                layer.in_range = bool(cb.material_in_range(layer.material, T_s))
+        self._last_profile = [T_s] * (len(self.layers) + 1)
+        radiation: dict[str, float] = {}
+        if face.kind:
+            if self.area_a is not None:
+                A = float(self.area_a)
+            elif self.contact_area is not None:
+                A = float(self.contact_area)
+            else:
+                A = float(A_conv_a)
+            radiation["q_rad_a"] = float(r.q_rad)
+            radiation["Q_rad_a"] = float(r.q_rad) * A
+            radiation["T_surface_a"] = T_s
+            if face.kind == 1:
+                radiation["eps_g_a"] = face.eps_g
+        return _AdiabaticWallResult(T_s, radiation)
+
+    def heat_loss_coupling(
+        self,
+        h_a: float,
+        T_aw_a: float,
+        A_conv_a: float,
+        C_a: float = math.inf,
+        gas_a: "tuple[float, float, Any] | None" = None,
+    ) -> cb.WallCouplingResult:
+        """A HeatLoss wall's exchange (#970): ``compute_coupling`` with side B
+        the external reservoir (h, T_ext, C = inf), so Q > 0 leaves side A's
+        stream for T_ext, bounded by C_a (T_aw_a - T_ext)."""
+        hl = self.heat_loss
+        if hl is None:
+            raise ValueError(f"ThermalWall '{self.id}': no HeatLoss side")
+        return self.compute_coupling(
+            h_a,
+            T_aw_a,
+            A_conv_a,
+            float(hl.h),
+            float(hl.T_ext),
+            math.inf,
+            C_a,
+            math.inf,
+            False,
+            gas_a=gas_a,
+            gas_b=None,
+        )
 
     @property
     def film_side_id(self) -> str | None:
@@ -10332,8 +10520,9 @@ class ChannelElement(NetworkElement):
         self._upstream_node = graph.nodes.get(self.from_node)
         # A side of a ThermalWall: its heat is deposited on the node the flow
         # goes into, so the end nodes' Tt ratio is this duct's heating (#551).
+        # An adiabatic wall (#970) heats nothing.
         walls = list(getattr(graph, "walls", {}).values())
-        self._wall_heated = any(self.id in (w.element_a, w.element_b) for w in walls)
+        self._wall_heated = any(self.id in w.heated_endpoints for w in walls)
         # The ends whose Tt IS this duct's exit Tt when the flow goes into
         # them: a plenum or chamber with this duct and one other connection,
         # and no wall of its own -- it mixes nothing else and receives only
@@ -10343,7 +10532,7 @@ class ChannelElement(NetworkElement):
         # carries the heat in the momentum.
         self._rayleigh_ends: set[str] = set()
         if self._wall_heated:
-            on_walls = {e for w in walls for e in (w.element_a, w.element_b)}
+            on_walls = {e for w in walls for e in w.heated_endpoints}
             for nid in (self.from_node, self.to_node):
                 node = graph.nodes.get(nid)
                 if not isinstance(node, (PlenumNode, MomentumChamberNode)) or nid in on_walls:

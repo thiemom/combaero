@@ -31,7 +31,8 @@ Every converged solve is checked twice after the fact:
 * **The network: mass and energy close over its control volume.** The
   streams crossing at the flow boundaries (``NetworkNode.is_flow_boundary``),
   the heat given to the network, and the heat leaving it (``Q_wall_out``, a
-  wall's heat landing on a boundary) or withheld (``Q_withheld``, heat a
+  wall's heat landing on a boundary; ``Q_loss``, a wall's heat to a HeatLoss
+  side's external temperature, #970) or withheld (``Q_withheld``, heat a
   stagnant node cannot take). Enthalpy is absolute (formation included), so a
   combustor closes the balance as it is.
 
@@ -530,7 +531,7 @@ class SecondLawReport:
         element = self.net.elements.get(eid)
         if element is None:
             raise ValueError(f"'{eid}' is a node, not a flowing element")
-        n_walls = sum(1 for w in self.net.walls.values() if eid in (w.element_a, w.element_b))
+        n_walls = sum(1 for w in self.net.walls.values() if eid in w.heated_endpoints)
         if n_walls > 1:
             raise ValueError(f"'{eid}' carries {n_walls} walls; their heat paths are shared")
         m = self._flow(eid)
@@ -569,10 +570,18 @@ class SecondLawReport:
             if Q is None:
                 out[wid] = {"verdict": "not_checked", "reason": "no heat solved for this wall"}
                 continue
+            if wall.adiabatic:
+                out[wid] = {"verdict": "pass", "sigma_wall": 0.0, "sigma_wall_norm": 0.0}
+                continue
             try:
                 # Q > 0 runs A -> B.
                 S_a = self._wall_side_entropy(wall.element_a, -float(Q))
-                S_b = self._wall_side_entropy(wall.element_b, float(Q))
+                if wall.heat_loss is not None:
+                    # A reservoir at T_ext takes the heat (#970): Q / T_ext.
+                    s_ext = float(Q) / float(wall.heat_loss.T_ext)
+                    S_b = (s_ext, s_ext, s_ext)
+                else:
+                    S_b = self._wall_side_entropy(wall.element_b, float(Q))
             except (ValueError, RuntimeError) as exc:
                 out[wid] = {"verdict": "not_checked", "reason": f"cannot be evaluated: {exc}"}
                 continue
@@ -658,12 +667,14 @@ class SecondLawReport:
                 w_shaft += abs(float(m)) * float(dh)
         q_out = sum(float(v) for k, v in self.sol.items() if k.endswith(".Q_wall_out"))
         q_withheld = sum(float(v) for k, v in self.sol.items() if k.endswith(".Q_withheld"))
+        # Heat a wall's HeatLoss side takes out of the network (#970).
+        q_loss = sum(float(self.sol.get(f"{wid}.Q_loss", 0.0)) for wid in self.net.walls)
 
         m_in = sum(r["m_dot_in"] for r in rows if r["m_dot_in"] > 0.0)
         m_out = -sum(r["m_dot_in"] for r in rows if r["m_dot_in"] < 0.0)
         H_in = sum(r["H_in"] for r in rows if r["m_dot_in"] > 0.0)
         H_out = -sum(r["H_in"] for r in rows if r["m_dot_in"] < 0.0)
-        energy = H_in + q_given + w_shaft - H_out - q_out - q_withheld
+        energy = H_in + q_given + w_shaft - H_out - q_out - q_withheld - q_loss
         h_scale = max(abs(H_in), abs(H_out), sum(abs(r["H_in"]) for r in rows), 1.0)
         return {
             "streams": rows,
@@ -677,6 +688,7 @@ class SecondLawReport:
             "W_shaft": w_shaft,
             "Q_wall_out": q_out,
             "Q_withheld": q_withheld,
+            "Q_loss": q_loss,
             "energy_closure": energy,
             "energy_closure_rel": energy / h_scale,
         }

@@ -308,6 +308,8 @@ def _splitters(
 
 
 def _wall(w: ThermalWall, problems: list[str]) -> dict[str, Any]:
+    if w.element_b is None:
+        problems.append(f"{w.id}: a wall with no stream on side B (side_b, #970; no GUI field)")
     if w.contact_area is None and w.area_a is None:
         problems.append(
             f"{w.id}: a wall without contact_area (the GUI stores the area; give it explicitly)"

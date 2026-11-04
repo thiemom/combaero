@@ -324,7 +324,8 @@ network:
 - a hot duct carrying vitiated air;
 - a `SlotFilmElement` with `film_htc="seban1960"`;
 - ten `ThermalWall` segments, one per thermocouple, each carrying the film;
-- a ten-segment backside `ChannelElement` chain.
+- a ten-segment backside `ChannelElement` chain in runs with convection air;
+  without it the walls' side B is adiabatic (`side_b="adiabatic"`, #970).
 
 The runner scores the wall temperatures per stage. The extraction is
 `extractions/marek_juhasz_1973_d7156.md`, and the pins are in
@@ -368,6 +369,15 @@ How to read the table:
     351-455 K, against coolant at 300-316 K, so heat did reach the passage.
   - At Tu 0.12, the authors' fitted C_m (a diagnostic, never adopted), the
     bias is +11.5 K.
+  - A backside heat loss (#970, `Options(backside_h=...)`, a sensitivity
+    never adopted: the report gives no h or far-side temperature for the
+    stagnant passage, gap and underside). Each wall loses heat through h to
+    the passage's measured inlet T. h 5 / 15 / 30 W/m^2K takes the stage's
+    bias from +24.8 K to +22.9 / +19.5 / +15.1 K, and the 1033 K runs' bias
+    from +36.1 K to +32.4 / +25.8 / +17.2 K. The 589 K runs barely move
+    (+11.8 to +12.5 K). So a plausible loss explains a part of the hot runs'
+    bias, but not all of it. k_air over the 0.3 cm passage alone is about
+    15 W/m^2K.
 - **TC 1-3** sit where conduction into the slot lip acts. The authors saw it
   to 3.8 cm. combaero models neither axial conduction nor the lip, so these
   thermocouples are reported separately.

@@ -81,7 +81,12 @@ class FlowNetwork:
         if wall.element_a not in self.elements and wall.element_a not in self.nodes:
             raise ValueError(f"Unknown element_a/node_a '{wall.element_a}' for wall '{wall.id}'.")
 
-        if wall.element_b not in self.elements and wall.element_b not in self.nodes:
+        # element_b None: side B has no stream (side_b, #970), checked by the wall.
+        if (
+            wall.element_b is not None
+            and wall.element_b not in self.elements
+            and wall.element_b not in self.nodes
+        ):
             raise ValueError(f"Unknown element_b/node_b '{wall.element_b}' for wall '{wall.id}'.")
 
         if wall.film is not None:
@@ -219,7 +224,7 @@ class FlowNetwork:
         # geometry.
         if self.thermal_coupling_enabled:
             for wid, wall in self.walls.items():
-                for side in (wall.element_a, wall.element_b):
+                for side in wall.endpoints:
                     obj = self.elements.get(side) or self.nodes.get(side)
                     if obj is not None and not obj.has_convective_surface:
                         raise ValueError(

@@ -17,8 +17,9 @@ wide), coupling h_i (film side, ``film=`` the slot) to c_i through 0.159 cm
 of stainless. The walls span x = 0.41-12.60 cm behind the slot. The
 backside's other face (the stagnant gap over the slave-air-cooled underside)
 is adiabatic. In a run without convection air the passage is stagnant too:
-it carries a token flow whose face is switched off (``STAGNANT_FLOW``), so
-the wall sits at the film's adiabatic wall temperature. The predicted wall
+there is no passage network, and each wall's side B is adiabatic
+(``ThermalWall(element_b=None, side_b="adiabatic")``, #970), so the wall
+sits at the film's adiabatic wall temperature. The predicted wall
 temperature is each wall's hot-face temperature, where the thermocouples
 sit. Every solve starts from the outlet-referenced warm start: the default
 cold start fails on these networks and then retries the same way, at
@@ -80,6 +81,7 @@ from combaero.network import (
     ChannelElement,
     ConvectiveSurface,
     FlowNetwork,
+    HeatLoss,
     MassFlowBoundary,
     NetworkSolver,
     PlenumNode,
@@ -112,13 +114,9 @@ PASSAGE_DH = 2.0 * PASSAGE_HEIGHT * SPAN / (PASSAGE_HEIGHT + SPAN)
 SEGMENT_AREA = TC_PITCH * SPAN
 WALL_MATERIAL = "ss304"  # type 304, CINDAS Report 45 (#972)
 #: Runs without convection air: the passage is stagnant and the plate's
-#: underside adiabatic. A ThermalWall needs a stream on each side, so the
-#: passage carries a token flow whose face is switched off (its h scaled by
-#: 1e-6, under the wall's 0.01 W/m^2K floor): the wall then passes ~mW and
-#: sits at its filmed side's adiabatic wall temperature. This models the
-#: adiabatic face; it is not a rig-matching tuner and moves no cooled run.
-STAGNANT_FLOW = 1e-3
-ADIABATIC_FACE_NU_MULTIPLIER = 1e-6
+#: underside adiabatic, an explicit adiabatic wall side (#970). It replaced a
+#: token 1e-3 kg/s passage flow whose face was switched off (h x 1e-6); the
+#: wall temperatures moved by under 0.04 K (cooled runs: bit-identical).
 T_BAND = 11.0  # K, the overall accuracy of the test-surface temperatures (p. 13)
 
 # --- the vitiated hot gas -------------------------------------------------
@@ -247,6 +245,20 @@ class Options:
     #: flow) or "tail" (g10, a diagnostic: every segment sees the undiluted
     #: hot gas and M is the report's rho_s u_s / rho_h u_h).
     slot_into: str = "head"
+    #: Runs without convection air: the backside adiabatic (None, the
+    #: default), or a HeatLoss side of this h [W/m^2 K] to the stagnant
+    #: passage's measured inlet temperature (T_conv_in). A sensitivity
+    #: DIAGNOSTIC (#970), never adopted: the report gives no h or far-side
+    #: temperature for the stagnant passage, gap and slave-air-cooled
+    #: underside, so no value is defensible and none is tuned to these data.
+    backside_h: float | None = None
+
+
+def _backside(run: Run, opt: Options) -> HeatLoss | str:
+    """A wall's side B in a run without convection air (see Options)."""
+    if opt.backside_h is None:
+        return "adiabatic"
+    return HeatLoss(T_ext=run.T_conv_in, h=opt.backside_h)
 
 
 def build(run: Run, opt: Options = Options()) -> FlowNetwork:
@@ -257,12 +269,15 @@ def build(run: Run, opt: Options = Options()) -> FlowNetwork:
     g = FlowNetwork()
     g.add_node(MassFlowBoundary("hot_in", m_dot=run.m_hot, Tt=run.T_hot, Y=Y_hot))
     g.add_node(PressureBoundary("out", Pt=P_ATM, Tt=run.T_hot, Y=Y_hot))
-    g.add_node(MassFlowBoundary("conv_in", m_dot=max(run.m_conv, STAGNANT_FLOW), Tt=run.T_conv_in, Y=Y_air))
-    g.add_node(PressureBoundary("conv_out", Pt=P_ATM, Tt=run.T_conv_in, Y=Y_air))
+    cooled = run.m_conv > 0.0
+    if cooled:
+        g.add_node(MassFlowBoundary("conv_in", m_dot=run.m_conv, Tt=run.T_conv_in, Y=Y_air))
+        g.add_node(PressureBoundary("conv_out", Pt=P_ATM, Tt=run.T_conv_in, Y=Y_air))
     for i in range(11):
         g.add_node(PlenumNode(f"g{i}"))
-    for i in range(1, 11):
-        g.add_node(PlenumNode(f"k{i}"))
+    if cooled:
+        for i in range(1, 11):
+            g.add_node(PlenumNode(f"k{i}"))
 
     def hot(eid: str, a: str, b: str, length: float, area: float = 0.0) -> ChannelElement:
         return ChannelElement(
@@ -293,21 +308,19 @@ def build(run: Run, opt: Options = Options()) -> FlowNetwork:
         )
     for i in range(1, 11):
         g.add_element(hot(f"h{i}", f"g{i - 1}", f"g{i}", TC_PITCH, SEGMENT_AREA))
-        g.add_element(
-            ChannelElement(
-                f"c{i}",
-                "conv_in" if i == 1 else f"k{i - 1}",
-                f"k{i}",
-                length=TC_PITCH,
-                diameter=D_pass,
-                Dh=PASSAGE_DH,
-                roughness=0.0,
-                surface=ConvectiveSurface(
-                    area=SEGMENT_AREA,
-                    Nu_multiplier=1.0 if run.m_conv > 0.0 else ADIABATIC_FACE_NU_MULTIPLIER,
-                ),
+        if cooled:
+            g.add_element(
+                ChannelElement(
+                    f"c{i}",
+                    "conv_in" if i == 1 else f"k{i - 1}",
+                    f"k{i}",
+                    length=TC_PITCH,
+                    diameter=D_pass,
+                    Dh=PASSAGE_DH,
+                    roughness=0.0,
+                    surface=ConvectiveSurface(area=SEGMENT_AREA),
+                )
             )
-        )
         x0 = TC_X[i - 1] - 0.5 * TC_PITCH
         layer = (
             WallLayer(WALL_THICKNESS, opt.wall_k)
@@ -318,7 +331,8 @@ def build(run: Run, opt: Options = Options()) -> FlowNetwork:
             ThermalWall(
                 id=f"w{i}",
                 element_a=f"h{i}",
-                element_b=f"c{i}",
+                element_b=f"c{i}" if cooled else None,
+                side_b=None if cooled else _backside(run, opt),
                 layers=[layer],
                 contact_area=SEGMENT_AREA,
                 film="slot" if run.m_film > 0.0 else None,
@@ -327,11 +341,12 @@ def build(run: Run, opt: Options = Options()) -> FlowNetwork:
             )
         )
     g.add_element(hot("tail", "g10", "out", 0.01))
-    g.add_element(
-        ChannelElement(
-            "conv_exit", "k10", "conv_out", length=0.01, diameter=D_pass, Dh=PASSAGE_DH, roughness=0.0
+    if cooled:
+        g.add_element(
+            ChannelElement(
+                "conv_exit", "k10", "conv_out", length=0.01, diameter=D_pass, Dh=PASSAGE_DH, roughness=0.0
+            )
         )
-    )
     return g
 
 
@@ -424,6 +439,11 @@ TU_SWEEP = (0.07, 0.12, 0.14, 0.23)
 #: Constant-k wall bounds, type 304 at 311 K and 811 K (the report's US
 #: values, 8 and 13 Btu/hr-ft-F).
 WALL_K_SWEEP = (13.8, 22.5)
+#: Backside heat-loss h [W/m^2 K], a sensitivity only (#970): conduction
+#: across the 0.3 cm stagnant passage alone is k_air / 0.003 m ~ 15 at the
+#: wall's temperatures; the gap under it lowers that, radiation across it
+#: raises it. The report states neither.
+BACKSIDE_H_SWEEP = (5.0, 15.0, 30.0)
 
 
 def _lines(res: list[Result], indent: str = "  ") -> list[str]:
@@ -494,6 +514,13 @@ def report(jobs: int = 4, per_run: bool = False) -> str:
     for stage in ("film", "combined"):
         res = solve_all(STAGES[stage], Options(slot_into="tail"), jobs=jobs)
         lines.append(f"  {stage:10s} {stage_scores(res)['all']}")
+    lines.append(
+        "\nDIAGNOSTIC (not adopted, #970): film-only stage with the backside losing heat to the"
+    )
+    lines.append("stagnant passage's measured inlet T through h [W/m^2 K] (no source gives h)")
+    for h in BACKSIDE_H_SWEEP:
+        res = solve_all(FILM_ONLY, Options(backside_h=h), jobs=jobs)
+        lines.append(f"  h {h:4.1f}  {stage_scores(res)['all']}")
     lines.append("\nDIAGNOSTIC: hot gas as plain air instead of vitiated")
     for stage in ("convection", "combined"):
         res = solve_all(STAGES[stage], Options(hot_gas="air"), jobs=jobs)
