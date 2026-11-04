@@ -779,6 +779,51 @@ documents:
   records: []
   notes: Arrived 2026-11-02 in sources/new/ as ThesisJES%5B1%5D.pdf (from the user). Journal versions exist
     (Sargison et al. 2002, J. Turbomach. 124, console papers), not held.
+- file: sources/heat_transfer/film/Goldstein_Eckert_Eriksen_Ramsey_1969_NASA_CR-72612_inclined_holes_eta.pdf
+  citation: Goldstein, R. J., Eckert, E. R. G., Eriksen, V. L., Ramsey, J. W. (1969). Film cooling following
+    injection through inclined circular tubes. NASA CR-72612 (HTL TR 91), University of Minnesota, summary report.
+  id: NASA CR-72612
+  topic: [film]
+  content: 'Open (NTRS 19700009085), 56 pp., scan. Adiabatic film-cooling effectiveness behind heated air jets
+    (about 55 K above the mainstream, so DR near 1): a single 35 deg hole, a row of 35 deg holes at P/D 3 (five
+    tubes), and single holes with lateral (compound) angles 15 and 35 deg. D 1.18 cm, U 30.5-61 m/s, boundary
+    layer displacement thickness 0.078-0.146 cm at injection, blowing ratio M 0.1-2.0. Centreline and laterally
+    averaged eta, plus a superposition comparison of the row against single holes. Data in figures.'
+  status: screened
+  verdict: 'Screened 2026-11-03. The classic Minnesota round-hole data (the basis of Goldstein et al. journal
+    papers, folded into later correlations such as Baldauf 2002). Possible cross-source accuracy points for the
+    shipped round-hole effectiveness at 35 deg, P/D 3, DR about 1, M 0.1-2 (figure-only, digitising needed).
+    The row is notably better than single-hole superposition at high M (the row of jets blocks the mainstream),
+    a caution for single-hole superposition. Compound-angle holes: combaero has no compound-angle closure.
+    Superseded for h by Eriksen 1971 (CR-72991, held), the same lab with heat-transfer data.'
+  read_for: ['#386 round-hole film effectiveness, cross-source', 'row vs single-hole superposition']
+  issues: [386]
+  records: []
+  notes: Fetched 2026-11-03 at the user's request (NTRS link).
+- file: sources/heat_transfer/film/Eriksen_1971_NASA_CR-72991_holes_eta_and_h.pdf
+  citation: Eriksen, V. L. (1971). Film cooling effectiveness and heat transfer with injection through holes. NASA
+    CR-72991 (HTL TR 102), University of Minnesota (PhD thesis work, adviser R. J. Goldstein).
+  id: NASA CR-72991
+  topic: [film]
+  content: 'Open (NTRS 19720007295), 184 pp., scan. Local film effectiveness AND heat transfer coefficient
+    downstream of air injection: a single 90 deg hole, a single 35 deg hole, and a row of 35 deg holes at P/D 3,
+    on a flat plate, two mainstream velocities (30.5 and 61 m/s), M 0.1-2.0. h is defined on (T_w - T_aw)
+    (eqns 1, 2, 10), with h0 the no-injection value fitted with an unheated starting length (Table I: starting
+    lengths and fit deviations). Table II (p. 160) TABULATES the heat transfer coefficient based on laterally
+    averaged wall temperatures. Appendix A gives uncertainties (Tables A.I-A.III). Also CO2-water fog flow
+    visualisation at 90 deg.'
+  status: extracted
+  verdict: 'Screened 2026-11-03. The primary of the Eriksen & Goldstein (1974) heat-transfer-with-film data:
+    measured h/h0 behind discrete holes, i.e. the gas-side augmentation the film element and the effusion plate
+    take as a user input (gas_augmentation, #476). Table II is tabulated (no digitising) for the row of 35 deg
+    holes at P/D 3: a candidate cross-source accuracy check for an augmentation closure, and context for
+    Caciolli''s HTC/HTC0 fit (held). Limits: DR 1.0 (unheated) or about 0.85 (heated), flat plate, low Tu, one
+    row, P/D 3 (effusion plates run P/D 5-8). Not implemented.'
+  read_for: ['#476 gas-side augmentation behind holes (h/h0)', '#386 round-hole film h and eta']
+  issues: [386, 476]
+  records: [validation/cooling/extractions/eriksen_1971_table2_h_over_h0.md, validation/cooling/data/eriksen1971/table2_ha_over_h0_long.csv]
+  notes: 'Fetched 2026-11-03 at the user''s request (NTRS link). Table II transcribed 2026-11-03 (user sign-off;
+    0 read disagreements; block B''s printed Re_D 0.44e5 is a misprint for 0.22e5, per Fig. 68 and the text).'
 - file: sources/heat_transfer/film/Hassan_2013_PhD_Concordia_micro_tangential_jet_film.pdf
   citation: Hassan, O. (2013). Thermal and flow field investigations of a micro-tangential-jet film cooling
     scheme on gas turbine components. PhD thesis, Concordia University, Montreal (June 2013).
@@ -3061,6 +3106,45 @@ documents:
     replicate) and Fig. 13(f) F-3/F-4 (about 30 points each, 0.125 in) for the #807 crossflow set; for a
     louver/scoop closure Figs. 13(b) (B-1/B-2, B-8 via Fig. 7) and 13(c)/(d) plus Fig. 12 (zero-flow Phi vs h)
     and Fig. 9 (delta* vs Phi). Render at 130 dpi or more; several figures are rotated 90 deg in the scan.'
+- file: sources/lefebvre/Lefebvre_1985_AFWAL-TR-84-2104_fuel_properties_combustion.pdf
+  citation: 'Lefebvre, A. H. (1985). Influence of fuel properties on gas turbine combustion performance.
+    AFWAL-TR-84-2104, Purdue University (Thermal Science and Propulsion Center), final report, January 1985.
+    DTIC AD-A151464, approved for public release.'
+  id: AFWAL-TR-84-2104 (DTIC AD-A151464)
+  topic: [combustion, radiation]
+  content: 'Public, 156 pp., poor scan (equations and figures read from page images; PDF page = printed page + 11
+    around Section VI). A re-analysis of six USAF engine fuel-effects programs (refs 1-6) for J79-17A, J79-17C,
+    F101, TF41, TF39, J85, TF33 and F100. Table 1 (p.4, TABULATED): 13 fuels, H 12.0-14.5 mass %, LHV and
+    properties. Section VI liner wall temperature: R1 Eq. 19 (as shipped); eps_g Eq. 21 (P in kPa); L =
+    336/(percent H)^2 Eq. 22 QUOTED from ref. 7 (AFWAL-TR-83-2004), with no fit, scatter or fitted quantity
+    printed; R2 = 0.4 sigma (Tw^4 - T3^4) Eq. 23; C1/C2 0.017/0.020 Re^0.8; no film term; combined Eq. 26 with
+    97440 = 290 x 336. Figs. 38-41 (PLOTTED only): liner wall T against fuel H at idle/cruise/take-off/dash for
+    J79-17A, J79-17C, F101 and TF41, measured against CALCULATED UNCOOLED Tw. F101 (Fig. 40) by eye: dash about
+    1300 K, take-off 1285-1295 K, cruise 1000-1015 K, idle 640-700 K, cluster spread about 60 K, faired lines
+    flat or slightly rising with H. F101 envelope P3 386-1266 kPa, T3 464-850 K, m_A 8.5-20.5 kg/s; a 54 deg
+    sector rig. Other engine-fitted closures (per-engine constants; geometry not tabulated): combustion
+    efficiency Eqs. 8-9; LBO Eq. 15 with Table 2 constants (TABULATED); NOx Eq. 27; CO Eq. 28; UHC Eq. 29; soot
+    Eq. 34 with Table 3 C3/C4 (TABULATED) and the smoke-number conversion (TABULATED); pattern factor Eqs.
+    36-37. No liner geometry, air split, cooling geometry, per-point conditions, radiation or emissivity data,
+    or measurement uncertainty.'
+  status: screened
+  verdict: 'Screened 2026-11-03 (was wanted). It does NOT contain the data or fit behind L = 336/H^2: Eq. 22 is
+    quoted from ref. 7 (AFWAL-TR-83-2004, now wanted), fitted over refs 1-6 (H 12.0-14.5 %, P3 about
+    250-1870 kPa, T3 413-850 K; on that range L = 1.60-2.33, and L = 1 only at H = 18.3 %, so gas fuels are an
+    extrapolation). No pressure-dependent L; p.128 only says pressure acts through soot concentration. F101
+    (Fig. 40, the likely source of L&B Fig. 8.5) is NOT a combaero case. It is not fidelity, because its
+    calculated lines are uncooled; and it is not accuracy, because it lacks geometry, air split, cooling and
+    per-point conditions, and is overplotted. Its measured Tw against H is flat to slightly rising, opposite to
+    the radiation model and to the report''s own Conclusion 4 (Section IX.4 calls the chemical effect small).
+    Use: confirms the shipped R1 and Eq. 26 constants; tabulated fuel properties; leads to the primaries (ref. 7
+    for L, ref. 2 Gleason et al. 1979 AFAPL-TR-79-2018 for F101; both wanted).'
+  read_for: ['#793 origin, data and range of L = 336/H^2', '#793 F101 liner wall temperature as a liner case (not buildable)', '#793 pressure dependence of L (none offered)']
+  issues: [793]
+  records: []
+  notes: 'Fetched 2026-11-03 via the Internet Archive DTIC mirror (archive.org/download/DTIC_ADA151464), since
+    apps.dtic.mil refuses scripted downloads. Screening arithmetic, not a record: the soot factor (18 - %H)^1.5
+    gives a 12.9/13.9 % H ratio of 1.39 against 1.16 for (13.9/12.9)^2, cf. the NASA JT8D 0.34 MPa flux ratio of
+    1.56: a lead only, not a validated L.'
 - file: sources/lefebvre/GAS_Turbine_Combustion_THIRD_EDITION_Alt.pdf
   citation: 'Lefebvre, A. H., Ballal, D. R. (2010). Gas Turbine Combustion: Alternative Fuels and Emissions,
     3rd ed. CRC Press, Boca Raton.'
@@ -5270,18 +5354,28 @@ wanted:
     (Lefebvre Eqs. 8.7, 8.11, 8.12) -- the radiation combaero lacks entirely; what data L was fitted to and
     over what pressure and fuel range.'
   where: SAGE (Proc. IMechE archive).
-- citation: Lefebvre, A. H. (1985). Influence of fuel properties on gas turbine combustion performance.
-    AFWAL-TR-84-2104.
+- citation: Lefebvre, A. H. (1984). Fuel effects on gas turbine combustion. AFWAL-TR-83-2004, Purdue University
+    (the report version; journal version Lefebvre 1984, J. Aircraft 21(11), 887-898).
   checked: false
   issues:
   - 793
   priority: later
-  question: 'Operating conditions and geometry behind Lefebvre Fig. 8.5 (GE F101 measured liner wall temperature
-    against fuel hydrogen content, idle to dash) -- a measured, cross-source liner-temperature case once a
-    radiation model exists; also the source of L = 336/H^2 (Eq. 8.15).'
-  where: 'DTIC AD-A151 464 (https://apps.dtic.mil/sti/pdfs/ADA151464.pdf, public; identified 2026-11-02 by a web
-    search showing its front matter: Lefebvre, Purdue, AFWAL-TR-84-2104). apps.dtic.mil returns 403 to automated
-    fetches, so it was not downloaded: the user can fetch it in a browser.'
+  question: 'Where L = 336/H^2 (Lefebvre & Ballal Eq. 8.15, shipped as the default luminosity factor) was fitted:
+    which quantity was fitted, over which engines and conditions, and with what scatter. AFWAL-TR-84-2104 (held)
+    only quotes it as from this report, fitted over the six USAF programs (H 12.0-14.5 %, P3 about 250-1870 kPa).'
+  where: 'DTIC (AD number not yet identified); try the Internet Archive DTIC mirror
+    (archive.org/download/DTIC_<AD>/DTIC_<AD>.pdf), which served AD-A151464 on 2026-11-03.'
+- citation: Gleason, C. C., Oller, T. L., Shayeson, M. W., Bahr, D. W. (1979). Evaluation of fuel character effects
+    on the F101 engine combustion system. AFAPL-TR-79-2018, General Electric. (citation as quoted in
+    AFWAL-TR-84-2104, ref. 2)
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: 'The F101 liner-wall-temperature data behind Lefebvre & Ballal Fig. 8.5 / AFWAL-TR-84-2104 Fig. 40:
+    combustor geometry, air split, cooling, per-point P3/T3/f/a and the thermocouple locations and values that
+    AFWAL-TR-84-2104 lacks. With them F101 could become a cross-source liner case for #960 radiation.'
+  where: 'DTIC (AD number not yet identified); try the Internet Archive DTIC mirror.'
 - citation: Hay, N., Spencer, A. (1992). Discharge coefficients of cooling holes with radiused and chamfered
     inlets. ASME J. Turbomachinery 114(4), 701-706.
   checked: false
