@@ -7,7 +7,8 @@ Three defects, each pinned here:
    small-pipe term, +0.011 (0.75 - beta)(2.8 - D/25.4) below D = 71.12 mm.
 2. The network's 'Stolz' was a four-term Reader-Harris/Gallagher typed out in
    Python, and its 'Miller' was Stolz; C++'s Miller had no published source.
-   Metering Cd now comes from C++'s metering_cd_and_dRe only; Miller is gone.
+   Metering Cd now comes from C++'s metering_cd_and_dRe only; Miller is gone,
+   and Stolz was removed in 0.9.0 (#876).
 3. The orifice kernels drove from the upstream STAGNATION pressure and also
    applied E = 1/sqrt(1 - beta^4), counting the approach velocity head twice
    behind a node that carries it: +6.2% flow at beta 0.7 behind a
@@ -31,10 +32,6 @@ from combaero.network import (
     PlenumNode,
     PressureBoundary,
 )
-
-# Stolz is deprecated (#876): its DeprecationWarning is tested in
-# test_stolz_deprecation_876.py; here Stolz is exercised for its values.
-pytestmark = pytest.mark.filterwarnings("ignore:.*Stolz.*:DeprecationWarning")
 
 M = cb.MeteringCdCorrelation
 T = cb.OrificeTap
@@ -88,7 +85,7 @@ def test_rhg_is_iso_eq4_at_every_tap(D: float, beta: float, Re: float) -> None:
         assert cd == pytest.approx(_iso_rhg(beta, Re_in, D, L1, L2), abs=1e-12), tap
 
 
-@pytest.mark.parametrize("corr", [M.ReaderHarrisGallagher, M.Stolz])
+@pytest.mark.parametrize("corr", [M.ReaderHarrisGallagher])
 @pytest.mark.parametrize("D", [0.05, 0.1])
 @pytest.mark.parametrize("Re", [5e3, 1e5, 3e6])
 def test_the_re_derivative_is_exact_at_every_tap(corr: object, D: float, Re: float) -> None:
@@ -142,16 +139,6 @@ def test_corner_taps_cross_check_cano_2021() -> None:
         assert sum(cds) / len(cds) == pytest.approx(mean, abs=1.5e-3)
 
 
-def test_stolz_tap_terms_saturate_at_l1_0_4333() -> None:
-    """ISO 5167:1980: 0.09 L1 is replaced by 0.039 from L1 = 0.4333 on, which is
-    continuous there. D and D/2 taps (L1 = 1) sit on the saturated branch."""
-    D = 0.1
-    corner = cb.metering_cd_and_dRe(M.Stolz, _geom(0.5, D, T.Corner), 1e5)[0]
-    dd2 = cb.metering_cd_and_dRe(M.Stolz, _geom(0.5, D, T.D_D2), 1e5)[0]
-    b4 = 0.5**4
-    assert dd2 - corner == pytest.approx(0.039 * b4 / (1 - b4) - 0.0337 * 0.47 * 0.5**3, abs=1e-12)
-
-
 def test_iso_range_flags() -> None:
     rhg = M.ReaderHarrisGallagher
     assert cb.metering_cd_in_range(rhg, _geom(0.5, 0.1, T.Flange), 1e5)
@@ -168,7 +155,7 @@ def test_iso_range_flags() -> None:
 
 def test_a_cd_without_a_formula_is_refused() -> None:
     for corr in (M.Constant, M.UserFunction):
-        with pytest.raises(ValueError, match="only ReaderHarrisGallagher and Stolz"):
+        with pytest.raises(ValueError, match="only ReaderHarrisGallagher carries"):
             cb.metering_cd_and_dRe(corr, _geom(0.5, 0.1, T.Flange), 1e5)
 
 
@@ -236,7 +223,8 @@ def test_a_saved_gui_file_naming_miller_says_what_to_pick() -> None:
 
     with pytest.raises(ValidationError, match="Pick 'ReaderHarrisGallagher'"):
         OrificeData(correlation="Miller")
-    assert OrificeData(correlation="Stolz").correlation == "Stolz"
+    with pytest.raises(ValidationError, match="Pick 'ReaderHarrisGallagher'"):
+        OrificeData(correlation="Stolz")
 
 
 def _gui_orifice(data: dict) -> OrificeElement:

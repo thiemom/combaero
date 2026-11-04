@@ -348,14 +348,11 @@ geom.tap = cb.OrificeTap.Corner  # Corner, D_D2 or Flange (default)
 Cd = cb.Cd_sharp_thin_plate(geom, state)  # Reader-Harris/Gallagher at geom.tap
 Cd, dCd_dRe = cb.Cd_sharp_thin_plate_and_dRe(geom, state)  # analytic Re_D derivative
 Cd, dCd_dRe = cb.metering_cd_and_dRe(cb.MeteringCdCorrelation.ReaderHarrisGallagher, geom, Re_D)
-# MeteringCdCorrelation.Stolz (ISO 5167:1980) is deprecated, removed in 0.9.0
-# (#876): metering_cd_and_dRe, metering_cd_in_range, solve_orifice_mdot,
-# orifice_flow and orifice_flow_state emit a DeprecationWarning when handed it.
+# MeteringCdCorrelation.Stolz (ISO 5167:1980) was removed in 0.9.0 (#876).
 ok = cb.metering_cd_in_range(cb.MeteringCdCorrelation.ReaderHarrisGallagher, geom, Re_D)
 # RHG's lower Re_D bound (ISO 5167-2 5.3.1). Below it the RHG Cd is HELD (#873,
 # 0.8.0), entered C1 in ln Re_D over 0.1 just below the bound; metering_cd_in_range
-# is False there. It used to climb to a 1.5 cap. Stolz: no hold, and
-# metering_cd_re_min raises ValueError (ISO 5167:1980's bound is not held).
+# is False there. It used to climb to a 1.5 cap.
 Re_b = cb.metering_cd_re_min(cb.MeteringCdCorrelation.ReaderHarrisGallagher, geom)
 # ISO 5167-2 permanent loss / tapping differential between pipes, and dk/dC
 k, dk_dC = cb.permanent_loss_ratio_and_dC(beta, Cd)
@@ -1755,17 +1752,17 @@ fluid. Three modes:
     - An orifice into a dead end (no flow boundary beyond its to-node) is never reversed: every root has zero flow there.
     - **With a pipe upstream (E applied) the orifice drives from that pipe's static state** (#651), the node's (Pt, Tt) at the pipe's mass flux, not from the node's own static pressure: a `PlenumNode` (P = Pt) and a `MomentumChamberNode` then give the same flow. Reported as `P_approach`. The row then solves its own consistency, m* = m_calc(m*, x).
     - **Between pipes the orifice charges its permanent loss** (#645). With a pipe on the side the flow comes from (beta) and a wider one on the side it goes to, a metering or `fixed` orifice's drop is the nodes' stagnation difference, ISO 5167-2's k(beta, C) times the tapping differential, and the kernel expands to the implied tap pressure. Into a node with no pipe beyond it, the jet's head is lost and the drop is the tapping differential. The row's Cd is at D-D/2 taps; `OrificeElement(tap=...)` only picks the `dP_tap` it reports.
-    - **The bore against its pipe** (#788, 0.8.0). The pipes that set beta (the single upstream channel forward, the single to-side channel in reverse) are compared with the bore to `ORIFICE_BORE_PIPE_RTOL` (1e-6 relative). Equal on either side is **no orifice**: zero loss, the row is `Pt_in - Pt_out = 0` with Jacobian +1/-1 (row kind "p"), `beta = 1`, and the resolve preview reports `pass_through = 1`; this is how an orifice is switched off without editing the network. A bore larger than either pipe is refused (`ValueError`). Until 0.8.0 a bore at or above the pipe silently became a wall hole (beta = 0, and only in that direction); that fallback is gone. Write a lumped Cd*A restriction as `OrificeElement(..., in_pipe=False)` (GUI: untick "In a pipe"): no pipe diameter, beta = 0 both ways, no recovery. Its metering Cd (Reader-Harris/Gallagher, Stolz) is then evaluated as for a plenum-fed orifice, at D = 1 m; the old fallback used D = 10 d.
+    - **The bore against its pipe** (#788, 0.8.0). The pipes that set beta (the single upstream channel forward, the single to-side channel in reverse) are compared with the bore to `ORIFICE_BORE_PIPE_RTOL` (1e-6 relative). Equal on either side is **no orifice**: zero loss, the row is `Pt_in - Pt_out = 0` with Jacobian +1/-1 (row kind "p"), `beta = 1`, and the resolve preview reports `pass_through = 1`; this is how an orifice is switched off without editing the network. A bore larger than either pipe is refused (`ValueError`). Until 0.8.0 a bore at or above the pipe silently became a wall hole (beta = 0, and only in that direction); that fallback is gone. Write a lumped Cd*A restriction as `OrificeElement(..., in_pipe=False)` (GUI: untick "In a pipe"): no pipe diameter, beta = 0 both ways, no recovery. Its metering Cd (Reader-Harris/Gallagher) is then evaluated as for a plenum-fed orifice, at D = 1 m; the old fallback used D = 10 d.
   - **Incompressible channels:** the friction and exit-head density is the upstream node's along the flow, blended through zero flow over `FLOW_REVERSAL_M_SCALE`. It is taken at the duct's own inlet static state, the node's (Pt, T) at the duct's flux (#651), not at the node's static pressure.
   - **Cold start:** on networks driven by pressure boundaries alone, the cold-start pressure guess of an interior node is clamped to the boundaries' range.
   - A fraction loss (`ConstantFractionLoss`, `LinearThetaFractionLoss`) takes an optional design flow `m_ref` [kg/s]: at and above it the loss is exactly the fraction; below it the loss scales with the dynamic head (`1 - (1 - r^2)^3`, `r = |m_dot|/m_ref`, C2) and vanishes at zero flow.
   - Set `m_ref` wherever the flow may run low or reverse. A constant fraction holds a pressure difference at zero flow, and a reversing flow cannot be carried through it.
   - **The four built-in loss classes evaluate in C++** (`cb.combustor_fraction_loss`, `cb.combustor_head_loss`, #718). `corr.evaluate(ctx, Y_in)` returns a `CombustorLossResult` (`xi` and its partials in theta, m_dot, Tt_in, Pt_in and each inlet `Y_k`), and `PressureLossElement` builds its Jacobian from it. Calling the class still returns `(xi, dxi/dtheta)`.
-  - **The context is the inlet STAGNATION state** (#782 audit): a `PressureLossContext` carries `Tt_in`/`Pt_in`, and the head loss is Lefebvre's total-total low-Mach pressure-loss factor, `xi = zeta 0.5 rho v^2 / Pt_in` with `rho` at (`Tt_in`, `Pt_in`). Until 0.8 the context's `P_in` was the inlet's STATIC pressure, so the loss came out high at a moving inlet (+8% at M 0.3); at a plenum inlet nothing changes. `ctx.T_in`/`ctx.P_in`, `combustor_head_loss(T_in=, P_in=)` and `CombustorLossResult.dxi_dT_in`/`dxi_dP_in` still work with a `DeprecationWarning` until 0.9.0. A coupled Fanno-Rayleigh / impulse form whose low-Mach limit is this one is #830.
+  - **The context is the inlet STAGNATION state** (#782 audit): a `PressureLossContext` carries `Tt_in`/`Pt_in`, and the head loss is Lefebvre's total-total low-Mach pressure-loss factor, `xi = zeta 0.5 rho v^2 / Pt_in` with `rho` at (`Tt_in`, `Pt_in`). Until 0.8 the context's `P_in` was the inlet's STATIC pressure, so the loss came out high at a moving inlet (+8% at M 0.3); at a plenum inlet nothing changes. The 0.7 spellings `ctx.T_in`/`ctx.P_in`, `combustor_head_loss(T_in=, P_in=)` and `CombustorLossResult.dxi_dT_in`/`dxi_dP_in` were removed in 0.9.0; a hand-built context without `Tt_in`/`Pt_in` raises `AttributeError`. A coupled Fanno-Rayleigh / impulse form whose low-Mach limit is this one is #830.
   - **A user-supplied callable** returning `(xi, dxi/dtheta)` still works. Its other dependences are central differences; that interface is the prototype for loss maps (#725).
 - **A `MomentumChamberNode` carries its stagnation temperature `Tt`** (#576). Its inflows mix as `(m, Tt, Pt, Y)` streams. The closure solves the static T from `h(T0) = h(T) + v^2/2`, `v = m_dot / (rho(T, P) A)`, and closes `Pt = P exp((s(T0) - s(T)) / R)`.
   - **One root per Pt** (#788). At fixed `(T0, |m|/A)` that `Pt(P)` falls to its minimum `Pt*` at the sonic static pressure `P*` and rises again below it, so one Pt had a subsonic and a supersonic static root, and Newton could land on the supersonic one. Below `P*` the closure is continued by its mirror image about `Pt*`, `2 Pt* - Pt(P)`: monotone in P through the sonic point (C1 there), so the root is subsonic whenever `Pt >= Pt*`. A `Pt < Pt*` roots on the continuation (the result's `bounded`, with `P_sonic` / `Pt_sonic`): accepted as a choked-bounded junction, or refused (`__choked_bounded_junctions__`, `__supersonic_chambers__`). The partials of `Pt*` need no `dP*/dx` (the closure's own slope is zero at `P*`). The incompressible closure has no sonic point and is unchanged.
-  - The node's `mach` and its reported properties (`rho`, `a`, `velocity`, `Re`, plus its static `T`, reported as `T_static` until 0.9.0) come from that static state.
+  - The node's `mach` and its reported properties (`rho`, `a`, `velocity`, `Re`, plus its static `T`) come from that static state.
   - Since 0.8 every node's result key `T`, and every element's `T_in`/`T_out`, is the STATIC temperature, like `P`; the total is `Tt`, `Tt_in`/`Tt_out` (#782, see [Static T in network results](#static-t-in-network-results-08)).
   - `MomentumChamberNode.static_density(state)` returns `(rho, {name: d rho / d name})`. Junction elements (`MultiPortChamberBase.port_densities`) take their port densities from it, so a port's momentum rows and its node's Pt describe the same flow.
   - The chamber now passes up to the true choked flux. Before, T0 read as static capped it at 92 % of choked.
@@ -1841,7 +1838,7 @@ from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberE
 # Cd is the "fixed" correlation's value only (#872, 0.8.0): with any other
 # correlation (default "ReaderHarrisGallagher") the correlation computes it and a
 # Cd given too raises ValueError; "fixed" without a Cd raises as well.
-# correlation="Stolz" is deprecated (#876), removed in 0.9.0: a DeprecationWarning.
+# correlation="Stolz" was removed in 0.9.0 (#876) and raises ValueError.
 orifice = OrificeElement("orifice", "node1", "node2", diameter=0.011284, regime="compressible")
 measured = OrificeElement("measured", "node1", "node2", Cd=0.65, diameter=0.011284, correlation="fixed")
 # The bore against the pipe it sits in (#788, 0.8.0): equal (to
@@ -1856,7 +1853,7 @@ lumped = OrificeElement("lumped", "node1", "node2", Cd=0.8, diameter=0.05, corre
 # flow (ReaderHarrisGallagher, IdelchikThick/Beveled/Rounded, Lichtarowicz,
 # McGreehanSchotsch) on a sharp-edged bore (edge_radius = bevel_depth = 0) at
 # beta <= cb.JOBSON_1955_BETA_MAX (0.75) in both directions; "nozzle" for
-# "fixed", "Stolz", a rounded/beveled edge or a wider bore. The cooling-plate and
+# "fixed", a rounded/beveled edge or a wider bore. The cooling-plate and
 # connection subclasses keep the nozzle. An explicit choice always wins.
 # "nozzle": isentropic nozzle at Cd E A, flat past choke. "jobson1955" (any
 # correlation): Jobson's sharp-edged jet, which widens
@@ -2404,8 +2401,8 @@ The combustor returns a `MixerResult`: the products' total temperature
 `Tt_mix`, `Y_mix` and total pressure `Pt_mix`, with their derivatives per
 stream (`dTt_mix_d_stream`, `dPt_mix_d_stream`, `dY_mix_d_stream`). The
 pre-0.8 spellings `T_mix`, `P_total_mix`, `dT_mix_d_stream`,
-`dP_total_mix_d_stream`, `dT_mix_d_delta_h` and `dT_mix_dQ` still read
-with a `DeprecationWarning` until 0.9.0.
+`dP_total_mix_d_stream`, `dT_mix_d_delta_h` and `dT_mix_dQ` were removed in
+0.9.0.
 
 ### Tee Junction Interface
 
@@ -2839,7 +2836,6 @@ can_geo = cb.CanAnnularFlowGeometry(
 materials = cb.list_materials()
 
 # Thermal conductivity [W/(m·K)]
-k_al = cb.k_aluminum_6061      # deprecated (no cited source), removed in 0.9.0
 k_ss = cb.k_stainless_steel_316  # Gen3 CSP measured, 533-1093 K
 k_310 = cb.k_stainless_steel_310  # Gen3 CSP measured, 533-1073 K
 k_304 = cb.k_stainless_steel_304  # CINDAS Report 45 Table 2 (Ho & Chu 1977), 200-1672 K (solidus)
@@ -2863,7 +2859,7 @@ k_tbc = cb.k_tbc_ysz
 # linear continuation of the end slope instead (unsourced). The database lookup
 # (and WallLayer) follows the k(T) envelope by default (#882): the end slope
 # ramped linearly to 0 over 100 K, then flat, from 200 K (or T_min, if lower) to
-# the solidus (1533.15 K where none is printed; T_max for alumina, ysz, al6061),
+# the solidus (1533.15 K where none is printed; T_max for alumina and ysz),
 # held beyond. Not sourced: material_in_range says which part is data, and a
 # wall reports "<wall>.material_in_range" (0 when any layer is outside).
 k = cb.k_hastelloy_x(1400.0, extrapolate=True)
@@ -3720,29 +3716,20 @@ T = cb.T_from_stagnation(Tt=Tt, M=0.5, X=air)
 P = cb.P_from_stagnation(Pt=Pt, Tt=Tt, M=0.5, X=air)
 ```
 
-### Stagnation names: Tt/Pt, deprecated T0/P0 (#782)
+### Stagnation names: Tt/Pt (#782)
 
 `P`/`T` are static and `Pt`/`Tt` total (stagnation) everywhere in the API:
-the pressure rule of #773 holds for temperature too. The spellings below
-still work until **0.9.0**, each with a `DeprecationWarning` naming its
-replacement and bit-for-bit the same result; passing an old keyword together
-with its replacement raises `TypeError`. A positional call is unaffected.
+the pressure rule of #773 holds for temperature too. The spellings below were
+deprecated in 0.8.0 and **removed in 0.9.0**; an old keyword now raises
+`TypeError`, an old function name or field `AttributeError`.
 
-| Deprecated (removed in 0.9.0) | Use |
+| Removed in 0.9.0 | Use |
 |---|---|
-| `T0=`, `P0=` keywords of `nozzle_flow`, `nozzle_cd`, `nozzle_thrust_cd`, `solve_A_eff_from_mdot`, `solve_P_back_from_mdot`, `critical_pressure_ratio`, `mach_from_pressure_ratio`, `mass_flux_isentropic`, `duct_static_state`, `duct_htc_static_state`, `duct_htc_static_state_dY`, `T_from_stagnation`, `P_from_stagnation` | `Tt=`, `Pt=` |
-| `compressible.nozzle_flow(T=, P=)` (the stagnation state) | `Tt=`, `Pt=` |
-| `T0_from_static`, `T0_from_static_v`, `P0_from_static` | `Tt_from_static`, `Tt_from_static_v`, `Pt_from_static` |
-| `solve_P0_from_mdot` (and its `T0=`) | `solve_Pt_from_mdot` (`Tt=`) |
-| `heat_entropy_flux(T0_in=, T0_out=)` | `Tt_in=`, `Tt_out=` |
-| `MixtureState.T_total`, `.P_total` and the constructor keywords | `MixtureState.Tt`, `.Pt` |
-| `MassStream.T`, `.P_total` | `MassStream.Tt`, `.Pt` |
-| `StreamJacobian.d_T`, `.d_P_total` | `.d_Tt`, `.d_Pt` |
-| `NozzleSolution.T0`, `.P0` | `.Tt`, `.Pt` |
-| `DuctStaticState.dT_dT0`, `dT_dP0`, `dP_dT0`, `dP_dP0`, `drho_dT0`, `drho_dP0`, `dGeff_dT0`, `dGeff_dP0` | the same with `Tt`/`Pt`: `dT_dTt`, ... |
-| `chamber_merge_face_state(T_main=, T=)` (both stagnation) | `Tt_main=`, `Tt=` |
-| internal solver tools: `momentum_chamber_residual_and_jacobian(P_total=, T=)`, `orifice_tap_pressure_and_jacobian(P_total_up=, P_total_down=)`, `p0=`, `t0=` of `ejector_choked_mass_flow_and_jacobian`, `ejector_cd_nozzle_mass_flow_and_jacobian`, `ejector_cd_nozzle_exit_static_and_jacobian`; `MixerResult.T_mix`, `.P_total_mix`, `.dT_mix_d_stream`, `.dP_total_mix_d_stream`, `.dT_mix_d_delta_h`, `.dT_mix_dQ` | `Pt=`, `Tt=`, `Pt_up=`, `Pt_down=`; `Tt_mix`, `Pt_mix`, `dTt_mix_d_stream`, `dPt_mix_d_stream`, `dTt_mix_d_delta_h`, `dTt_mix_dQ` |
-| internal solver tools: `sonic_static_pressure(T0=)`, `approach_static_pressure(P_total=, T_total=)`, `orifice_compressible_mdot_and_jacobian(T0=, P0=)`, `T_up=` of `orifice_residuals_and_jacobian`, `channel_residuals_and_jacobian`, `orifice_compressible_residuals_and_jacobian`; `SonicStatic.dP_dT0`, `OrificeResult.d_mdot_dT_up`, `ChannelSolverResult.d_dP_dT_up`; `T0_/P0_from_static_and_jacobian_M` | `Tt=`, `Pt=`, `Tt_up=`; `dP_dTt`, `d_mdot_dTt_up`, `d_dP_dTt_up`; `Tt_/Pt_from_static_and_jacobian_M` |
+| `T0=`, `P0=` keywords (`nozzle_flow`, `nozzle_cd`, `nozzle_thrust_cd`, `solve_A_eff_from_mdot`, `solve_P_back_from_mdot`, `critical_pressure_ratio`, `mach_from_pressure_ratio`, `mass_flux_isentropic`, `duct_static_state`, `duct_htc_static_state(_dY)`, `T_from_stagnation`, `P_from_stagnation`); `compressible.nozzle_flow(T=, P=)` | `Tt=`, `Pt=` |
+| `T0_from_static`, `T0_from_static_v`, `P0_from_static`, `solve_P0_from_mdot` | `Tt_from_static`, `Tt_from_static_v`, `Pt_from_static`, `solve_Pt_from_mdot` |
+| `heat_entropy_flux(T0_in=, T0_out=)`; `combustor_head_loss(T_in=, P_in=)`; `chamber_merge_face_state(T_main=, T=)` | `Tt_in=`, `Tt_out=`; `Tt_in=`, `Pt_in=`; `Tt_main=`, `Tt=` |
+| fields `MixtureState.T_total`/`.P_total` (and constructor keywords), `MassStream.T`/`.P_total`, `StreamJacobian.d_T`/`.d_P_total`, `NozzleSolution.T0`/`.P0`, `DuctStaticState.d*_dT0`/`d*_dP0`, `CombustorLossResult.dxi_dT_in`/`dxi_dP_in`, `MixerResult.T_mix`, `.P_total_mix`, `.dT_mix_*`, `.dP_total_mix_d_stream` | the same with `Tt`/`Pt` (`MixtureState.Tt`, `MassStream.Pt`, `dT_dTt`, `dxi_dTt_in`, `Tt_mix`, ...) |
+| internal solver tools: old keywords of `momentum_chamber_residual_and_jacobian`, `orifice_tap_pressure_and_jacobian`, the ejector kernels (`p0=`, `t0=`), `sonic_static_pressure`, `approach_static_pressure`, `orifice_compressible_mdot_and_jacobian`, `T_up=` of the orifice/channel residuals; fields `SonicStatic.dP_dT0`, `OrificeResult.d_mdot_dT_up`, `ChannelSolverResult.d_dP_dT_up`; `T0_/P0_from_static_and_jacobian_M` | `Pt=`, `Tt=`, `Pt_up=`, `Tt_up=`; `dP_dTt`, `d_mdot_dTt_up`, `d_dP_dTt_up`; `Tt_/Pt_from_static_and_jacobian_M` |
 
 Kept: `Pt0`/`Tt0` of the Fanno functions (`fanno_channel_flow`,
 `fanno_rayleigh_*`, `area_change_*`) -- the `t` already says total and the
@@ -3758,7 +3745,7 @@ keys and `NetworkMixtureState` are the next section.
 |---|---|---|
 | `"<node>.T"` | stagnation T | **static** T; the stagnation T is `"<node>.Tt"` |
 | element `T_in`, `T_out` (`result["__element_diag__"][id]`) | stagnation T of the end nodes | **static** T of the end nodes, as `P_in`/`P_out`; `Tt_in`/`Tt_out` unchanged |
-| `"<chamber>.T_static"` | a momentum chamber's static T | deprecated alias of `"<chamber>.T"`, removed in 0.9.0 |
+| `"<chamber>.T_static"` | a momentum chamber's static T | `"<chamber>.T"` (the alias was removed in 0.9.0) |
 | junction `port_<i>_T` (`__element_diag__`) | the port's stagnation T | **static** T of the port; the stagnation T is the new `port_<i>_Tt` |
 | a crossflow station's `.T`, `.Pt`, `.mach` | Tt, the static P, 0 | the station's moving state: static T and Mach at the station's mean flow, its true Pt (the node's `.P` is the static P at the middle of the station) |
 | an area `CombustorNode`'s `.T` | Tt | the static T at G = m / area (its `.P` = `.Pt`, a large slow volume) |
@@ -3771,15 +3758,16 @@ a momentum chamber reports the static T its closure solved, which is that
 point.
 
 The same key name changed meaning, so code that read `"<node>.T"` as the
-total temperature keeps running with a different number. In 0.8 the result
-of `NetworkSolver.solve()` warns once (`FutureWarning`) the first time such a
-key is read where its value differs from the `Tt` one. Read `Tt` for the
-total temperature. The warning goes in 0.9.0.
+total temperature keeps running with a different number. Read `Tt` for the
+total temperature. 0.8 warned once (`FutureWarning`) on the first such read;
+the warning was removed in 0.9.0 and `solve()` returns a plain `dict`.
 
-`NetworkMixtureState(P, Pt, T, Tt, m_dot, Y)` still accepts `T`, and
-`state.T = ...` still assigns, both with a `DeprecationWarning`: they set
-`Tt`, which is what `T` held. Pass `Tt=` (and `incompressible=` for a node in
-that regime). Removed in 0.9.0.
+`NetworkMixtureState(P, Pt, *, Tt, m_dot=0.0, Y, incompressible=False)`:
+since 0.9.0 `Tt`, `m_dot` and `Y` are keyword-only and `T` is no longer a
+constructor argument or settable (it is the computed static T). The 0.8
+signature `(P, Pt, T, Tt, m_dot, Y)` accepted `T` with a `DeprecationWarning`;
+a positional call written for it now raises `TypeError` instead of shifting
+its arguments.
 
 No residual reads `NetworkMixtureState.T` (#825), so solutions are
 unchanged. The residuals already form the static state wherever a node
@@ -3794,27 +3782,30 @@ loss correlation's `T_in`.
 
 A residual's Jacobian names a node's stagnation-T column `"<node>.Tt"`, the
 quantity it is (#782). A custom element that still keys it `"<node>.T"`, the
-0.7 name, gets the same Jacobian with one `DeprecationWarning`; the old name
-is removed in 0.9.0.
+0.7 name (relayed with a `DeprecationWarning` in 0.8), raises `KeyError`
+naming `"<node>.Tt"` since 0.9.0.
 
 ### The Stolz metering Cd (#876)
 
-The Stolz correlation (ISO 5167:1980) is deprecated in 0.8.0 and removed in
-0.9.0. ISO replaced it with Reader-Harris/Gallagher in ISO 5167-1:1991/Amd
+The Stolz correlation (ISO 5167:1980) was deprecated in 0.8.0 and **removed in
+0.9.0**. ISO replaced it with Reader-Harris/Gallagher in ISO 5167-1:1991/Amd
 1:1998 (and ISO 5167-2:2003, 2022). Reader-Harris/Gallagher has a sourced range
 of use (`metering_cd_in_range`) and fits the EEC/API database better over
 Stolz's own range (Reader-Harris & Sattary 1996, Table 10: s 0.245 % against
-0.390 %). Stolz's limits of use are not held, so `metering_cd_in_range` cannot
-flag a Stolz plate outside them.
+0.390 %).
 
-| Deprecated (removed in 0.9.0) | Use | Warns |
+| Removed in 0.9.0 | Use | Now |
 |---|---|---|
-| `OrificeElement(correlation="Stolz")` | `correlation="ReaderHarrisGallagher"` (the default) | once per element, at construction |
-| `cb.MeteringCdCorrelation.Stolz` in `metering_cd_and_dRe`, `metering_cd_in_range`, `solve_orifice_mdot`, `orifice_flow`, `orifice_flow_state` | `cb.MeteringCdCorrelation.ReaderHarrisGallagher` | every call |
-| GUI orifice "Stolz (ISO 5167:1980, deprecated)" | Reader-Harris/Gallagher | a note in `/solve`'s `deprecations` |
+| `OrificeElement(correlation="Stolz")` | `correlation="ReaderHarrisGallagher"` (the default) | `ValueError` naming the replacement |
+| `cb.MeteringCdCorrelation.Stolz`, C++ `Cd_Stolz` | `cb.MeteringCdCorrelation.ReaderHarrisGallagher`, `Cd_ReaderHarrisGallagher` | `AttributeError` |
+| GUI orifice "Stolz (ISO 5167:1980, deprecated)" and `SolveResponse.deprecations` | Reader-Harris/Gallagher | a saved file with `"correlation": "Stolz"` is refused with a message naming `ReaderHarrisGallagher` |
 
-Results are unchanged until removal. The cooling plates, which refuse the whole
-ISO 5167 family, refuse Stolz without the warning.
+### Al 6061 conductivity (#761)
+
+`cb.k_aluminum_6061` and the database material `"al6061"` cited no source;
+deprecated in 0.8.0, removed in 0.9.0. Give the wall layer its conductivity
+(`material="custom"`) instead; `get_material_conductivity("al6061", T)` raises
+`ValueError`.
 
 ---
 

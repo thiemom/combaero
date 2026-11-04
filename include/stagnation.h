@@ -120,24 +120,6 @@ double P_from_stagnation(double Pt, double Tt, double M,
                          const std::vector<double>& X,
                          double tol = 1e-8, std::size_t max_iter = 50);
 
-// Deprecated names (#782): the T0/P0 spelling of the functions above. They
-// forward unchanged and are removed in 0.9.0.
-[[deprecated("renamed Tt_from_static (#782); removed in 0.9.0")]]
-inline double T0_from_static(double T, double M, const std::vector<double>& X,
-                             double tol = 1e-8, std::size_t max_iter = 50) {
-  return Tt_from_static(T, M, X, tol, max_iter);
-}
-[[deprecated("renamed Tt_from_static_v (#782); removed in 0.9.0")]]
-inline double T0_from_static_v(double T, double v, const std::vector<double>& X,
-                               double tol = 1e-8, std::size_t max_iter = 50) {
-  return Tt_from_static_v(T, v, X, tol, max_iter);
-}
-[[deprecated("renamed Pt_from_static (#782); removed in 0.9.0")]]
-inline double P0_from_static(double P, double T, double M, const std::vector<double>& X,
-                             double tol = 1e-8, std::size_t max_iter = 50) {
-  return Pt_from_static(P, T, M, X, tol, max_iter);
-}
-
 // -------------------------------------------------------------
 // Adiabatic wall temperature
 // -------------------------------------------------------------

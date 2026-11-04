@@ -35,8 +35,8 @@ struct ThermalMaterial {
     double T_solidus = std::numeric_limits<double>::quiet_NaN();
     std::string solidus_source;
     // No hot extension of the envelope: it ends at T_max. For the ceramics
-    // (no solidus held, and the generic metal cap does not apply to them) and
-    // for al6061, whose data end far below the generic metal cap (#882).
+    // (no solidus held, and the generic metal cap does not apply to them,
+    // #882).
     bool hot_cap_at_data_end = false;
 };
 
@@ -162,12 +162,6 @@ double k_stainless_steel_310(double T);
 // data sets, interpolated linearly. Solidus 1672 K, the table's melting range.
 // Valid: 200-1672 K (the table from 200 K to the solidus)
 double k_stainless_steel_304(double T);
-
-// Aluminum 6061-T6
-// Source: ASM Handbook, Aluminum Association
-// Valid: 200-600 K (limited by T6 temper stability)
-// Linear fit: k = 167.0 - 0.012*T_C
-double k_aluminum_6061(double T);
 
 // -------------------------------------------------------------
 // Thermal Barrier Coatings - k(T) with Aging

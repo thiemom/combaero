@@ -127,7 +127,7 @@ def test_lichtarowicz_refuses_a_one_diameter_plate() -> None:
 
 
 def test_metering_correlations_are_refused() -> None:
-    p = _plate(correlation="Stolz")
+    p = _plate(correlation="ReaderHarrisGallagher")
     g = FlowNetwork()
     g.add_node(PlenumNode("s"))
     g.add_node(PlenumNode("c"))

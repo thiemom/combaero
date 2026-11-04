@@ -32,10 +32,6 @@ from combaero.network import (
     PressureBoundary,
 )
 
-# Stolz is deprecated (#876): its DeprecationWarning is tested in
-# test_stolz_deprecation_876.py; here Stolz is exercised for its values.
-pytestmark = pytest.mark.filterwarnings("ignore:.*Stolz.*:DeprecationWarning")
-
 D = 0.1
 
 
@@ -223,7 +219,7 @@ def test_the_node_type_does_not_move_the_flow(regime: str, beta: float) -> None:
     assert rc["a.P"] == pytest.approx(rc["o.P_approach"], rel=1e-9)
 
 
-@pytest.mark.parametrize("correlation", ["ReaderHarrisGallagher", "Stolz"])
+@pytest.mark.parametrize("correlation", ["ReaderHarrisGallagher"])
 def test_the_tap_never_moves_the_flow_only_the_reported_differential(correlation: str) -> None:
     """Owner's ruling on #645: the tap is measurement. Every tap gives the
     same solved flow, to the last bit; dP_tap moves as 1/C_tap^2."""
@@ -248,7 +244,7 @@ def test_the_tap_never_moves_the_flow_only_the_reported_differential(correlation
         assert dp[tap] * c[tap] ** 2 == pytest.approx(dp["D_D2"] * c["D_D2"] ** 2, rel=1e-4)
 
 
-@pytest.mark.parametrize("correlation", ["ReaderHarrisGallagher", "Stolz"])
+@pytest.mark.parametrize("correlation", ["ReaderHarrisGallagher"])
 def test_the_network_metering_cd_is_cpps_at_dd2_taps(correlation: str) -> None:
     """No metering formula in Python: the row's Cd is metering_cd_and_dRe at
     the pipe Reynolds number and D-D/2 taps, the taps ISO's loss relation is

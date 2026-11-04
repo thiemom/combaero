@@ -338,7 +338,6 @@ class OrificeData(BaseModel):
     # are not interchangeable; there is deliberately no "Auto" member.
     correlation: Literal[
         "ReaderHarrisGallagher",
-        "Stolz",
         "IdelchikThick",
         "IdelchikBeveled",
         "IdelchikRounded",
@@ -370,15 +369,22 @@ class OrificeData(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def refuse_removed_miller(cls, data: dict) -> dict:
+    def refuse_removed_correlations(cls, data: dict) -> dict:
         # A file saved before the removal names a correlation that no longer
         # exists. Say which one and what to pick, rather than a bare Literal
-        # mismatch; silently swapping in Stolz would change the result.
+        # mismatch; silently swapping in another Cd would change the result.
         if isinstance(data, dict) and data.get("correlation") == "Miller":
             raise ValueError(
                 "The 'Miller' orifice correlation was removed: no published "
                 "source matched its formula. Pick 'ReaderHarrisGallagher' for "
-                "this orifice (Stolz, which 'Miller' had computed, is deprecated, #876)."
+                "this orifice (Stolz, which 'Miller' had computed, was removed "
+                "in 0.9.0, #876)."
+            )
+        if isinstance(data, dict) and data.get("correlation") == "Stolz":
+            raise ValueError(
+                "The 'Stolz' orifice correlation (ISO 5167:1980) was removed in "
+                "0.9.0 (#876): ISO replaced it with Reader-Harris/Gallagher. Pick "
+                "'ReaderHarrisGallagher' for this orifice."
             )
         return data
 
@@ -995,9 +1001,6 @@ class SolveResponse(BaseModel):
     #: Report only (#588): elements on an incompressible closure running above
     #: the solver's Mach limit, each attributed to its canvas node.
     incompressible_warnings: list[IncompressibleFlag] = []
-    #: Deprecated settings the network uses (#876), one note each. Report
-    #: only: the solve is unchanged.
-    deprecations: list[str] = []
     #: Mass and energy over the network's control volume (empty if the root
     #: finder did not converge).
     ledger: dict = {}

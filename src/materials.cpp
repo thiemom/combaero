@@ -297,19 +297,6 @@ double k_stainless_steel_304(double T) {
     return kd_stainless_steel_304(T).k;
 }
 
-static ConductivityAndSlope kd_aluminum_6061(double T) {
-    constexpr double T_min = 200.0;
-    constexpr double T_max = 600.0;
-    validate_temperature("Aluminum 6061", T, T_min, T_max);
-
-    double T_C = T - 273.15;
-    return {167.0 - 0.012 * T_C, -0.012};
-}
-
-double k_aluminum_6061(double T) {
-    return kd_aluminum_6061(T).k;
-}
-
 // -------------------------------------------------------------
 // Thermal Barrier Coatings
 // -------------------------------------------------------------
@@ -505,16 +492,6 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         1672.0,
         "CINDAS Report 45 Table 2, melting range 1672-1727 K (Cleveland-Cliffs 304/304L bulletin: 1399-1454 C)",
         false
-    }},
-    {"al6061", {
-        "al6061",
-        kd_aluminum_6061,
-        200.0, 600.0,
-        "ASM Handbook, Aluminum Association",
-        "Aluminum alloy, limited to <300degC due to T6 temper",
-        NO_SOLIDUS,
-        "",
-        true
     }},
     {"ysz", {
         "ysz",

@@ -13,7 +13,6 @@ using namespace combaero;
 //
 // Demonstrates:
 // 1. Cd correlations: Reader-Harris/Gallagher (flange and corner taps).
-//    Stolz (ISO 5167:1980) is deprecated (#876), removed in 0.9.0.
 // 2. Thick-plate and rounded-entry corrections
 // 3. Iterative Cd-Re solver (solve_orifice_mdot)
 // 4. Full orifice_flow bundle (OrificeFlowResult)

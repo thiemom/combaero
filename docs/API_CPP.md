@@ -521,14 +521,10 @@ double Tt_from_static_v(double T, double v, const std::vector<double>& X);
 double Pt_from_static(double P, double T, double M, const std::vector<double>& X);
 double T_from_stagnation(double Tt, double M, const std::vector<double>& X);
 double P_from_stagnation(double Pt, double Tt, double M, const std::vector<double>& X);
-// T0_from_static, T0_from_static_v, P0_from_static: [[deprecated]] inline
-// forwarders to the Tt/Pt names (#782), removed in 0.9.0. Likewise
-// solve_P0_from_mdot (compressible.h) and T0_/P0_from_static_and_jacobian_M
-// (solver_interface.h). Renamed struct fields (Stream::Tt/Pt,
-// StreamJacobian::d_Tt/d_Pt, MixtureState::Tt/Pt, NozzleSolution::Tt/Pt,
-// DuctStaticState::d*_dTt/d*_dPt, SonicStatic::dP_dTt,
-// OrificeResult::d_mdot_dTt_up, ChannelResult::d_dP_dTt_up) have no C++
-// alias; the Python bindings keep the old spellings as warning properties.
+// Removed in 0.9.0 (#782): the T0_from_static, T0_from_static_v,
+// P0_from_static forwarders (use the Tt/Pt names above), solve_P0_from_mdot
+// (compressible.h; use solve_Pt_from_mdot) and T0_/P0_from_static_and_jacobian_M
+// (solver_interface.h; use Tt_/Pt_from_static_and_jacobian_M).
 
 double T_adiabatic_wall(double T_static, double v, double T, double P,
                         const std::vector<double>& X, bool turbulent = true);
@@ -1627,15 +1623,12 @@ struct OrificeState {
 // NORMED measurement orifice: a standardised plate in a pipe, Cd referenced
 // to the TAPPING differential, every member a function of beta = d/D.
 enum class MeteringCdCorrelation {
-    ReaderHarrisGallagher, Stolz,   // ISO 5167-2:2003 and ISO 5167:1980
+    ReaderHarrisGallagher,          // ISO 5167-2:2003
     Constant, UserFunction
 };
-// Stolz is DEPRECATED in 0.8.0, removed in 0.9.0 (#876): ISO replaced it with
-// Reader-Harris/Gallagher (ISO 5167-1:1991/Amd 1:1998, ISO 5167-2:2003), and
-// its limits of use are not held, so metering_cd_in_range cannot flag it.
-// Cd_Stolz is [[deprecated]]; the enum value is deprecated in comments only
-// (an attribute on it would fire inside the library's own dispatch). The
-// Python bindings warn (DeprecationWarning) whenever they are handed Stolz.
+// Stolz (ISO 5167:1980) and Cd_Stolz were removed in 0.9.0 (#876): ISO
+// replaced it with Reader-Harris/Gallagher (ISO 5167-1:1991/Amd 1:1998,
+// ISO 5167-2:2003). Use ReaderHarrisGallagher / Cd_ReaderHarrisGallagher.
 
 // Reader-Harris/Gallagher at geom.tap, with the small-pipe term below 71.12 mm.
 double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& state);
@@ -1643,21 +1636,21 @@ double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& stat
 // The network orifice's flow column uses it (dRe_D/dm = Re_D/|m|).
 std::tuple<double, double> Cd_sharp_thin_plate_and_dRe(const OrificeGeometry& geom,
                                                        const OrificeState& state);
-// (Cd, dCd/dRe_D) of ReaderHarrisGallagher or Stolz at geom.tap; the network
+// (Cd, dCd/dRe_D) of ReaderHarrisGallagher at geom.tap; the network
 // element's only metering entry point. Constant/UserFunction throw. RHG below
 // Re_b = metering_cd_re_min is HELD (#873, 0.8.0), entered C1 in ln Re_D over
 // orifice::metering_hold::blend_ln_re = 0.1 just below Re_b (the slope ramps
 // linearly to 0); at Re_D >= Re_b nothing changed. The form and its
 // derivative are in include/orifice.h. A 1.5 cap stays for flange taps below
-// D ~32 mm. Stolz has no hold (ISO 5167:1980 not held): Re_D < 1 floor and
-// 1.5 cap, as before.
+// D ~32 mm.
 std::tuple<double, double> metering_cd_and_dRe(MeteringCdCorrelation id,
                                                const OrificeGeometry& geom, double Re_D);
 // RHG's lower Re_D bound, ISO 5167-2:2003 5.3.1 (5000, 16000 b^2 above
 // beta 0.56, flange max(5000, 170 b^2 D[mm])). Throws std::invalid_argument
-// for every other correlation: Stolz has no encoded bound and no hold.
+// for every other correlation (Constant/UserFunction carry no formula).
 double metering_cd_re_min(MeteringCdCorrelation id, const OrificeGeometry& geom);
-// ISO 5167-2:2003 5.3.1 range (Reader-Harris/Gallagher); Stolz returns true.
+// ISO 5167-2:2003 5.3.1 range (Reader-Harris/Gallagher); Constant and
+// UserFunction return true.
 bool metering_cd_in_range(MeteringCdCorrelation id, const OrificeGeometry& geom,
                           double Re_D);
 // ISO 5167-2:2003 5.4.1: permanent loss / tapping differential of a plate

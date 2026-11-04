@@ -532,19 +532,6 @@ Pt_from_static_and_jacobian_M(double P, double T, double M,
                               const std::vector<double> &X,
                               double tol = 1e-8, std::size_t max_iter = 50);
 
-// Deprecated names (#782), removed in 0.9.0.
-[[deprecated("renamed Tt_from_static_and_jacobian_M (#782); removed in 0.9.0")]]
-inline std::tuple<double, double>
-T0_from_static_and_jacobian_M(double T, double M, const std::vector<double> &X) {
-  return Tt_from_static_and_jacobian_M(T, M, X);
-}
-[[deprecated("renamed Pt_from_static_and_jacobian_M (#782); removed in 0.9.0")]]
-inline std::tuple<double, double>
-P0_from_static_and_jacobian_M(double P, double T, double M, const std::vector<double> &X,
-                              double tol = 1e-8, std::size_t max_iter = 50) {
-  return Pt_from_static_and_jacobian_M(P, T, M, X, tol, max_iter);
-}
-
 // -----------------------------------------------------------------------------
 // 6. Combustion Interfaces
 // -----------------------------------------------------------------------------

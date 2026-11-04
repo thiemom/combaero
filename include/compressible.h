@@ -95,14 +95,6 @@ double solve_Pt_from_mdot(
     const std::vector<double>& X,
     double tol = 1e-8, std::size_t max_iter = 50);
 
-// Deprecated name (#782), removed in 0.9.0.
-[[deprecated("renamed solve_Pt_from_mdot (#782); removed in 0.9.0")]]
-inline double solve_P0_from_mdot(double Tt, double P_back, double A_eff, double mdot_target,
-                                 const std::vector<double>& X, double tol = 1e-8,
-                                 std::size_t max_iter = 50) {
-  return solve_Pt_from_mdot(Tt, P_back, A_eff, mdot_target, X, tol, max_iter);
-}
-
 // -------------------------------------------------------------
 // Utility functions
 // -------------------------------------------------------------

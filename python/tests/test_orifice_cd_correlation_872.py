@@ -34,10 +34,6 @@ from gui.backend.graph_builder import build_network_from_schema
 from gui.backend.runner import NetworkRunner
 from gui.backend.schemas import NetworkGraphSchema
 
-# Stolz is deprecated (#876): its DeprecationWarning is tested in
-# test_stolz_deprecation_876.py; here Stolz is exercised for its values.
-pytestmark = pytest.mark.filterwarnings("ignore:.*Stolz.*:DeprecationWarning")
-
 _REPO = Path(__file__).resolve().parents[2]
 _ISO_GUI = _REPO / "gui" / "examples" / "iso5167_orifice_metering.json"
 
@@ -109,7 +105,7 @@ def test_a_cd_with_a_correlation_is_refused(name: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "corr", ["ReaderHarrisGallagher", "Stolz", "IdelchikThick", "Lichtarowicz", "McGreehanSchotsch"]
+    "corr", ["ReaderHarrisGallagher", "IdelchikThick", "Lichtarowicz", "McGreehanSchotsch"]
 )
 def test_every_orifice_correlation_refuses_a_cd(corr: str) -> None:
     with pytest.raises(ValueError, match="'o'.*Cd=0.8.*correlation='fixed'"):

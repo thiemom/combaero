@@ -2,7 +2,7 @@
 
 Three gaps, all pre-existing:
 
-* The Reynolds-dependent Cd (Reader-Harris/Gallagher, Stolz, the Idelchik
+* The Reynolds-dependent Cd (Reader-Harris/Gallagher, the Idelchik
   and McGreehan-Schotsch holes, Lichtarowicz) reads Re ~ |m| / mu(T, Y). The
   row carried mu's temperature column but not its composition: with an RHG
   orifice behind a combustor the row's fuel-flow column was 7e-4 off.

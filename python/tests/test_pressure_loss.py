@@ -541,9 +541,10 @@ def test_the_head_loss_is_total_total() -> None:
     assert res[0] == pytest.approx(b.Pt - a.Pt * (1.0 - expected), rel=1e-12)
 
 
-def test_a_0_7_context_still_evaluates_and_says_so() -> None:
+def test_a_0_7_context_is_refused_naming_the_new_fields() -> None:
     """A hand-built context with the 0.7 names T_in/P_in (P_in was the
-    static P) evaluates the same loss with a DeprecationWarning."""
+    static P) was evaluated with a DeprecationWarning in 0.8; since 0.9.0 it
+    is refused with a message naming Tt_in/Pt_in."""
     from types import SimpleNamespace
 
     import combaero as cb
@@ -552,16 +553,10 @@ def test_a_0_7_context_still_evaluates_and_says_so() -> None:
     Y = list(cb.species.dry_air_mass())
     X = list(cb.mass_to_mole(Y))
     corr = ConstantHeadLoss(zeta=4.0, area=0.05)
-    new = corr.evaluate(
-        SimpleNamespace(theta=0.0, mdot_total=0.4, Tt_in=700.0, Pt_in=2e5, X_in=X), Y
-    )
+    corr.evaluate(SimpleNamespace(theta=0.0, mdot_total=0.4, Tt_in=700.0, Pt_in=2e5, X_in=X), Y)
     old_ctx = SimpleNamespace(theta=0.0, mdot_total=0.4, T_in=700.0, P_in=2e5, X_in=X)
-    with pytest.warns(DeprecationWarning, match="0.9.0"):
-        old = corr.evaluate(old_ctx, Y)
-    assert old.xi == new.xi
+    with pytest.raises(AttributeError, match="Tt_in and Pt_in"):
+        corr.evaluate(old_ctx, Y)
     ctx = PressureLossContext(theta=0.0, mdot_total=0.4, Tt_in=700.0, Pt_in=2e5, X_in=X)
-    with pytest.warns(DeprecationWarning, match="Pt_in"):
-        assert ctx.P_in == 2e5
-    with pytest.warns(DeprecationWarning, match="Tt_in"):
-        ctx.T_in = 650.0
-    assert ctx.Tt_in == 650.0
+    with pytest.raises(AttributeError):
+        ctx.P_in  # noqa: B018

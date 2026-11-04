@@ -41,7 +41,6 @@ from ._core import (
     nozzle_flow as _nozzle_flow,
 )
 from ._flow_solution import FlowSolution
-from ._renamed import renamed_kwargs
 
 
 def _fanno_to_flow_solution(sol: FannoSolution, store_profile: bool = False) -> FlowSolution:
@@ -212,10 +211,9 @@ def nozzle_flow(
     Parameters
     ----------
     Tt:
-        Stagnation (total) temperature [K]. Was ``T`` before 0.8.0; ``T=``
-        still works, with a DeprecationWarning, until 0.9.0.
+        Stagnation (total) temperature [K]. (``T=`` before 0.8.0.)
     Pt:
-        Stagnation (total) pressure [Pa]. Was ``P`` (same deprecation).
+        Stagnation (total) pressure [Pa]. (``P=`` before 0.8.0.)
     X:
         Mole fractions [-].
     P_back:
@@ -235,7 +233,3 @@ def nozzle_flow(
     """
     sol = _nozzle_flow(Tt, Pt, P_back, A_eff, list(X), tol=tol, max_iter=max_iter)
     return _nozzle_to_flow_solution(sol)
-
-
-# T/P meant the stagnation state here, against the P/Pt rule (#782).
-nozzle_flow = renamed_kwargs(nozzle_flow, "compressible.nozzle_flow", {"T": "Tt", "P": "Pt"})

@@ -22,10 +22,6 @@ from combaero.network import (
     PressureBoundary,
 )
 
-# Stolz is deprecated (#876): its DeprecationWarning is tested in
-# test_stolz_deprecation_876.py; here Stolz is exercised for its values.
-pytestmark = pytest.mark.filterwarnings("ignore:.*Stolz.*:DeprecationWarning")
-
 
 def _network(corr: str, regime: str) -> FlowNetwork:
     g = FlowNetwork()
@@ -41,9 +37,7 @@ def _network(corr: str, regime: str) -> FlowNetwork:
     return g
 
 
-@pytest.mark.parametrize(
-    "corr", ["ReaderHarrisGallagher", "Stolz", "IdelchikThick", "McGreehanSchotsch"]
-)
+@pytest.mark.parametrize("corr", ["ReaderHarrisGallagher", "IdelchikThick", "McGreehanSchotsch"])
 @pytest.mark.parametrize("regime", ["compressible", "incompressible"])
 def test_a_reynolds_dependent_cd_has_its_temperature_column(corr: str, regime: str) -> None:
     s = NetworkSolver(_network(corr, regime))

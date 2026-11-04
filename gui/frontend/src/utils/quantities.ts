@@ -224,16 +224,10 @@ export const QUANTITY_CATALOGUE: Record<
 	// State results (accessed via result.state.*). P and T are static, Pt and
 	// Tt total (#773, #782): until 0.7 T held the total temperature. T is Tt
 	// at a plenum and an incompressible node; a moving compressible node's T
-	// is on the isentrope through (Tt, Pt). T_static is the old name of a
-	// momentum chamber's T, emitted until 0.9.0.
+	// is on the isentrope through (Tt, Pt).
 	P: { label: "P", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	Pt: { label: "Pt", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	T: { label: "T (static)", unit: "K", format: (v) => v.toFixed(2) },
-	T_static: {
-		label: "T_static (deprecated: T)",
-		unit: "K",
-		format: (v) => v.toFixed(2),
-	},
 	Tt: { label: "Tt", unit: "K", format: (v) => v.toFixed(2) },
 	// A heat source's set outlet temperature (#792): a TOTAL temperature.
 	Tt_target: {

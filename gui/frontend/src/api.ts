@@ -41,8 +41,6 @@ export interface SolveResponse {
 	lm_started_at_eval?: number | null;
 	second_law_failures?: SecondLawFlag[];
 	incompressible_warnings?: IncompressibleFlag[];
-	// Deprecated settings the network uses (#876); report only.
-	deprecations?: string[];
 	ledger?: Ledger | Record<string, never>;
 }
 

@@ -1339,8 +1339,7 @@ const Inspector = () => {
 						};
 						const metering =
 							(selectedNode.data.correlation || "ReaderHarrisGallagher") ===
-								"ReaderHarrisGallagher" ||
-							selectedNode.data.correlation === "Stolz";
+							"ReaderHarrisGallagher";
 						const lu = unitPreferences.length === "mm" ? 1000 : 1;
 						// #788: in_pipe = false is a lumped Cd*A restriction (no pipe
 						// diameter, beta = 0). In a pipe, a bore equal to it is no
@@ -1481,9 +1480,6 @@ const Inspector = () => {
 										<option value="ReaderHarrisGallagher">
 											Reader-Harris/Gallagher (Sharp)
 										</option>
-										<option value="Stolz">
-											Stolz (ISO 5167:1980, deprecated)
-										</option>
 										<option value="IdelchikThick">
 											Deep Hole in Wall (Idelchik 4-18a)
 										</option>
@@ -1501,13 +1497,6 @@ const Inspector = () => {
 										</option>
 										<option value="fixed">Manual / Fixed Value</option>
 									</select>
-									{selectedNode.data.correlation === "Stolz" && (
-										<span className="text-[10px] text-amber-700">
-											Deprecated (#876), removed in 0.9.0: ISO 5167 replaced
-											Stolz with Reader-Harris/Gallagher, which has a sourced
-											range of use.
-										</span>
-									)}
 								</div>
 
 								{/* Conditional Inputs based on correlation */}
@@ -1712,8 +1701,8 @@ const Inspector = () => {
 										pressure ratio falls, through choke; ISO: valid for p2/p1 ≥
 										0.75. Default: Jobson for an incompressible-referenced Cd
 										(RHG, Idelchik, Lichtarowicz, McGreehan-Schotsch) on a
-										sharp-edged bore at β ≤ 0.75; the nozzle for fixed Cd,
-										Stolz, a rounded or beveled edge or a wider bore.
+										sharp-edged bore at β ≤ 0.75; the nozzle for fixed Cd, a
+										rounded or beveled edge or a wider bore.
 									</span>
 									{(selectedNode.data.compressible_model || "default") ===
 										"default" &&

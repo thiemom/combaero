@@ -9,9 +9,6 @@ from . import _core
 # Re-export all internal solver tools from _core
 Pt_from_static_and_jacobian_M = _core.Pt_from_static_and_jacobian_M
 Tt_from_static_and_jacobian_M = _core.Tt_from_static_and_jacobian_M
-# Deprecated (#782), removed in 0.9.0: warn and forward to the Pt/Tt names.
-P0_from_static_and_jacobian_M = _core.P0_from_static_and_jacobian_M
-T0_from_static_and_jacobian_M = _core.T0_from_static_and_jacobian_M
 T_adiabatic_wall_and_jacobian_v = _core.T_adiabatic_wall_and_jacobian_v
 adiabatic_T_complete_and_jacobian_T = _core.adiabatic_T_complete_and_jacobian_T
 adiabatic_T_complete_and_jacobian_T_from_streams = (
@@ -51,10 +48,6 @@ friction_and_jacobian_petukhov = _core.friction_and_jacobian_petukhov
 friction_and_jacobian_serghides = _core.friction_and_jacobian_serghides
 lossless_pressure_and_jacobian = _core.lossless_pressure_and_jacobian
 mach_number_and_jacobian_v = _core.mach_number_and_jacobian_v
-# metering_cd_and_dRe / metering_cd_in_range without the Stolz
-# DeprecationWarning (#876): the network element warns once at construction.
-metering_cd_and_dRe_quiet = _core._metering_cd_and_dRe
-metering_cd_in_range_quiet = _core._metering_cd_in_range
 mixer_from_streams_and_jacobians = _core.mixer_from_streams_and_jacobians
 momentum_chamber_residual_and_jacobian = _core.momentum_chamber_residual_and_jacobian
 nusselt_and_jacobian_dittus_boelter = _core.nusselt_and_jacobian_dittus_boelter
@@ -83,9 +76,7 @@ wall_adiabatic_face = _core.wall_adiabatic_face
 WallAdiabaticFace = _core.WallAdiabaticFace
 
 __all__ = [
-    "P0_from_static_and_jacobian_M",
     "Pt_from_static_and_jacobian_M",
-    "T0_from_static_and_jacobian_M",
     "Tt_from_static_and_jacobian_M",
     "T_adiabatic_wall_and_jacobian_v",
     "adiabatic_T_complete_and_jacobian_T",
