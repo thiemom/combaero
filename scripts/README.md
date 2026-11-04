@@ -178,15 +178,20 @@ and smoke-tests that the server starts and serves JS assets with the correct MIM
 ## Dependency Scripts
 
 ### bulk_merge_safe.sh
-Merges safe Dependabot PRs (grouped safe-updates, or same-major bumps) one at a
-time. `main` requires up-to-date branches and signed commits (ruleset "Iron"),
-so each PR is rebased by Dependabot (`@dependabot rebase`, which re-signs;
-a GitHub-side `gh pr update-branch` rebase is unsigned and blocks the merge),
-waits for CI, is re-checked (all checks passed or skipped, `CLEAN`, pinned
-versions agree at its head) and squash-merged at exactly the verified commit.
+Queues safe Dependabot PRs (grouped safe-updates, or same-major bumps; majors
+too with `--major`) in the merge queue. It starts with the security
+housekeeping -- every dependency floor against OSV (`dependency_floors.py
+--osv`) and `pnpm audit` on the frontend lock -- reported, never a gate. PRs
+that rewrite the same lock file cannot share the queue (the second one's lock
+predates the first's merge and bounces), so each wave queues one PR per
+manifest directory and waits until it is merged or has left the queue; the
+next in that directory is rebased by Dependabot first (`@dependabot rebase`,
+which re-signs; a GitHub-side `gh pr update-branch` rebase is unsigned). Each
+PR is gated (all checks passed or skipped, pinned versions agree at its head)
+and queued at exactly the verified commit.
 ```bash
-./scripts/bulk_merge_safe.sh --dry-run      # report only
-./scripts/bulk_merge_safe.sh 510            # one PR
+./scripts/bulk_merge_safe.sh --dry-run           # report the waves only
+./scripts/bulk_merge_safe.sh --major 977 978     # majors you have decided to take
 ```
 
 ### check_version_sync.py

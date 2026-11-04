@@ -1,33 +1,47 @@
 #!/bin/bash
 # scripts/bulk_merge_safe.sh
-# Merge "safe" Dependabot PRs (grouped safe-updates, or minor/patch bumps),
-# ONE AT A TIME: main is branch-protected and requires up-to-date branches,
-# so every merge leaves the next PR behind. For each PR, in order:
-#   1. author must be app/dependabot and the bump safe;
-#   2. if behind main: ask Dependabot to rebase ("@dependabot rebase"), wait
-#      for the new head, then for CI. NOT gh pr update-branch: the Iron
-#      ruleset requires signed commits and a GitHub-side rebase is unsigned;
-#      Dependabot re-signs its own;
-#   3. all checks finished, none failed (SKIPPED/NEUTRAL are fine);
-#   4. mergeStateStatus CLEAN;
-#   5. pinned tool versions agree at the PR head (scripts/check_version_sync.py);
-#   6. squash-merge exactly the verified head commit (--match-head-commit).
+# Queue "safe" Dependabot PRs (grouped safe-updates, or same-major bumps) in
+# the merge queue (ruleset "Iron"), after a security housekeeping pass.
+#
+# 0. Housekeeping (skip with --no-audit), reported, never a gate: every
+#    dependency floor against OSV (dependency_floors.py --osv) and the
+#    frontend lock with pnpm audit. Dependabot moves only the top of each
+#    range and only direct dependencies; these cover the rest.
+# 1. A PR is eligible when its author is app/dependabot and the bump is safe
+#    (same major, or a grouped safe set); --major also admits major bumps,
+#    which the user has decided to take.
+# 2. Waves: PRs that rewrite the same lock file (same manifest directory)
+#    cannot share the queue -- the second one's lock was generated against
+#    the old main and bounces. Each wave queues at most one PR per manifest
+#    directory, then waits until each is merged or has left the queue.
+# 3. A PR whose directory had a merge earlier in the run is first rebased by
+#    Dependabot ("@dependabot rebase"; never gh pr update-branch, whose
+#    rebase is unsigned), then waits for CI.
+# 4. Gate before queueing: all checks finished, none failed (SKIPPED/NEUTRAL
+#    are fine), and pinned tool versions agree at the PR head
+#    (scripts/check_version_sync.py). Queued at exactly that head
+#    (--match-head-commit); the queue picks the merge method (squash).
 # Anything else is reported and skipped; nothing is forced.
 #
-# Usage: scripts/bulk_merge_safe.sh [--dry-run] [PR ...]
+# Usage: scripts/bulk_merge_safe.sh [--dry-run] [--no-audit] [--major] [PR ...]
 
 set -euo pipefail
 
 GH_BIN="$(command -v gh)"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO="thirox-lab/combaero"
 DRY_RUN=false
+AUDIT=true
+MAJOR=false
 ONLY=()
 
 for arg in "$@"; do
     case $arg in
         --dry-run) DRY_RUN=true ;;
+        --no-audit) AUDIT=false ;;
+        --major) MAJOR=true ;;
         [0-9]*) ONLY+=("$arg") ;;
-        *) echo "Usage: $0 [--dry-run] [PR ...]"; exit 1 ;;
+        *) echo "Usage: $0 [--dry-run] [--no-audit] [--major] [PR ...]"; exit 1 ;;
     esac
 done
 
@@ -40,23 +54,30 @@ is_safe_title() {
     return 1
 }
 
-pr_field() { $GH_BIN pr view "$1" --json "$2" --jq ".$2"; }
+pr_field() { $GH_BIN pr view "$1" -R "$REPO" --json "$2" --jq ".$2"; }
 
-merge_state() {
-    # mergeStateStatus, waiting out UNKNOWN (~2 min): GitHub recomputes it
-    # whenever main or the PR head moves, and BEHIND hides behind it.
-    local n="$1" tries=0 s
-    s=$(pr_field "$n" mergeStateStatus)
-    while [[ "$s" == "UNKNOWN" ]] && (( tries++ < 8 )); do
-        sleep 15
-        s=$(pr_field "$n" mergeStateStatus)
-    done
-    echo "$s"
+manifest_dir() {
+    # The directory of the PR's manifest or lock file: PRs sharing it share
+    # a lock file. GitHub Actions bumps have none and share ".github".
+    local d
+    d=$($GH_BIN pr view "$1" -R "$REPO" --json files --jq '
+      [.files[].path | select(test("(^|/)(package\\.json|pnpm-lock\\.yaml|pyproject\\.toml|uv\\.lock)$"))
+       | (split("/") | .[:-1] | join("/"))] | first // ""')
+    [[ -z "$d" ]] && d=".github"
+    echo "$d"
+}
+
+in_queue() {
+    # true while the PR has a merge-queue entry (scripts/merge_queue_status.sh);
+    # unknown when the query fails, which wait_for_queue waits out.
+    local out
+    out=$("$ROOT/scripts/merge_queue_status.sh" "$1") || { echo unknown; return; }
+    if [[ "$out" == *" queued: "* ]]; then echo true; else echo false; fi
 }
 
 checks_state() {
     # PASS when every check finished and none failed; PENDING; or FAIL.
-    $GH_BIN pr view "$1" --json statusCheckRollup --jq '
+    $GH_BIN pr view "$1" -R "$REPO" --json statusCheckRollup --jq '
       [.statusCheckRollup[] | (.conclusion // .state // "")] as $c
       | if ($c | length) == 0 then "PENDING"
         elif any($c[]; . == "" or . == "PENDING" or . == "QUEUED" or . == "IN_PROGRESS" or . == "EXPECTED") then "PENDING"
@@ -86,55 +107,107 @@ wait_for_checks() {
     done
 }
 
-merge_one() {
-    local n="$1" title state head
-    title=$(pr_field "$n" title)
-    echo "--- #$n  $title"
-    if [[ "$($GH_BIN pr view "$n" --json author --jq .author.login)" != "app/dependabot" ]]; then
-        echo "    skip: not a Dependabot PR"; return 1
-    fi
-    is_safe_title "$title" || { echo "    skip: not a safe (grouped/minor/patch) bump"; return 1; }
+wait_for_queue() {
+    # MERGED, or DEQUEUED once the PR is open and out of the queue (a failed
+    # or conflicting entry), or TIMEOUT (~90 min; a full queue run is ~17).
+    local n="$1" i=0
+    while :; do
+        sleep 60
+        [[ "$(pr_field "$n" state)" == "MERGED" ]] && { echo "MERGED"; return; }
+        (( i > 1 )) && [[ "$(in_queue "$n")" == "false" ]] && { echo "DEQUEUED"; return; }
+        (( i++ > 90 )) && { echo "TIMEOUT"; return; }
+    done
+}
 
-    state=$(merge_state "$n")
-    if [[ "$state" == "BEHIND" ]]; then
-        if $DRY_RUN; then echo "    would ask Dependabot to rebase, wait for CI, then re-check"; return 0; fi
-        echo "    behind main: asking Dependabot to rebase"
+housekeeping() {
+    echo "=== housekeeping (reported, not a gate)"
+    uv run --no-project --with packaging "$ROOT/scripts/dependency_floors.py" --osv \
+        || echo "!!! a dependency floor has an advisory: raise it (see CLAUDE.md, Dependency floors)"
+    (cd "$ROOT/gui/frontend" && pnpm audit --prod) \
+        || echo "!!! the frontend production dependencies have an advisory"
+    (cd "$ROOT/gui/frontend" && pnpm audit 2>&1 | tail -1) || true
+}
+
+prepare_one() {
+    # Gate one PR and queue it. $2 = "rebase" when its directory had a merge
+    # earlier in this run. Returns 0 when queued (or would be, in a dry run).
+    local n="$1" rebase="$2" head
+    echo "--- #$n  $(pr_field "$n" title)  [$(manifest_dir "$n")]"
+    if [[ "$rebase" == "rebase" ]]; then
+        if $DRY_RUN; then echo "    would ask Dependabot to rebase (its lock file predates a merge), wait for CI"; return 0; fi
+        echo "    asking Dependabot to rebase: its lock file predates a merge in this run"
         local old; old=$(pr_field "$n" headRefOid)
-        $GH_BIN pr comment "$n" --body "@dependabot rebase" >/dev/null
+        $GH_BIN pr comment "$n" -R "$REPO" --body "@dependabot rebase" >/dev/null
         if [[ "$(wait_for_new_head "$n" "$old")" == "TIMEOUT" ]]; then
             echo "    skip: Dependabot did not rebase (if it says the branch was edited, comment '@dependabot recreate')"
             return 1
         fi
-        echo "    rebased; waiting for CI..."
-        [[ "$(wait_for_checks "$n")" == "PASS" ]] || { echo "    skip: CI did not pass after rebase"; return 1; }
-        state=$(merge_state "$n")
     fi
     if [[ "$(checks_state "$n")" == "PENDING" ]] && ! $DRY_RUN; then
-        echo "    CI still running; waiting..."
+        echo "    CI running; waiting..."
         wait_for_checks "$n" >/dev/null
-        state=$(merge_state "$n")
     fi
     [[ "$(checks_state "$n")" == "PASS" ]] || { echo "    skip: checks not all passed"; return 1; }
-    [[ "$state" == "CLEAN" ]] || { echo "    skip: mergeStateStatus $state"; return 1; }
 
     head=$(pr_field "$n" headRefOid)
     git -C "$ROOT" fetch -q origin "$head"
-    if ! uv run --project "$ROOT" "$ROOT/scripts/check_version_sync.py" --ref "$head"; then
+    if ! uv run --no-project "$ROOT/scripts/check_version_sync.py" --ref "$head"; then
         echo "    skip: pinned versions disagree at the PR head"; return 1
     fi
-    if $DRY_RUN; then echo "    would merge $head"; return 0; fi
-    $GH_BIN pr merge "$n" --squash --delete-branch --match-head-commit "$head"
-    echo "    merged"
+    if $DRY_RUN; then echo "    would queue $head"; return 0; fi
+    $GH_BIN pr merge "$n" -R "$REPO" --squash --match-head-commit "$head"
+    echo "    queued $head"
 }
 
+$AUDIT && housekeeping
+
 if [[ ${#ONLY[@]} -eq 0 ]]; then
-    # bash 3.2 (macOS): no mapfile
-    while read -r n; do ONLY+=("$n"); done < <($GH_BIN pr list --author "app/dependabot" --json number --jq '.[].number' | sort -n)
+    # bash 3.2 (macOS): no mapfile, no associative arrays
+    while read -r n; do ONLY+=("$n"); done < <($GH_BIN pr list -R "$REPO" --author "app/dependabot" --json number --jq '.[].number' | sort -n)
 fi
 [[ ${#ONLY[@]} -eq 0 ]] && { echo "No open Dependabot PRs."; exit 0; }
 
-merged=0; skipped=0
+# Eligibility first; then pending holds "number:directory" entries.
+pending=()
+skipped=0
 for n in "${ONLY[@]}"; do
-    if merge_one "$n"; then merged=$((merged + 1)); else skipped=$((skipped + 1)); fi
+    if [[ "$($GH_BIN pr view "$n" -R "$REPO" --json author --jq .author.login)" != "app/dependabot" ]]; then
+        echo "--- #$n  skip: not a Dependabot PR"; skipped=$((skipped + 1)); continue
+    fi
+    if ! $MAJOR && ! is_safe_title "$(pr_field "$n" title)"; then
+        echo "--- #$n  skip: not a safe (grouped/minor/patch) bump: $(pr_field "$n" title)"; skipped=$((skipped + 1)); continue
+    fi
+    pending+=("$n:$(manifest_dir "$n")")
 done
-if $DRY_RUN; then echo "=== dry run: $merged eligible, $skipped skipped"; else echo "=== done: $merged merged, $skipped skipped"; fi
+
+merged=0
+dirty=" "   # directories that had a merge in this run, space-delimited
+wave=0
+while [[ ${#pending[@]} -gt 0 ]]; do
+    wave=$((wave + 1))
+    echo "=== wave $wave"
+    used=" "; this=(); rest=()
+    for e in "${pending[@]}"; do
+        d="${e#*:}"
+        if [[ "$used" == *" $d "* ]]; then rest+=("$e"); else this+=("$e"); used="$used$d "; fi
+    done
+    queued=()
+    for e in "${this[@]}"; do
+        n="${e%%:*}"; d="${e#*:}"
+        r=no; [[ "$dirty" == *" $d "* ]] && r=rebase
+        if prepare_one "$n" "$r"; then queued+=("$e"); else skipped=$((skipped + 1)); fi
+    done
+    if ! $DRY_RUN; then
+        for e in ${queued[@]+"${queued[@]}"}; do
+            n="${e%%:*}"; d="${e#*:}"
+            s=$(wait_for_queue "$n")
+            echo "    #$n: $s"
+            if [[ "$s" == "MERGED" ]]; then merged=$((merged + 1)); dirty="$dirty$d "; else skipped=$((skipped + 1)); fi
+        done
+    else
+        # A dry run assumes every queued PR merges, to show the later waves.
+        for e in ${queued[@]+"${queued[@]}"}; do merged=$((merged + 1)); dirty="$dirty${e#*:} "; done
+    fi
+    pending=(${rest[@]+"${rest[@]}"})
+done
+if $DRY_RUN; then echo "=== dry run: $merged would be queued, $skipped skipped"; else echo "=== done: $merged merged, $skipped skipped"; fi
