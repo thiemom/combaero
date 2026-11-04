@@ -54,4 +54,4 @@ For agents with screen control (multimodal LLMs), the following selectors and ID
 ## Related
 
 - **[combaero](https://pypi.org/project/combaero/)** — the C++ physics core and Python API powering this GUI.
-- **[Source & docs](https://github.com/thiemom/combaero)** — monorepo with full API reference and technical documentation.
+- **[Source & docs](https://github.com/thirox-lab/combaero)** — monorepo with full API reference and technical documentation.
