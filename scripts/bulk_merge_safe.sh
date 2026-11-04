@@ -14,9 +14,12 @@
 #    cannot share the queue -- the second one's lock was generated against
 #    the old main and bounces. Each wave queues at most one PR per manifest
 #    directory, then waits until each is merged or has left the queue.
-# 3. A PR whose directory had a merge earlier in the run is first rebased by
+# 3. A PR whose manifest directory changed on main after its branch point
+#    (an earlier merge, in this run or before it) is first rebased by
 #    Dependabot ("@dependabot rebase"; never gh pr update-branch, whose
-#    rebase is unsigned), then waits for CI.
+#    rebase is unsigned), then waits for CI. Git may merge such a lock file
+#    without a conflict, yet pnpm's frozen install rejects it (#976 after
+#    #975: "Broken lockfile: no entry for 'eslint@10.13.0'").
 # 4. Gate before queueing: all checks finished, none failed (SKIPPED/NEUTRAL
 #    are fine), and pinned tool versions agree at the PR head
 #    (scripts/check_version_sync.py). Queued at exactly that head
@@ -128,15 +131,25 @@ housekeeping() {
     (cd "$ROOT/gui/frontend" && pnpm audit 2>&1 | tail -1) || true
 }
 
+stale_base() {
+    # true when main changed the PR's manifest directory after the PR's
+    # branch point, so its lock file was generated against an older main.
+    local n="$1" d="$2" head mb
+    head=$(pr_field "$n" headRefOid)
+    git -C "$ROOT" fetch -q origin main "$head"
+    mb=$(git -C "$ROOT" merge-base "$head" origin/main)
+    if git -C "$ROOT" diff --quiet "$mb" origin/main -- "$d"; then echo false; else echo true; fi
+}
+
 prepare_one() {
-    # Gate one PR and queue it. $2 = "rebase" when its directory had a merge
-    # earlier in this run. Returns 0 when queued (or would be, in a dry run).
+    # Gate one PR and queue it. $2 = "rebase" when its lock file predates
+    # main's. Returns 0 when queued (or would be, in a dry run).
     local n="$1" rebase="$2" head
     echo "--- #$n  $(pr_field "$n" title)  [$(manifest_dir "$n")]"
     if [[ "$(in_queue "$n")" == "true" ]]; then echo "    already in the queue; waiting for it"; return 0; fi
     if [[ "$rebase" == "rebase" ]]; then
-        if $DRY_RUN; then echo "    would ask Dependabot to rebase (its lock file predates a merge), wait for CI"; return 0; fi
-        echo "    asking Dependabot to rebase: its lock file predates a merge in this run"
+        if $DRY_RUN; then echo "    would ask Dependabot to rebase (its lock file predates main's), wait for CI"; return 0; fi
+        echo "    asking Dependabot to rebase: its lock file predates main's"
         local old; old=$(pr_field "$n" headRefOid)
         $GH_BIN pr comment "$n" -R "$REPO" --body "@dependabot rebase" >/dev/null
         if [[ "$(wait_for_new_head "$n" "$old")" == "TIMEOUT" ]]; then
@@ -195,7 +208,10 @@ while [[ ${#pending[@]} -gt 0 ]]; do
     queued=()
     for e in "${this[@]}"; do
         n="${e%%:*}"; d="${e#*:}"
-        r=no; [[ "$dirty" == *" $d "* ]] && r=rebase
+        # dirty: a merge earlier in this run (all a dry run can know of);
+        # stale_base: main moved the directory since the PR branched.
+        r=no
+        if [[ "$dirty" == *" $d "* || "$(stale_base "$n" "$d")" == "true" ]]; then r=rebase; fi
         if prepare_one "$n" "$r"; then queued+=("$e"); else skipped=$((skipped + 1)); fi
     done
     if ! $DRY_RUN; then
