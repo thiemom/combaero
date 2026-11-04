@@ -288,6 +288,12 @@ jobs:
       - name: Every runtime dependency declares a floor
         run: uv run --no-sync scripts/dependency_floors.py --check
 
+      # Dependabot moves only the top of each range: an advisory against an
+      # old release reaches the floor and nothing else. Nightly, so one
+      # published between Dependabot rounds is caught too.
+      - name: No floor has a known advisory (OSV)
+        run: uv run --no-sync scripts/dependency_floors.py --osv
+
       - name: Move the runtime dependencies down to their floors
         run: |
           uv run --no-sync scripts/dependency_floors.py > "$RUNNER_TEMP/floors.in"
