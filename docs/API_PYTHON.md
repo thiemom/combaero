@@ -1149,6 +1149,46 @@ every cooling configuration).
 Every converged solve in the test suite is also checked for this balance
 (`python/tests/conftest.py`, `_closure_check.py`).
 
+##### A side with no stream: adiabatic or heat loss (#970)
+
+Side B may have no stream: `element_b=None` with `side_b`. The layers run
+from side A's stream to the free side; the free side is B only.
+
+```python
+from combaero.network import HeatLoss
+
+# An insulated backside: no heat crosses; the wall sits at side A's T_aw
+# (with radiation_a=GasRadiation, at the face's radiation balance).
+net.add_wall(ThermalWall("w1", "hot_duct", None, side_b="adiabatic",
+                         layers=[WallLayer(0.0016, 16.0)], contact_area=0.0012))
+
+# A lossy backside: a fixed T_ext behind h [W/(m^2 K)]
+net.add_wall(ThermalWall("w2", "hot_duct", None,
+                         side_b=HeatLoss(T_ext=300.0, h=10.0),
+                         layers=[WallLayer(0.0016, 16.0)], contact_area=0.0012))
+```
+
+- **Adiabatic:** Q = 0 and the network solves exactly as without the wall
+  (the duct is not wall-heated). Reported: `{wall}.Q` = 0, `T_hot`,
+  `T_interface` (the whole stack at the face temperature), `T_aw_a`, `h_a`,
+  the film and radiation keys of side A. The face temperature with
+  radiation is `_solver_tools.wall_adiabatic_face` (C++):
+  `h (T_aw - T_s) + h_r (T_src - T_s) = 0`.
+- **HeatLoss(T_ext, h):** side A's stream exchanges with the reservoir at
+  `T_ext` through `1/(h_a A_a) + sum t/(k A_m) + R_fouling/A_a + 1/(h A_b)`:
+  the epsilon-NTU integral against a reservoir,
+  `Q = C_a (1 - exp(-UA/C_a)) (T_aw_a - T_ext)` (C++
+  `wall_exchange_and_jacobian` with `C_b = inf`), bounded and none into a
+  stream that does not flow; analytic Jacobian. The heat leaves the network:
+  `{wall}.Q_loss` [W] (> 0 out), booked by the ledger (`__ledger__["Q_loss"]`)
+  and in the wall's second-law check as `Q / T_ext` into the reservoir.
+  `h` is the user's input (radiation from that face linearised into it).
+- **Not with:** `radiation_b`, a film on side B, and for an adiabatic wall
+  `radiation_a=CasingRadiation` (its heat would leave to a casing no stream
+  carries; use HeatLoss). Per-side areas, k(T) layers, `GasRadiation` on
+  side A and a film on side A work as on a two-stream wall.
+- Not in the GUI yet: exporting such a wall to the GUI refuses it.
+
 ##### Radiation (liner) (#793)
 
 Off by default. A face can carry radiation: `radiation_a` / `radiation_b`.
@@ -1465,7 +1505,7 @@ bookkeeping keys. Five of them say what happened:
 | `__second_law_wall_failures__` | `list[str]` | wall ids whose verdict is `"fail"` |
 | `__incompressible_validity__` | `dict[str, dict]` | per element on an incompressible closure: `verdict` (`"ok"`, `"warn"`, `"not_checked"` with a `reason`), its highest internal `mach` and the `limit`. **Report only** (#588). |
 | `__incompressible_warnings__` | `list[str]` | ids whose verdict is `"warn"` |
-| `__ledger__` | `dict` | mass and energy over the network's control volume: `streams` (one row per crossing, `m_dot_in` > 0 entering), `m_dot_in/out`, `H_in/out`, `Q_given`, `Q_wall_out`, `Q_withheld`, `mass_closure(_rel)`, `energy_closure(_rel)`. Empty when the root finder did not converge. A converged root with either relative closure above `combaero.network.second_law.LEDGER_CLOSURE_TOL = 1e-6` is reported INCONSISTENT (`__success__` False, #552); the suite's accepted solves close to 4.2e-8 (mass) and 1.1e-7 (energy). |
+| `__ledger__` | `dict` | mass and energy over the network's control volume: `streams` (one row per crossing, `m_dot_in` > 0 entering), `m_dot_in/out`, `H_in/out`, `Q_given`, `Q_wall_out`, `Q_withheld`, `Q_loss` (heat to a wall's HeatLoss side, #970), `mass_closure(_rel)`, `energy_closure(_rel)`. Empty when the root finder did not converge. A converged root with either relative closure above `combaero.network.second_law.LEDGER_CLOSURE_TOL = 1e-6` is reported INCONSISTENT (`__success__` False, #552); the suite's accepted solves close to 4.2e-8 (mass) and 1.1e-7 (energy). |
 | `__caught_exceptions__` | `list[dict]` | every exception the solve caught instead of raising, at most 50: `phase` (`start`: an attempt's starting point; `probe` / `probe_jacobian`: a trial point the root finder rejected; `diagnostics`: a node's or element's diagnostics on a FAILED solve's final state, which then reports none for it -- on a successful solve that error raises (#810); a `wall_free_seed:` prefix for the wall-free seed solve), `where` (the node or element being evaluated, or the non-finite Jacobian rows and columns), `type`, `message`, `frames` (innermost three). Empty on a clean solve. |
 | `__caught_exception_count__` | `int` | all caught exceptions, including those beyond the 50 kept |
 

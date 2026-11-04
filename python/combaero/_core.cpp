@@ -8212,6 +8212,23 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "face (kind 0 none, 1 gas Eq. 8.7, 2 surface Eq. 8.17) and fold it\n"
         "into effective (H, T) per side; analytic total derivatives.");
 
+  py::class_<WallAdiabaticFace>(
+      m, "WallAdiabaticFace",
+      "The face of a wall whose other side is adiabatic (#970): its surface\n"
+      "temperature from h (T_aw - T_s) + h_r (T_src - T_s) = 0. dT_s: in\n"
+      "[T_aw, h, T_src, k].")
+      .def_readonly("T_s", &WallAdiabaticFace::T_s)
+      .def_readonly("h_r", &WallAdiabaticFace::h_r)
+      .def_readonly("q_rad", &WallAdiabaticFace::q_rad)
+      .def_readonly("iterations", &WallAdiabaticFace::iterations)
+      .def_readonly("dT_s", &WallAdiabaticFace::dT_s);
+
+  m.def("wall_adiabatic_face", &wall_adiabatic_face, py::arg("T_aw"),
+        py::arg("h"), py::arg("kind"), py::arg("T_src"), py::arg("k"),
+        "Surface temperature of a wall face whose other side is adiabatic\n"
+        "(#970), with radiation on the face (kind 0 none: T_s = T_aw; 1 gas\n"
+        "Eq. 8.7; 2 surface Eq. 8.17); analytic derivatives.");
+
   // -----------------------------------------------------------------
   // Film-side h downstream of a slot (#962): Seban 1960, Ballal-Lefebvre
   // -----------------------------------------------------------------

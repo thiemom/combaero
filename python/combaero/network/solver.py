@@ -2218,13 +2218,14 @@ class NetworkSolver:
         # Build a mapping: node_id -> set of wall IDs that affect it
         affected_nodes: dict[str, set[str]] = {}
         for wall in self.network.walls.values():
-            nodes_a = _endpoint_to_node_ids(wall.element_a)
-            nodes_b = _endpoint_to_node_ids(wall.element_b)
+            # A wall with a side B of no stream (#970) heats side A's alone;
+            # an adiabatic one heats nothing.
+            ends = [_endpoint_to_node_ids(e) for e in wall.heated_endpoints]
 
-            if nodes_a is None or nodes_b is None:
+            if not ends or any(n is None for n in ends):
                 continue
 
-            for n in nodes_a + nodes_b:
+            for n in (n for ns in ends for n in ns):
                 affected_nodes.setdefault(n, set()).add(wall.id)
 
         for nid in affected_nodes:
@@ -2320,6 +2321,15 @@ class NetworkSolver:
 
         for wall in self.network.walls.values():
             if wall.id in processed_walls:
+                continue
+            if wall.one_sided:
+                # Side B has no stream (#970): adiabatic passes no heat; a
+                # HeatLoss side takes side A's heat out of the network.
+                if wall.heat_loss is not None:
+                    wc = self._evaluate_heat_loss_wall(wall, nid, x)
+                    if wc is not None:
+                        wall_contributions.append(wc)
+                        processed_walls.add(wall.id)
                 continue
 
             # Endpoints may be elements or nodes
@@ -2423,6 +2433,119 @@ class NetworkSolver:
             self._wall_ebs[nid].Q = sum(c[1] for c in wall_contributions)
 
         return wall_contributions
+
+    def _one_sided_wall_inputs(
+        self, wall: Any, x: np.ndarray, lagged: bool = True, nid: str | None = None
+    ) -> tuple[Any, str, str, NetworkMixtureState, Any] | None:
+        """(side A object, its feed node, its target node, its state, its
+        surface result) of a wall whose side B has no stream (#970); None
+        without a surface, or when side A's heat does not go into ``nid``
+        (if given)."""
+        obj_a = self.network.elements.get(wall.element_a) or self.network.nodes.get(wall.element_a)
+        if obj_a is None:
+            return None
+        feed_a, target_a = self._flow_ends(obj_a, x)
+        if nid is not None and nid != target_a:
+            return None
+        node = self.network.nodes[feed_a]
+        state_a = (
+            self._get_node_state_with_prev(node, x) if lagged else self._get_node_state(node, x)
+        )
+        if wall.element_a not in self.network.nodes:
+            m_indices_a = self._unknown_indices.get(wall.element_a, [])
+            if m_indices_a:
+                state_a.m_dot = x[m_indices_a[0]]
+        ch_a = self._wall_side_htc(wall, obj_a, state_a, x, lagged=lagged)
+        if ch_a is None:
+            return None
+        return obj_a, feed_a, target_a, state_a, ch_a
+
+    def _evaluate_heat_loss_wall(self, wall: Any, nid: str, x: np.ndarray) -> tuple | None:
+        """A HeatLoss wall's contribution to node ``nid`` (#970), in the
+        layout of ``_evaluate_walls_for_node``: side A's stream gives Q to
+        the external reservoir (C++ ``wall_exchange_and_jacobian`` with
+        C_b = inf), so the node takes -Q. Side B carries no unknowns: its
+        entries are None and its capacity partials zero."""
+        ins = self._one_sided_wall_inputs(wall, x, nid=nid)
+        if ins is None:
+            return None
+        obj_a, _feed_a, _target_a, state_a, ch_a = ins
+        hl = wall.heat_loss
+        C_a, dCa_dm, dCa_dTa, _dCa_dText, _sign_a, dCa_dYa = self._wall_capacity(
+            wall.element_a, state_a, float(hl.T_ext)
+        )
+        gas_a = (
+            (float(state_a.Tt), float(state_a.P), list(state_a.Y))
+            if wall.radiation_a is not None
+            else None
+        )
+        wall_result = wall.heat_loss_coupling(
+            ch_a.h, ch_a.T_aw, obj_a.surface.area, C_a, gas_a=gas_a
+        )
+        return (
+            wall,
+            -wall_result.Q,
+            wall_result,
+            wall.element_a,
+            None,
+            True,
+            ch_a,
+            None,
+            (dCa_dm, dCa_dTa, 0.0, 0.0, 0.0, 0.0, dCa_dYa, None),
+        )
+
+    def _report_one_sided_wall(
+        self, wid: str, wall: Any, x: np.ndarray, sol_dict: dict[str, Any]
+    ) -> None:
+        """Results of a wall whose side B has no stream (#970), the same
+        evaluation as the residuals'. Adiabatic: Q = 0 and the wall at side
+        A's face balance. HeatLoss: Q > 0 leaves side A's stream for T_ext,
+        reported again as ``{wid}.Q_loss``, the heat leaving the network."""
+        ins = self._one_sided_wall_inputs(wall, x, lagged=False)
+        if ins is None:
+            return
+        obj_a, _feed_a, tgt_a, state_a, ch_a = ins
+        gas_a = (
+            (float(state_a.Tt), float(state_a.P), list(state_a.Y))
+            if wall.radiation_a is not None
+            else None
+        )
+        hl = wall.heat_loss
+        if hl is None:
+            res: Any = wall.adiabatic_coupling(ch_a.h, ch_a.T_aw, obj_a.surface.area, gas_a)
+            C_a = math.inf
+        else:
+            C_a = self._wall_capacity(wall.element_a, state_a, float(hl.T_ext))[0]
+            res = wall.heat_loss_coupling(ch_a.h, ch_a.T_aw, obj_a.surface.area, C_a, gas_a=gas_a)
+        Q = float(res.Q)
+        sol_dict[f"{wid}.Q"] = Q
+        sol_dict[f"{wid}.Q_loss"] = Q
+        sol_dict[f"{wid}.T_hot"] = float(res.T_hot)
+        sol_dict[f"{wid}.UA"] = float(res.UA)
+        sol_dict[f"{wid}.NTU"] = float(res.UA) / C_a if 0.0 < C_a < math.inf else 0.0
+        sol_dict[f"{wid}.effectiveness"] = float(res.effectiveness)
+        sol_dict[f"{wid}.counterflow"] = 0.0
+        # Side A's heat on a node that cannot take it, as for two streams.
+        q_to_boundary = 0.0
+        if Q != 0.0 and tgt_a not in self._wall_ebs:
+            if self.network.nodes[tgt_a].is_flow_boundary:
+                q_to_boundary = -Q
+                key = f"{tgt_a}.Q_wall_out"
+            else:
+                key = f"{tgt_a}.Q_withheld"
+            sol_dict[key] = sol_dict.get(key, 0.0) - Q
+        sol_dict[f"{wid}.Q_to_boundary"] = q_to_boundary
+        sol_dict[f"{wid}.h_a"] = float(ch_a.h)
+        sol_dict[f"{wid}.T_aw_a"] = float(ch_a.T_aw)
+        if hl is not None:
+            sol_dict[f"{wid}.h_b"] = float(hl.h)
+            sol_dict[f"{wid}.T_aw_b"] = float(hl.T_ext)
+        for key, val in (getattr(ch_a, "film", None) or {}).items():
+            sol_dict[f"{wid}.{key}"] = float(val)
+        for key, val in (getattr(res, "radiation", None) or {}).items():
+            sol_dict[f"{wid}.{key}"] = float(val)
+        sol_dict[f"{wid}.T_interface"] = list(wall._last_profile or [])
+        sol_dict[f"{wid}.material_in_range"] = float(all(layer.in_range for layer in wall.layers))
 
     # Propagation passes per evaluation when a state is read ahead of the
     # order (wall back-edges, recirculation): enough for the contraction seen
@@ -2919,7 +3042,9 @@ class NetworkSolver:
                     nr = out.setdefault(idx_Pt_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
                     nr["T"] += dTt_mix_dQ * sign * dQ_dPt_a
 
-                # Side B contributions
+                # Side B contributions: none from a side with no stream (#970)
+                if eb_id is None:
+                    continue
                 obj_b = self.network.elements.get(eb_id) or self.network.nodes.get(eb_id)
                 from_b = self._flow_ends(obj_b, x)[0]
 
@@ -6674,6 +6799,9 @@ class NetworkSolver:
 
         walls = self.network.walls if self.network.thermal_coupling_enabled else {}
         for wid, wall in walls.items():
+            if wall.one_sided:
+                self._report_one_sided_wall(wid, wall, final_x, sol_dict)
+                continue
             obj_a = self.network.elements.get(wall.element_a) or self.network.nodes.get(
                 wall.element_a
             )

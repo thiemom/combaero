@@ -186,4 +186,32 @@ WallRadiationSides wall_radiation_sides(double T_aw_a, double h_a,
                                         double T_src_a, double k_a, int kind_b,
                                         double T_src_b, double k_b);
 
+// -----------------------------------------------------------------------------
+// The face of a wall whose OTHER side is adiabatic (#970): no heat crosses the
+// wall, so the face's own balance closes on itself,
+//   h (T_aw - T_s) + h_r(T_s) (T_src - T_s) = 0,
+// with h_r as in wall_radiation_sides (kind 0 none, 1 gas Eq. 8.7, 2 surface
+// Eq. 8.17). Without radiation T_s = T_aw. The left side falls strictly with
+// T_s, so the root is unique and lies between T_aw and T_src; it is solved by
+// a bracketed Newton and differentiated implicitly.
+// -----------------------------------------------------------------------------
+
+// Parameter order of WallAdiabaticFace::dT_s.
+constexpr int WALL_ADIABATIC_N_PARAMS = 4;
+// [T_aw, h, T_src, k]
+
+struct WallAdiabaticFace {
+  double T_s = 0.0;   // surface temperature [K]
+  double h_r = 0.0;   // radiative conductance at T_s [W/(m^2*K)]
+  double q_rad = 0.0; // radiative flux into the face, h_r (T_src - T_s) [W/m^2]
+  int iterations = 0;
+  // dT_s/d[T_aw, h, T_src, k]
+  std::array<double, WALL_ADIABATIC_N_PARAMS> dT_s{};
+};
+
+// h > 0 (the caller floors it); k >= 0; kind None ignores T_src and k. Throws
+// on a non-finite input, an invalid kind or temperature, or no convergence.
+WallAdiabaticFace wall_adiabatic_face(double T_aw, double h, int kind,
+                                      double T_src, double k);
+
 } // namespace combaero

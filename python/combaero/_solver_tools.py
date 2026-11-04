@@ -79,6 +79,8 @@ wall_exchange_and_jacobian = _core.wall_exchange_and_jacobian
 wall_resistance_fixed_point_derivatives = _core.wall_resistance_fixed_point_derivatives
 wall_radiation_sides = _core.wall_radiation_sides
 WallRadiationSides = _core.WallRadiationSides
+wall_adiabatic_face = _core.wall_adiabatic_face
+WallAdiabaticFace = _core.WallAdiabaticFace
 
 __all__ = [
     "P0_from_static_and_jacobian_M",
@@ -135,4 +137,6 @@ __all__ = [
     "wall_resistance_fixed_point_derivatives",
     "wall_radiation_sides",
     "WallRadiationSides",
+    "wall_adiabatic_face",
+    "WallAdiabaticFace",
 ]

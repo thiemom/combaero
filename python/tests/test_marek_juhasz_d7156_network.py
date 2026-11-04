@@ -115,10 +115,10 @@ class TestFilmOnly:
         _pin(s["all"], 24.8, 34.8)
         _pin(s["TC1-3"], 13.6, 22.7)
         _pin(s["TC4-10"], 29.6, 38.9)
-        # Adiabatic: the token passage takes no heat, the wall sits at T_aw.
+        # An adiabatic side B (#970): no heat, the wall sits at T_aw exactly.
         for r in res:
-            assert max(abs(q) for q in r.extras["Q"]) < 0.01, r.run.run
-            np.testing.assert_allclose(r.T_wall, r.extras["T_aw_a"], atol=0.05)
+            assert all(q == 0.0 for q in r.extras["Q"]), r.run.run
+            assert list(r.T_wall) == list(r.extras["T_aw_a"]), r.run.run
 
 
 class TestCombined:

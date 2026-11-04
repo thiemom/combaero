@@ -6,10 +6,12 @@ of the node the stream comes FROM -- by the sign of its flow, not the
 element's declared direction. Heat enters through the user's
 EnergyBoundaries (Q, and ``{node}.Q_fraction`` for 'fraction') and the shaft
 work of compressors and turbines (``{elem}.dh``, #893), leaves
-through walls that put heat on a boundary (``{node}.Q_wall_out``), and is
-not taken up where a node cannot absorb it (``{node}.Q_withheld``):
+through walls that put heat on a boundary (``{node}.Q_wall_out``) and through
+a wall's HeatLoss side to its external temperature (``{wall}.Q_loss``, #970),
+and is not taken up where a node cannot absorb it (``{node}.Q_withheld``):
 
-    sum_out m h + sum Q_wall_out + sum Q_withheld - sum_in m h - sum Q_user = 0
+    sum_out m h + sum Q_wall_out + sum Q_loss + sum Q_withheld
+        - sum_in m h - sum Q_user = 0
 
 conftest.py runs this on every converged ``NetworkSolver.solve`` in the
 suite, so every test network is also a conservation test.
@@ -138,11 +140,12 @@ def closure(solver: Any, result: dict) -> dict[str, float] | None:
     q_withheld = sum(
         v for k, v in result.items() if isinstance(k, str) and k.endswith(".Q_withheld")
     )
+    q_loss = sum(float(result.get(f"{wid}.Q_loss", 0.0)) for wid in net.walls)
     mass = sum(abs(v) for n, v in imbalance.items() if n not in bnd)
     h_span = max((abs(v) for v in h.values()), default=0.0)
     scale = max(abs(e_in), abs(e_out), abs(q_user), thermal, 1.0)
     return {
-        "energy": e_out + q_wall_out + q_withheld - e_in - q_user,
+        "energy": e_out + q_wall_out + q_loss + q_withheld - e_in - q_user,
         "energy_tol": 1e-7 * scale + mass * (h_span + 1.0),
         "mass": mass,
         "scale": scale,

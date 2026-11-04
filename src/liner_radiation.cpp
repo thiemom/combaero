@@ -373,4 +373,94 @@ WallRadiationSides wall_radiation_sides(double T_aw_a, double h_a,
   return r;
 }
 
+WallAdiabaticFace wall_adiabatic_face(double T_aw, double h, int kind,
+                                      double T_src, double k) {
+  for (double v : {T_aw, h, T_src, k}) {
+    require_finite(v, "wall_adiabatic_face input");
+  }
+  if (!(h > 0.0) || k < 0.0 || !(T_aw > 0.0)) {
+    throw std::invalid_argument(
+        "wall_adiabatic_face: needs h > 0, k >= 0 and T_aw > 0");
+  }
+  if (kind < 0 || kind > 2) {
+    throw std::invalid_argument("wall_adiabatic_face: kind must be 0, 1 or 2");
+  }
+  if ((kind == 1 && !(T_src > 0.0)) || (kind == 2 && T_src < 0.0)) {
+    throw std::invalid_argument(
+        "wall_adiabatic_face: a gas temperature must be > 0, a surface's >= 0");
+  }
+  WallAdiabaticFace r;
+  if (kind == 0 || k == 0.0) {
+    r.T_s = T_aw;
+    r.dT_s = {1.0, 0.0, 0.0, 0.0};
+    return r;
+  }
+
+  // f(T) = h (T_aw - T) + h_r(T) (T_src - T), seeded in T (0) and the
+  // parameters [T_aw, h, T_src, k] (1..4).
+  constexpr int ND = WALL_ADIABATIC_N_PARAMS + 1;
+  using DN = DualN<ND>;
+  const DN p_Taw = DN::seed(T_aw, 1);
+  const DN p_h = DN::seed(h, 2);
+  const DN p_src = DN::seed(T_src, 3);
+  const DN p_k = DN::seed(k, 4);
+  auto balance = [&](double T) {
+    const DN Ts = DN::seed(T, 0);
+    const DN hr = radiative_htc<ND>(kind, Ts, p_src, p_k);
+    return p_h * (p_Taw - Ts) + hr * (p_src - Ts);
+  };
+
+  // f falls strictly with T: the root lies between T_aw and T_src.
+  double lo = std::max(std::min(T_aw, T_src), kWallRadTFloor);
+  double hi = std::max(T_aw, T_src);
+  double T = T_aw;
+  int it = 0;
+  bool converged = false;
+  for (; it < kWallRadMaxIter; ++it) {
+    const DN f = balance(T);
+    if (f.v > 0.0) {
+      lo = std::max(lo, T);
+    } else if (f.v < 0.0) {
+      hi = std::min(hi, T);
+    } else {
+      converged = true;
+      break;
+    }
+    const double fT = f.d[0];
+    double T_new = (fT < 0.0) ? T - f.v / fT : 0.5 * (lo + hi);
+    if (!(T_new > lo && T_new < hi)) {
+      T_new = 0.5 * (lo + hi); // Newton left the bracket: bisect
+    }
+    const double step = T_new - T;
+    T = T_new;
+    if (std::abs(step) <= kWallRadRelTol * std::max(1.0, std::abs(T)) ||
+        hi - lo <= kWallRadRelTol * std::max(1.0, std::abs(T))) {
+      converged = true;
+      ++it;
+      break;
+    }
+  }
+  if (!converged || !(T > 0.0)) {
+    throw std::runtime_error(
+        "wall_adiabatic_face: the surface temperature did not converge");
+  }
+
+  const DN f = balance(T);
+  const double fT = f.d[0];
+  if (!(fT < 0.0) || !std::isfinite(fT)) {
+    throw std::runtime_error(
+        "wall_adiabatic_face: the surface temperature is not isolated");
+  }
+  r.T_s = T;
+  r.iterations = it;
+  for (int j = 0; j < WALL_ADIABATIC_N_PARAMS; ++j) {
+    r.dT_s[static_cast<std::size_t>(j)] = -f.d[j + 1] / fT;
+  }
+  const DN Ts = DN::constant(T);
+  const DN hr = radiative_htc<ND>(kind, Ts, p_src, p_k);
+  r.h_r = hr.v;
+  r.q_rad = (hr * (p_src - Ts)).v;
+  return r;
+}
+
 } // namespace combaero

@@ -1501,6 +1501,15 @@ WallRadiationSides wall_radiation_sides(
     double T_aw_a, double h_a, double T_aw_b, double h_b, double R_wall,
     int kind_a, double T_src_a, double k_a,
     int kind_b, double T_src_b, double k_b);
+
+// The face of a wall whose other side is adiabatic (#970): its own balance
+// h (T_aw - T_s) + h_r(T_s) (T_src - T_s) = 0, h_r as above. Kind 0 (or
+// k = 0): T_s = T_aw exactly. The left side falls strictly with T_s, so the
+// root is unique, between T_aw and T_src (bracketed Newton). Returns T_s,
+// h_r, q_rad = h_r (T_src - T_s) [W/m^2] and dT_s/d[T_aw, h, T_src, k]
+// (implicit differentiation, DualN).
+WallAdiabaticFace wall_adiabatic_face(
+    double T_aw, double h, int kind, double T_src, double k);
 ```
 
 ### Data Structures

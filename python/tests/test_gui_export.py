@@ -217,6 +217,21 @@ def test_what_has_no_gui_form_is_refused_and_named() -> None:
     assert "c: an explicit convective area" in text
 
 
+def test_a_wall_without_a_side_b_stream_is_refused() -> None:
+    """#970: the GUI has no field for an adiabatic or heat-loss side yet."""
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("a", Pt=2.0e5, Tt=600.0, Y=AIR))
+    net.add_node(PressureBoundary("b", Pt=1.9e5, Tt=600.0, Y=AIR))
+    net.add_element(
+        ChannelElement(
+            "c", "a", "b", length=1.0, diameter=0.02, surface=ConvectiveSurface(model=SmoothModel())
+        )
+    )
+    net.add_wall(ThermalWall("w", "c", None, side_b="adiabatic", contact_area=0.01))
+    with pytest.raises(UnsupportedForGUIError, match="w: a wall with no stream on side B"):
+        network_to_gui(net)
+
+
 def test_a_head_loss_area_must_be_the_element_area() -> None:
     """The GUI's loss element has one area for both (#902): refuse, don't approximate."""
     net = FlowNetwork()
