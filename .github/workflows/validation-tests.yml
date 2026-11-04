@@ -5,15 +5,21 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  # The merge queue's run on the PR as it would land. Unfiltered: it is the
+  # last check before main, where a missed dependency would land.
+  merge_group:
+    types: [ checks_requested ]
   # The backstop for a path filter that misses a dependency: every job runs
-  # on a push to main, nightly and on demand -- only a pull request is
-  # filtered.
+  # in the merge queue, on a push to main, nightly and on demand -- only a
+  # pull request is filtered.
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
 
 concurrency:
   # Keyed on the event too: the nightly run must not cancel a push to main.
+  # A merge-queue entry has its own gh-readonly-queue ref, so entries never
+  # cancel each other.
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
@@ -34,8 +40,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      # Only a pull request is filtered; a push to main, the nightly run and
-      # a manual dispatch run everything.
+      # Only a pull request is filtered; the merge queue, a push to main, the
+      # nightly run and a manual dispatch run everything.
       - name: Full or filtered
         id: mode
         run: echo "full=${{ github.event_name != 'pull_request' }}" >> "$GITHUB_OUTPUT"
