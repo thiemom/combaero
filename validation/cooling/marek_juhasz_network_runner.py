@@ -55,11 +55,10 @@ LABELLED ASSUMPTIONS (the user's sign-off, 2026-11-03):
   authors inferred it, their film thermocouple having failed).
 - A slot lip of 1 mm: it sets only the slot's pressure drop, irrelevant with
   the film flow prescribed.
-- The wall's k(T): combaero has no type-304 entry; ss316 (its nearest
-  austenitic stainless) stands in. The printed SI k is a factor ~17 too low
-  (the US value is right) and is not used. The thin wall makes the choice
-  immaterial: a constant k of 13.8 or 22.5 W/m K (304 at 311 K and 811 K)
-  moves the combined stage by 0.3 K.
+- The wall's k(T): ss304 (CINDAS Report 45, #972). The printed SI k is a
+  factor ~17 too low (the US value is right) and is not used. The thin wall
+  makes k nearly immaterial: a constant k of 13.8 or 22.5 W/m K (304 at
+  311 K and 811 K) moves the combined stage by 0.3 K.
 - Thermocouples 1-3 are scored and reported apart from 4-10: combaero has no
   axial conduction and no slot-lip heat sink, and the authors saw conduction
   effects out to 3.8 cm.
@@ -111,7 +110,7 @@ HOT_DH = 4.0 * HOT_AREA / HOT_PERIMETER
 PASSAGE_AREA = PASSAGE_HEIGHT * SPAN
 PASSAGE_DH = 2.0 * PASSAGE_HEIGHT * SPAN / (PASSAGE_HEIGHT + SPAN)
 SEGMENT_AREA = TC_PITCH * SPAN
-WALL_MATERIAL = "ss316"  # stands in for type 304 (see the module docstring)
+WALL_MATERIAL = "ss304"  # type 304, CINDAS Report 45 (#972)
 #: Runs without convection air: the passage is stagnant and the plate's
 #: underside adiabatic. A ThermalWall needs a stream on each side, so the
 #: passage carries a token flow whose face is switched off (its h scaled by
@@ -488,7 +487,7 @@ def report(jobs: int = 4, per_run: bool = False) -> str:
             FILM_ONLY, Options(turbulence_intensity=tu), jobs=jobs
         )
         lines.append(f"  Tu {tu:4.2f}  {stage_scores(res)['all']}")
-    lines.append("\nDIAGNOSTIC: combined stage, constant wall k [W/m K] instead of ss316 k(T)")
+    lines.append("\nDIAGNOSTIC: combined stage, constant wall k [W/m K] instead of ss304 k(T)")
     for k in WALL_K_SWEEP:
         lines.append(f"  k {k:4.1f}  {stage_scores(solve_all(COMBINED, Options(wall_k=k), jobs=jobs))['all']}")
     lines.append("\nDIAGNOSTIC: the slot's flow joins the hot stream after the wall (undiluted)")
