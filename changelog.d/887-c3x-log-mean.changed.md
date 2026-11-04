@@ -1,3 +1,0 @@
-- **The C3X example's walls conduct on the log mean of their two faces (#887),** not on the segment's: the metal narrows from the segment to its hole. The gas-side `Nu_multiplier` tuners are refitted (the leading edge goes from 2.2 to 1.9–2.0).
-  - Untuned run 158 (cross-source): bias −21.0 → −14.3 K, MAE 26.9 → 23.8 K.
-  - Run 149 with run 158's multipliers: MAE 11.7 → 9.6 K, bias +11.2 → +8.9 K.

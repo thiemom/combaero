@@ -1,1 +1,0 @@
-- The project moved to the `thirox-lab` GitHub organisation: the package URLs (homepage, repository, issues, changelog) and the README links now point at `github.com/thirox-lab/combaero`. The old `thiemom/combaero` URLs redirect.
