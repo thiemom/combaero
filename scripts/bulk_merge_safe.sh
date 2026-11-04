@@ -133,6 +133,7 @@ prepare_one() {
     # earlier in this run. Returns 0 when queued (or would be, in a dry run).
     local n="$1" rebase="$2" head
     echo "--- #$n  $(pr_field "$n" title)  [$(manifest_dir "$n")]"
+    if [[ "$(in_queue "$n")" == "true" ]]; then echo "    already in the queue; waiting for it"; return 0; fi
     if [[ "$rebase" == "rebase" ]]; then
         if $DRY_RUN; then echo "    would ask Dependabot to rebase (its lock file predates a merge), wait for CI"; return 0; fi
         echo "    asking Dependabot to rebase: its lock file predates a merge in this run"
