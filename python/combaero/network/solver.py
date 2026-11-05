@@ -31,6 +31,7 @@ from .components import (
     OrificeElement,
     PlenumNode,
     PressureBoundary,
+    PressureLossElement,
     TurbomachineElement,
     WallNode,
     film_discharge_node,
@@ -167,6 +168,9 @@ SEED_COMPRESSIBLE_RTOL = 0.05
 #: Seed flux, as a fraction of the sonic flux at the upstream Pt, from which
 #: an element's seed K is re-fitted to its compressible kernel (about M 0.2).
 SEED_COMPRESSIBLE_FLUX_GATE = 0.3
+#: Times a fraction loss may change state in the seed's Picard loop (ratio or
+#: resistance; #989) before it keeps the one it is in.
+SEED_FRACTION_MAX_SWITCHES = 8
 _SEED_NODE_TYPES = (
     PlenumNode,
     MomentumChamberNode,
@@ -1393,7 +1397,25 @@ class NetworkSolver:
         K = np.array(K_list)
         if not np.any(K > 0.0):
             return None
-        K[K == 0.0] = SEED_LOSSLESS_FRACTION * K[K > 0.0].min()
+        # A fraction loss is a pressure ratio, Pt_dn = Pt_up (1 - xi), at any
+        # flow (#989): it fixes the drop and leaves the flow to the rest of the
+        # network. Its K at the reference flow, xi P_ref / m_ref^2, has no
+        # scale -- stress random 3832186739 started its 117 kg/s through one
+        # at 0.56 kg/s. The Picard loop below carries it as that ratio once
+        # its resistance would take more than xi Pt_up; below that it stays a
+        # resistance (with a design flow m_ref, the dynamic head the loss fades
+        # with). Between two fixed ends the flow is not its to set: its K.
+        frac: dict[int, tuple[float, float | None]] = {}
+        for k, e in enumerate(els):
+            law = e._seed_fraction() if isinstance(e, PressureLossElement) else None
+            if (
+                law is not None
+                and law[0] > 0.0
+                and not (e.from_node in fixed and e.to_node in fixed)
+            ):
+                frac[k] = law
+        sized = [k for k in range(len(els)) if k not in frac and K[k] > 0.0]
+        K[K == 0.0] = SEED_LOSSLESS_FRACTION * (K[sized] if sized else K[K > 0.0]).min()
 
         free = [nid for nid in net.nodes if nid not in fixed and nid not in walls]
         if not free and not machines:
@@ -1410,6 +1432,24 @@ class NetworkSolver:
         a_fix = np.array([fixed.get(e.from_node, 0.0) for e in els])
         b_fix = np.array([fixed.get(e.to_node, 0.0) for e in els])
 
+        # A fraction loss's state in the loop: a resistance (2) while the drop
+        # it takes stays under xi Pt_up, else a forward (+1) or reverse (-1)
+        # ratio, a row of its own with its flow as the unknown. With a design
+        # flow m_ref the resistance is the fade 1 - (1 - r^2)^3, K = xi Pt_up
+        # (3 - 3 r^2 + r^4) / m_ref^2 at r = |m| / m_ref < 1 (``_m_ref_arg``).
+        # Without one it is the reference-flow K: its residual holds a drop
+        # inside +-xi Pt_up at zero flow (blending the two directions), where
+        # a seed at no flow left random 10 to the warm-start retry (11 s
+        # against 0.1 s), and where a lossless loop closes on it.
+        mode = dict.fromkeys(frac, 2)
+        switches = dict.fromkeys(frac, 0)
+        pu0 = np.array(
+            [
+                max(a_fix[k] if a_ix[k] is None else P_ref, b_fix[k] if b_ix[k] is None else P_ref)
+                for k in range(len(els))
+            ]
+        )
+
         def picard(
             K: np.ndarray, m: np.ndarray
         ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
@@ -1421,10 +1461,24 @@ class NetworkSolver:
                 dp = a_fix - b_fix
                 return p, np.sign(dp) * np.sqrt(np.abs(dp) / K), a_fix, b_fix
             pa, pb = a_fix, b_fix
+            pu = pu0
             for _ in range(SEED_MAX_ITER):
-                G = 1.0 / (K * (np.abs(m) + SEED_MDOT_FLOOR))
-                L = np.zeros((len(free), len(free)))
-                b = inj.copy()
+                K_it = K
+                if frac:
+                    K_it = K.copy()
+                    for k, (xi, mr) in frac.items():
+                        if mode[k] == 2 and mr is not None:
+                            r2 = min(abs(m[k]) / mr, 1.0) ** 2
+                            K_it[k] = xi * pu[k] * (3.0 - 3.0 * r2 + r2 * r2) / (mr * mr)
+                G = 1.0 / (K_it * (np.abs(m) + SEED_MDOT_FLOOR))
+                ratio = [k for k in frac if mode[k] in (1, -1)]
+                for k in frac:
+                    if mode[k] != 2:
+                        G[k] = 0.0
+                n_free = len(free)
+                L = np.zeros((n_free + len(ratio), n_free + len(ratio)))
+                b = np.zeros(n_free + len(ratio))
+                b[:n_free] = inj
                 for k, g in enumerate(G):
                     i, j = a_ix[k], b_ix[k]
                     if i is not None:
@@ -1439,24 +1493,71 @@ class NetworkSolver:
                             L[j, i] -= g
                         else:
                             b[j] += g * a_fix[k]
+                # A ratio's flow leaves its from node and enters its to node;
+                # its row is Pt_dn - (1 - xi) Pt_up = 0 in the flow's direction.
+                tied = np.zeros(n_free, dtype=bool)
+                for c, k in enumerate(ratio):
+                    col = n_free + c
+                    i, j = a_ix[k], b_ix[k]
+                    for node, sign in ((i, 1.0), (j, -1.0)):
+                        if node is not None:
+                            L[node, col] += sign
+                            tied[node] = True
+                    keep = 1.0 - frac[k][0]
+                    up, dn = ((i, a_fix[k]), (j, b_fix[k]))[:: mode[k]]
+                    for (node, fix), coef in ((dn, 1.0), (up, -keep)):
+                        if node is not None:
+                            L[col, node] += coef
+                        else:
+                            b[col] -= coef * fix
                 # A free node no element reaches (or one only through walls)
                 # keeps the reference pressure.
-                diag = np.diag(L).copy()
-                lone = diag == 0.0
+                diag = np.diag(L)[:n_free].copy()
+                lone = np.flatnonzero((diag == 0.0) & ~tied)
                 L[lone, lone] = 1.0
                 b[lone] = P_ref
                 try:
-                    p = np.linalg.solve(L, b)
+                    z = np.linalg.solve(L, b)
                 except np.linalg.LinAlgError:
+                    z = None
+                if z is None or not np.all(np.isfinite(z)):
+                    if frac:
+                        # Ratios the rest cannot close (two in parallel, say):
+                        # the fraction losses keep their reference-flow K.
+                        frac.clear()
+                        return picard(K, np.full(len(els), m_ref))
                     return None
+                p = z[:n_free]
                 pa = np.array([p[i] if i is not None else a_fix[k] for k, i in enumerate(a_ix)])
                 pb = np.array([p[j] if j is not None else b_fix[k] for k, j in enumerate(b_ix)])
                 m_new = G * (pa - pb)
+                for c, k in enumerate(ratio):
+                    m_new[k] = z[n_free + c]
                 if not np.all(np.isfinite(m_new)):
                     return None
+                pu = np.maximum(pa, pb)
+                switched = False
+                for k, (xi, mr) in frac.items():
+                    was = mode[k]
+                    if switches[k] > SEED_FRACTION_MAX_SWITCHES:
+                        continue  # cycling between states: it keeps this one
+                    if was == 2:
+                        # The resistance takes more than the ratio would.
+                        if abs(pa[k] - pb[k]) > xi * pu[k]:
+                            mode[k] = 1 if pa[k] > pb[k] else -1
+                    elif was * m_new[k] < 0.0:
+                        mode[k] = 2
+                    elif mr is not None:
+                        if abs(m_new[k]) < mr:
+                            mode[k] = 2
+                    elif K[k] * m_new[k] * m_new[k] < xi * pu[k]:
+                        mode[k] = 2  # it would take less at this flow
+                    if mode[k] != was:
+                        switches[k] += 1
+                        switched = True
                 done = np.max(np.abs(m_new - m)) <= 1e-6 * (np.max(np.abs(m_new)) + SEED_MDOT_FLOOR)
                 m = SEED_RELAX * m + (1.0 - SEED_RELAX) * m_new
-                if done:
+                if done and not switched:
                     m = m_new
                     break
             return p, m, pa, pb

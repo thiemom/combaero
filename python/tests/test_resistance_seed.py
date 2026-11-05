@@ -28,9 +28,11 @@ from combaero.network import (
     OrificeElement,
     PlenumNode,
     PressureBoundary,
+    PressureLossElement,
 )
 from combaero.network import solver as solver_module
 from combaero.network.components import SEED_FRICTION_FACTOR
+from combaero.network.pressure_loss import ConstantFractionLoss
 
 Y_AIR = list(cb.mole_to_mass(cb.species.dry_air()))
 
@@ -212,3 +214,93 @@ def test_a_stress_draw_the_propagated_start_could_not_reach() -> None:
             warnings.simplefilter("ignore")
             out[seeded] = s.solve(timeout=20.0)["__converged__"]
     assert out == {False: False, True: True}
+
+
+def _fraction_loss_feed(m_ref: float | None) -> FlowNetwork:
+    """A 5 % fraction loss from 20 bar into a plenum that discharges through
+    a 20 cm orifice to 1 bar: about 100 kg/s, set by the choked orifice. A
+    0.1 kg/s injection sets the reference flow (injected / elements) at 0.03
+    kg/s. Stress random 3832186739 in small (#989)."""
+    g = FlowNetwork()
+    g.add_node(PressureBoundary("a", Pt=2.0e6, Tt=300.0, Y=Y_AIR))
+    g.add_node(PlenumNode("p"))
+    g.add_node(PressureBoundary("b", Pt=1.0e5, Tt=300.0, Y=Y_AIR))
+    g.add_node(MassFlowBoundary("m", m_dot=0.1, Tt=300.0, Y=Y_AIR))
+    g.add_element(OrificeElement("i", "m", "p", Cd=0.8, diameter=0.01, correlation="fixed"))
+    loss = ConstantFractionLoss(xi=0.05, m_ref=m_ref)
+    g.add_element(PressureLossElement("l", "a", "p", correlation=loss))
+    g.add_element(
+        OrificeElement(
+            "o", "p", "b", Cd=0.8, diameter=0.2, correlation="fixed", regime="compressible"
+        )
+    )
+    return g
+
+
+def _seed(g: FlowNetwork) -> tuple[dict[str, float], dict[str, float]]:
+    g.resolve_all_topology()
+    s = NetworkSolver(g)
+    return s._resistance_network_guess(s._infer_reference_state())
+
+
+@pytest.mark.parametrize("m_ref", [None, 10.0])
+def test_a_fraction_loss_seeds_its_own_ratio(m_ref: float | None) -> None:
+    """A fraction loss is a pressure ratio, Pt_p = 0.95 Pt_a, at any flow (and
+    above a design flow m_ref): where the reference-flow K would take more,
+    the seed holds the ratio exactly and leaves the flow
+    to the orifice, to 1e-4 of the root (measured 5e-7). Its K at a reference
+    flow (#989) started 0.2 kg/s through it with no m_ref (p at 0.1 MPa), and
+    48 kg/s (p at 0.78 MPa) with m_ref = 10 kg/s, against the root's 111 kg/s
+    and 1.9 MPa."""
+    root = NetworkSolver(_fraction_loss_feed(m_ref)).solve()
+    assert root["__success__"]
+    p_map, m_map = _seed(_fraction_loss_feed(m_ref))
+    assert p_map["p"] == pytest.approx(0.95 * 2.0e6, rel=1e-12)
+    assert m_map["l"] == pytest.approx(root["l.m_dot"], rel=1e-4)
+
+
+def test_a_fraction_loss_below_its_design_flow_seeds_its_faded_head() -> None:
+    """Below m_ref the loss fades as the dynamic head, xi (1 - (1 - r^2)^3)
+    with r = m / m_ref (``_m_ref_arg``): a flow-dependent law, which the seed
+    iterates. With m_ref = 1000 kg/s the drop is 4 % of the full fraction
+    (4.06 kPa); the seed starts on it to 1e-4, where the reference-flow K
+    gave 0.72 kPa."""
+    root = NetworkSolver(_fraction_loss_feed(1000.0)).solve()
+    assert root["__success__"]
+    p_map, m_map = _seed(_fraction_loss_feed(1000.0))
+    r2 = (m_map["l"] / 1000.0) ** 2
+    assert 2.0e6 - p_map["p"] == pytest.approx(0.05 * 2.0e6 * (1.0 - (1.0 - r2) ** 3), rel=1e-4)
+    assert p_map["p"] == pytest.approx(root["p.Pt"], rel=1e-6)
+    assert m_map["l"] == pytest.approx(root["l.m_dot"], rel=1e-4)
+
+
+def test_a_fraction_loss_inside_its_band_keeps_its_reference_flow_k(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Between two plenums whose Pt differ by less than xi Pt, a fraction loss
+    with no design flow stays the reference-flow resistance it was before
+    #989: the start is bit for bit the one with the ratio switched off (no
+    flow there left stress random 10 to the warm-start retry)."""
+
+    def build() -> FlowNetwork:
+        g = FlowNetwork()
+        g.add_node(PressureBoundary("a", Pt=2.0e5, Tt=300.0, Y=Y_AIR))
+        g.add_node(PressureBoundary("b", Pt=1.0e5, Tt=300.0, Y=Y_AIR))
+        for n in ("p1", "p2"):
+            g.add_node(PlenumNode(n))
+        for eid, x, y, d in (
+            ("o1", "a", "p1", 0.02),
+            ("o2", "a", "p2", 0.02),
+            ("o3", "p1", "b", 0.019),
+            ("o4", "p2", "b", 0.02),
+        ):
+            g.add_element(OrificeElement(eid, x, y, Cd=0.7, diameter=d, correlation="fixed"))
+        loss = ConstantFractionLoss(xi=0.05)
+        g.add_element(PressureLossElement("l", "p1", "p2", correlation=loss))
+        return g
+
+    p_map, m_map = _seed(build())
+    assert 0.0 < p_map["p1"] - p_map["p2"] < 0.05 * p_map["p1"]
+    assert m_map["l"] > 0.0
+    monkeypatch.setattr(PressureLossElement, "_seed_fraction", lambda self: None)
+    assert _seed(build()) == (p_map, m_map)

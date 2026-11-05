@@ -9180,6 +9180,24 @@ class PressureLossElement(NetworkElement):
             return float(zeta) / (2.0 * rho * area * area)
         return None
 
+    def _seed_fraction(self) -> tuple[float, float | None] | None:
+        """(xi, m_ref) of a shipped fraction correlation, for the cold start's
+        own law dPt = xi Pt_up (``NetworkSolver._resistance_network_guess``,
+        #989): a flow-independent ratio, faded as the dynamic head below a
+        design flow m_ref. None for a head loss, any other callable, and a
+        linear-theta loss that reads a theta source: its xi = k theta + xi0
+        waits on the combustion the seed does not know (a burner's exit duct
+        seeded at xi0 started 190 times its flow and the cold solve stalled), so
+        it keeps the reference-flow K (``_seed_resistance``)."""
+        c = self.correlation
+        xi = getattr(c, "xi", getattr(c, "xi0", None))
+        if xi is None:
+            return None
+        if getattr(c, "k", 0.0) and self._theta_source_resolved is not None:
+            return None
+        m_ref = getattr(c, "m_ref", None)
+        return float(xi), (float(m_ref) if m_ref else None)
+
     def n_equations(self) -> int:
         return 1
 
