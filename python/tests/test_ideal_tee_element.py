@@ -370,7 +370,8 @@ def test_diagnostics_name_the_regime_from_the_converged_flows() -> None:
     assert diag["mass_flow_ratio"] == pytest.approx(sol["ch_bra.m_dot"] / sol["ch_in.m_dot"])
     q_b = diag["mass_flow_ratio"]
     assert diag["K_branch"] == pytest.approx(1.0 + q_b * q_b, abs=2e-3)
-    assert "K11" not in diag
+    # A merge coefficient on a split has no value: present, NaN.
+    assert math.isnan(diag["K11"]) and math.isnan(diag["K12"])
 
 
 def _cross_net(pt_left: float, tt_left: float = 300.0) -> FlowNetwork:

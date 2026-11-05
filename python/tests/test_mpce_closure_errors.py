@@ -24,6 +24,8 @@ inject there.
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 import combaero as cb
@@ -193,7 +195,10 @@ def test_diagnostics_annotate_a_closure_error_instead_of_dropping_K(monkeypatch)
     diag = _element().diagnostics(_states(), 100_300.0, _BRANCH_MDOTS)
 
     assert diag["closure_error"] == "ValueError"
-    assert not any(k.endswith("_K") for k in diag)
+    # The K keys stay, undefined: NaN, never a made-up value or a dropped key.
+    k_keys = [k for k in diag if k.endswith("_K") or k in ("K_straight", "K_branch")]
+    assert k_keys
+    assert all(math.isnan(diag[k]) for k in k_keys)
 
 
 def test_diagnostics_let_programming_errors_through(monkeypatch):

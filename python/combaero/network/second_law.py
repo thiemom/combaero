@@ -491,7 +491,15 @@ class SecondLawReport:
             except (ValueError, RuntimeError) as exc:
                 verdict_or_reason = f"cannot be evaluated: {exc}"
             if isinstance(verdict_or_reason, str):
-                verdict: dict[str, Any] = {"verdict": "not_checked", "reason": verdict_or_reason}
+                # The band keys stay, NaN: a result has the same keys whatever
+                # its operating point (zero flow has no sigma per unit flow).
+                verdict: dict[str, Any] = {
+                    "verdict": "not_checked",
+                    "reason": verdict_or_reason,
+                    "sigma_norm": math.nan,
+                    "sigma_norm_low": math.nan,
+                    "sigma_norm_high": math.nan,
+                }
             else:
                 verdict = verdict_or_reason
                 # Fail only where even the most favourable Mach path does.

@@ -9,8 +9,8 @@ renamed or added on the element side while the catalogue kept the old ones.
 This script solves one small network per palette kind (the defaults the
 palette drops, plus the variants that switch on optional diagnostics: a
 thermal wall, a tee per junction model and direction, an orifice in a pipe,
-...) through the HTTP ``/solve`` route and records every finite numeric key
-the dropped node's result carries. The output,
+...) through the HTTP ``/solve`` route and records every numeric key
+(null included: an undefined value) the dropped node's result carries. The output,
 ``gui/frontend/src/utils/resultKeys.generated.json``, is
 
 * read by the frontend: the Probe offers a kind's keys before the first solve,
@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import sys
 import warnings
 from collections.abc import Iterator
@@ -264,16 +263,19 @@ def networks() -> Iterator[tuple[str, str, dict]]:
     yield "impingement_array", "thermal wall", _renamed(imp._schema(with_wall=True), "arr")
 
 
-def _finite_number(v: object) -> bool:
-    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+def _numeric(v: object) -> bool:
+    """A number, or null: /solve writes an undefined (NaN) or unbounded
+    (inf) value as null, and the KEY is still the result's -- the list is the
+    schema, not the values one solve happened to produce."""
+    return v is None or isinstance(v, (int, float)) and not isinstance(v, bool)
 
 
 def _numeric_keys(res: dict) -> set[str]:
     keys = set()
     for k, v in res.items():
         if k == "state" and isinstance(v, dict):
-            keys |= {f"state.{sk}" for sk, sv in v.items() if _finite_number(sv)}
-        elif _finite_number(v):
+            keys |= {f"state.{sk}" for sk, sv in v.items() if _numeric(sv)}
+        elif _numeric(v):
             keys.add(k)
     return keys
 

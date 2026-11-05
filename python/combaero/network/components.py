@@ -471,6 +471,17 @@ def _stanton(res: Any) -> float:
     return nu / (re * pr) if re > 0.0 and pr > 0.0 and math.isfinite(nu) else 0.0
 
 
+def _max_over_min(flows: list[float]) -> float:
+    """max / min of a set of row flows, the nonuniformity an array reports.
+    inf when a row is starved while another flows (unbounded, but defined);
+    NaN when none flows or any runs backwards (no ratio of the two means
+    anything) -- a key with no value is NaN, never absent."""
+    lo, hi = min(flows), max(flows)
+    if lo < 0.0 or hi <= 0.0:
+        return math.nan
+    return float(hi / lo) if lo > 0.0 else math.inf
+
+
 @dataclass
 class ConvectiveSurface:
     """Convective surface description attached to a NetworkElement.
@@ -6027,6 +6038,32 @@ def _effusion_wall(
     return float(w.T_hot), T_c + q / h_i, q
 
 
+#: The numeric keys EffusionPlateElement.wall_heat_transfer reports on a
+#: gas-side chamber (besides gas_side_chamber and the coolant-side ones).
+_EFFUSION_CHAMBER_SIDE_KEYS = (
+    "h_gas_unblown",
+    "h_gas_unblown_Re",
+    "h_gas_unblown_Pr",
+    "h_gas_unblown_Nu",
+    "gas_augmentation",
+    "h_gas",
+    "T_gas",
+    "T_gas_from_main_inlet",
+    "eta_film",
+    "film_extrapolated",
+    "T_adiabatic_wall",
+    "q_wall",
+    "Q_wall",
+    "T_wall_hot",
+    "T_wall_cold",
+    "eta_overall",
+    "U_gas",
+    "blowing_ratio",
+    "density_ratio",
+    "velocity_ratio",
+)
+
+
 def _chamber_gas_side(node: Any, state: "NetworkMixtureState") -> dict[str, Any] | None:
     """What a discharge node offers a wall as its gas side, or None.
 
@@ -6659,12 +6696,16 @@ class EffusionPlateElement(OrificeElement):
           cannot.
 
         WALL: one layer, `wall_thickness / wall_conductivity`, through C++'s
-        wall_coupling_and_jacobian. Returns {} without coolant flow.
+        wall_coupling_and_jacobian.
+
+        WITHOUT COOLANT FLOW the keys stay. On a gas-side chamber the plate is
+        then adiabatic (no coolant takes heat): q = 0, both faces at the gas
+        side's adiabatic wall temperature, no film. On a plenum the wall
+        temperatures are undefined (NaN): nothing sets them.
         """
         internal = self.internal_heat_transfer(state_in)
-        if not internal:
-            return {}
-        h_i = internal["h_plate_area"]
+        no_coolant = not internal
+        h_i = math.nan if no_coolant else internal["h_plate_area"]
         T_c = float(state_in.Tt)
         A = self.panel_area
         t_over_k = self.wall_thickness / self.wall_conductivity
@@ -6677,10 +6718,19 @@ class EffusionPlateElement(OrificeElement):
             # until a crossflow-supply source; #785).
             "coolant_ht_plenum_assumed": float(self.crossflow_segments is not None),
         }
-        gas = _chamber_gas_side(getattr(self, "_discharge_node", None), state_out)
+        node = getattr(self, "_discharge_node", None)
+        gas = _chamber_gas_side(node, state_out)
+        if gas is None and isinstance(node, MomentumChamberNode) and node.area > 0.0:
+            # A gas-side chamber with no gas flow: no coefficient, so nothing
+            # on the gas side is defined. Its keys stay (the topology, not the
+            # flow, decides which side this is), NaN.
+            out["gas_side_chamber"] = 1.0
+            for key in _EFFUSION_CHAMBER_SIDE_KEYS:
+                out[key] = math.nan
+            return out
         if gas is None:
             q = self.gas_heat_flux
-            t_cold = T_c + q / h_i
+            t_cold = math.nan if no_coolant else T_c + q / h_i
             out.update(
                 {
                     "gas_side_chamber": 0.0,
@@ -6699,7 +6749,7 @@ class EffusionPlateElement(OrificeElement):
         G_jet = abs(state_in.m_dot) / (self.n_holes * hole_area)
         blowing = G_jet / (rho_g * U_g) if U_g > 0.0 else math.inf
         eta_film, film_extrapolated = 0.0, False
-        if self.gas_film == "baldauf_sellers" and math.isfinite(blowing):
+        if self.gas_film == "baldauf_sellers" and math.isfinite(blowing) and not no_coolant:
             film = cb.effusion_panel_film_effectiveness(
                 max(1, round(self.panel_length / self.pitch_x)),
                 self.pitch_x / self.hole_diameter,
@@ -6712,7 +6762,10 @@ class EffusionPlateElement(OrificeElement):
             eta_film, film_extrapolated = float(film.eta), bool(film.extrapolated)
         T_aw_g = T_g - eta_film * (T_g - T_c)
         h_g = gas["h_unblown"] * self.gas_augmentation
-        t_hot, t_cold, q = _effusion_wall(h_i, T_c, h_g, T_aw_g, t_over_k)
+        if no_coolant:
+            t_hot, t_cold, q = T_aw_g, T_aw_g, 0.0  # adiabatic: nothing takes the heat
+        else:
+            t_hot, t_cold, q = _effusion_wall(h_i, T_c, h_g, T_aw_g, t_over_k)
         out.update(
             {
                 "gas_side_chamber": 1.0,
@@ -6780,10 +6833,29 @@ class EffusionPlateElement(OrificeElement):
         }
         # Coolant-side heat transfer, when there is flow to carry it, and the
         # plate's own wall with the gas side its discharge node decides.
-        out.update(self.internal_heat_transfer(state_in))
+        out.update(self.internal_heat_transfer(state_in) or self._internal_without_flow())
         out.update(self.wall_heat_transfer(state_in, state_out))
         out.update(base)
         return out
+
+    def _internal_without_flow(self) -> dict[str, float]:
+        """internal_heat_transfer's keys without coolant flow: Re 0, the
+        geometry as ever, the Nusselt numbers and h undefined (NaN) -- the
+        keys stay, whatever the operating point."""
+        area_hole = math.pi * self.hole_diameter * self.hole_length
+        area_approach = self.panel_area / self.n_holes - math.pi * (self.hole_diameter**2) / 4.0
+        return {
+            "Re_hole": 0.0,
+            "Nu_approach": math.nan,
+            "Nu_throat": math.nan,
+            "Nu_internal": math.nan,
+            "internal_Nu_multiplier": float(self.internal_Nu_multiplier),
+            "h_hole_area": math.nan,
+            "h_plate_area": math.nan,
+            "approach_to_hole_area_ratio": float(area_approach / area_hole),
+            "area_approach_total": float(area_approach * self.n_holes),
+            "area_hole_total": float(area_hole * self.n_holes),
+        }
 
 
 class FilmCoolingElement(OrificeElement):
@@ -9417,6 +9489,10 @@ class PressureLossElement(NetworkElement):
                 diag["htc"] = float(h_res.h)
                 diag["T_aw"] = float(h_res.T_aw)
                 diag["f"] = float(h_res.f)
+            else:
+                # No correlation evaluated (no flow): the keys stay, undefined.
+                for key in ("Nu", "St", "htc", "T_aw", "f"):
+                    diag[key] = math.nan
 
         return diag
 
@@ -10274,6 +10350,12 @@ class ChannelElement(NetworkElement):
             surface_diag["f_surface"] = float(h_res.f)
         else:
             Nu, htc, T_aw = 0.0, 0.0, state_in.Tt
+            # No correlation evaluated (no flow): the keys stay, undefined.
+            surface_diag = {
+                "Re_surface": math.nan,
+                "surface_extrapolated": math.nan,
+                "f_surface": math.nan,
+            }
         if enhanced and h_res is not None:
             f = h_res.f
         else:

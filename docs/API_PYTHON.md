@@ -1720,6 +1720,15 @@ fluid. Three modes:
 - **Reported heat**, in every mode: `{id}.Q` [W] per boundary (the set `Q`,
   the solved `Q`, or its share of `{node}.Q_fraction`) and `{node}.Q`, their
   sum. The second-law check and the balance ledger (#552) use the solved heat.
+  `{node}.Q_withheld` and `{node}.Q_fraction` [W] are always reported on a
+  node with an energy boundary, 0.0 when nothing is withheld or no fraction
+  heat applied.
+- **A result's keys follow the network, never the operating point.** A key
+  whose value is undefined at a point (a per-unit-flow quantity at zero flow,
+  a merge coefficient on a split, a choking anchor of an unchoked ejector) is
+  present and NaN; the GUI's `/solve` writes it as `null`.
+  `python/tests/test_result_keys_invariant.py` solves every palette network at
+  its own point, at zero, reversed and choked flow and requires the same keys.
 
 - **`fraction`** scales the inflow's sensible enthalpy, `h(T) - h(298.15 K)`
   at its own composition (`cb.SENSIBLE_ENTHALPY_REF_T`); on a combustor, the
@@ -2105,9 +2114,10 @@ jct_ideal = IdealMomentumTeeElement(
 # port's dynamic head; p_jn was a duplicate of P_jct until #773);
 # port_i_K referenced to the converged common port's head;
 # for a 3-port tee the geometric flows m_dot_com/straight/branch (signed in the
-# wired direction) and n_reversed_ports, plus K_straight/K_branch (dividing) or
-# K11/K12 (joining) only when the converged regime is the wired one. Exposed in
-# the GUI as the tee's "Ideal momentum (parameter-free)" junction model.
+# wired direction) and n_reversed_ports, plus K_straight/K_branch (dividing) and
+# K11/K12 (joining), each with a value only when the converged regime is that
+# one and NaN otherwise (every key is always present). Exposed in the GUI as the
+# tee's "Ideal momentum (parameter-free)" junction model.
 #
 # Every multi-port junction also reports port_i_outer_area (the connected
 # element's own area), port_i_connected_area_ratio (that over the port area;

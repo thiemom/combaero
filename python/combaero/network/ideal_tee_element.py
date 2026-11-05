@@ -347,21 +347,30 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
         on a dividing junction, ``(Pt_i - Pt_c)/q_c`` on a joining one -- the
         conventions of Bassett's K5/K6 and K11/K12. The common port of THAT
         definition is read off the CONVERGED flows (the lone port flowing the
-        other way); where there is no lone port the K fields are omitted.
+        other way); where there is no lone port the K fields are NaN.
 
         For a three-port tee the named aliases are GEOMETRIC, as the GUI wires
         them: ``m_dot_com`` / ``m_dot_straight`` / ``m_dot_branch`` are the
         declared ports' flows, signed positive in the declared direction (a
         negative one ran reversed; ``n_reversed_ports`` counts them). The K
         aliases -- ``K_straight``/``K_branch`` dividing, ``K11``/``K12``
-        joining -- and ``mass_flow_ratio`` are emitted only when the converged
-        regime IS the declared one, so a tee that ran as a merge although wired
-        as a split never reports a merge coefficient under a split's name.
+        joining -- and ``mass_flow_ratio`` carry a value only when the
+        converged regime IS the declared one, so a tee that ran as a merge
+        although wired as a split never reports a merge coefficient under a
+        split's name. Every one of these keys is always present, NaN where it
+        has no value (the common port's own K, a regime not run): a result's
+        keys never follow its operating point.
         """
         diag = super().diagnostics(states, P_jct, port_mdots)
         declared_common = None
         if self.N == 3:
             declared_common = 0 if len(self.inlet_nodes) == 1 else self.N - 1
+        for i in range(self.N):
+            diag[f"port_{i}_K"] = math.nan
+            diag[f"port_{i}_flow_fraction"] = math.nan
+        if declared_common is not None:
+            for key in ("K_straight", "K_branch", "K11", "K12", "mass_flow_ratio"):
+                diag[key] = math.nan
         if port_mdots is None or len(port_mdots) != self.N:
             self._report_total(diag, states, P_jct, declared_common)
             return diag

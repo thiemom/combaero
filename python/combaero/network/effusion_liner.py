@@ -46,7 +46,13 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import combaero as cb
 
-from .components import CrossflowSegmentElement, EffusionPlateElement, FilmSource, PlenumNode
+from .components import (
+    CrossflowSegmentElement,
+    EffusionPlateElement,
+    FilmSource,
+    PlenumNode,
+    _max_over_min,
+)
 
 if TYPE_CHECKING:
     from .graph import FlowNetwork
@@ -233,7 +239,7 @@ class EffusionLiner:
             "crossflow_cd_degraded": float(
                 any(p.get("crossflow_cd_degraded", 0.0) for p in panels)
             ),
-            "bleed_nonuniformity": float(max(bleed) / min(bleed)) if min(bleed) > 0.0 else math.inf,
+            "bleed_nonuniformity": _max_over_min(bleed),
             "station_psi_min": float(min(psi)),
             "station_psi_beyond_bassett": float(min(psi) > BASSETT_PSI_MEASURED_MAX),
             "coolant_ht_plenum_assumed": 1.0,

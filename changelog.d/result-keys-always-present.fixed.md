@@ -1,0 +1,1 @@
+- An `EffusionPlateElement` on a gas-side chamber with no coolant flow reports the adiabatic limit (q = 0, both faces at the gas side's adiabatic wall temperature, no film) instead of dropping its wall keys; on a plenum, or on a chamber with no gas flow, the wall temperatures are NaN. A chamber with no gas flow no longer switches the plate to the plenum key set.
