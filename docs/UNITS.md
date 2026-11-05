@@ -494,6 +494,7 @@ All functions use consistent units to avoid conversion errors.
 | `get_material_conductivity_and_slope` | name: str, T: K, extrapolate: bool (default False)         | tuple: k [W/(m*K)], dk_dT [W/(m*K^2)]                                                            |
 | `get_material_info`                   | name: str                                                  | dict: T_min, T_max, T_solidus, T_envelope_min, T_envelope_max [K]; source, notes, solidus_source |
 | `material_in_range`                   | name: str, T: K                                            | bool                                                                                             |
+| `GENERIC_METAL_SOLIDUS`               | -                                                          | K                                                                                                |
 
 ### cooling_correlations.h - Advanced Cooling Correlations
 
