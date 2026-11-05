@@ -270,6 +270,30 @@ def test_heat_given_to_a_stagnant_node_is_reported_as_withheld() -> None:
     _assert_closed(s, r)
 
 
+@pytest.mark.parametrize("Q", [0.0, 2.0e5])
+@pytest.mark.parametrize("m", [0.09, 0.36, 1.0])
+def test_a_flowing_heated_node_reports_exactly_none_withheld(m: float, Q: float) -> None:
+    """The key is there whatever the heat (a 0 W source too), and it is 0.0:
+    m * (1/m) rounds to 1 - 1 ulp for about one flow in eight (0.09 and 0.36
+    kg/s here, not 1.0), which surfaced as Q_withheld ~ 1e-16 Q on one
+    platform and not another -- a result key that came and went with the
+    last bit of a solved flow."""
+    g = FlowNetwork()
+    g.add_node(MassFlowBoundary("src", m_dot=m, Tt=400.0, Y=Y_AIR))
+    g.add_node(_pb("out", 1e5, 300.0))
+    p = PlenumNode("p")
+    p.add_energy_boundary(EnergyBoundary("heater", Q=Q))
+    g.add_node(p)
+    g.add_element(_orifice("e1", "src", "p", 0.3))
+    g.add_element(_orifice("e2", "p", "out", 0.3))
+    s = NetworkSolver(g)
+    r = s.solve()
+    assert r["__success__"]
+    assert r["e1.m_dot"] == pytest.approx(m, rel=1e-12)
+    assert r["p.Q_withheld"] == 0.0
+    _assert_closed(s, r)
+
+
 @pytest.mark.parametrize("m", [0.0, 1e-9, 3e-7, 8e-7, 1e-6, 1e-4, -5e-7, -1e-4])
 def test_the_heat_taken_up_fades_c1_from_the_floor_to_none_at_zero_flow(m: float) -> None:
     """phi = 1/|m| at or above the floor; below it the share taken up,

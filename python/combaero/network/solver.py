@@ -125,6 +125,12 @@ _STATE_EXCEPTIONS = (RuntimeError, ValueError, ArithmeticError)
 # undetermined state, so such a "root" is refused, never returned.
 _FUEL_MIN_OXIDIZER_FLOW = 1e-9
 
+# A node's Q_withheld below this fraction of the heat given is the rounding
+# of m * (1/m), not heat withheld: reported as 0.0. The real fade below the
+# 1 mg/s uptake floor passes it within 4e-7 (relative) below the floor
+# (6e-12 at m = 0.999999 mg/s), so only heat at that level is dropped.
+_WITHHELD_RTOL = 1e-12
+
 #: Default wall-clock budget [s] (``NetworkSolver.homotopy_budget``) of the
 #: Newton-homotopy last retry (#642), within the
 #: caller's timeout. Inside the solver its stress rescues took 1.2-4.2 s; every
@@ -6890,13 +6896,18 @@ class NetworkSolver:
             frac = sum(float(eb.fraction) for eb in ebs)
             inflows = self._node_inflows(nid, final_x)
             m_in = sum(m for m, _, _ in inflows)
+            # Always reported, 0.0 when nothing is withheld: which keys a
+            # result has follows the network, never a solved value. Above the
+            # floor phi = 1/m_in, and m_in * (1/m_in) can round to 1 - 1 ulp
+            # (m_in = 7.3), so that remainder is snapped to zero rather than
+            # reported as heat withheld.
+            withheld = 0.0
             if q_given != 0.0:
                 phi, _ = cb.mixer_heat_per_unit_flow(m_in)
                 withheld = q_given * (1.0 - m_in * phi)
-                if withheld != 0.0:
-                    sol_dict[f"{nid}.Q_withheld"] = (
-                        sol_dict.get(f"{nid}.Q_withheld", 0.0) + withheld
-                    )
+                if abs(withheld) <= _WITHHELD_RTOL * abs(q_given):
+                    withheld = 0.0
+            sol_dict[f"{nid}.Q_withheld"] = sol_dict.get(f"{nid}.Q_withheld", 0.0) + withheld
             if frac != 0.0 and not isinstance(node, CombustorNode) and m_in > 0.0:
                 Y_mix = np.zeros(self._n_species)
                 H = 0.0
