@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from collections import deque
 from typing import TYPE_CHECKING, Any, Self
 
 if TYPE_CHECKING:
@@ -175,12 +176,61 @@ class FlowNetwork:
                         queue.append(nb)
         return visited
 
+    def _lossless_loop(self) -> list[str] | None:
+        """The element ids of one closed loop made only of lossless connections
+        (#988), or None. Union-find over the nodes: a lossless edge whose ends
+        are already joined by lossless edges closes a loop, and the tree path
+        between its ends completes it."""
+        from .components import LosslessConnectionElement
+
+        parent: dict[str, str] = {}
+
+        def root(n: str) -> str:
+            parent.setdefault(n, n)
+            while parent[n] != n:
+                parent[n] = parent[parent[n]]
+                n = parent[n]
+            return n
+
+        tree: dict[str, list[tuple[str, str]]] = {}
+        for eid, elem in self.elements.items():
+            if not isinstance(elem, LosslessConnectionElement):
+                continue
+            a, b = elem.from_node, elem.to_node
+            ra, rb = root(a), root(b)
+            if ra != rb:
+                parent[ra] = rb
+                tree.setdefault(a, []).append((b, eid))
+                tree.setdefault(b, []).append((a, eid))
+                continue
+            # a and b are already joined: the tree path from a to b plus eid.
+            # (a == b cannot occur: add_element refuses an element whose ends
+            # are one node.)
+            came: dict[str, tuple[str, str]] = {a: (a, "")}
+            queue = deque([a])
+            while queue:
+                n = queue.popleft()
+                if n == b:
+                    break
+                for nb, via in tree.get(n, []):
+                    if nb not in came:
+                        came[nb] = (n, via)
+                        queue.append(nb)
+            path, n = [], b
+            while n != a:
+                n, via = came[n]
+                path.append(via)
+            return [*reversed(path), eid]
+        return None
+
     def validate(self) -> None:
         """
         Validate the network topology.
         - Must have at least one node and one element.
         - Must have at least one PressureBoundary.
         - Must contain at least one element with losses (to prevent infinite flow).
+        - No closed loop made only of lossless connections (#988): its
+          circulation is not determined.
         - No isolated subgraphs (all nodes reachable from first node).
         - Every interior node must be connected to at least one element.
         """
@@ -206,6 +256,24 @@ class FlowNetwork:
             raise ValueError(
                 "Network contains only lossless connection elements. "
                 "There must be at least one pressure drop element to solve flow."
+            )
+
+        # A closed loop of lossless connections (two in parallel, or a ring)
+        # holds Pt equal all round it, so any flow circulating around it meets
+        # every row: the steady problem has a one-parameter family of roots
+        # and the solver returns whichever its start lies nearest (#988).
+        loop = self._lossless_loop()
+        if loop is not None:
+            described = ", ".join(
+                f"{eid!r} ({self.elements[eid].from_node} -> {self.elements[eid].to_node})"
+                for eid in loop
+            )
+            raise ValueError(
+                f"FlowNetwork validation failed: the lossless connections {described} form a "
+                "closed loop. Total pressure is equal all around it, so the flow circulating "
+                "around it is not determined: any value is a root, and the solve would return "
+                "an arbitrary one. Remove one of the connections, or give one path a loss "
+                "element (a real duct has one)."
             )
 
         # Per-element specific validation
