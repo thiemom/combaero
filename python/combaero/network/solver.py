@@ -1626,9 +1626,10 @@ class NetworkSolver:
             # No root on that branch at the guessed oxidizer state: start lean
             # and small; the solve then reports whether the target is
             # reachable, with this reason.
+            method = getattr(self.network.nodes.get(comb), "method", "complete")
             node._guess_note = (
                 f"No {node.branch} root at the start ({exc}; oxidizer {T_ox:.1f} K, "
-                "complete combustion)."
+                f"{method} combustion)."
             )
             return 0.01 * m_air
 
@@ -1662,10 +1663,18 @@ class NetworkSolver:
     ) -> float:
         """The fuel flow that burns ``m_air`` of oxidizer to the target on the
         node's branch by the combustor's own model (mix, then
-        complete_combustion with its smooth phi blending): bisection, exact to
-        1e-6 K; lean on [0, stoichiometric], rich on [stoichiometric, 10 x].
+        complete_combustion with its smooth phi blending, or
+        combustion_equilibrium for an equilibrium combustor): bisection, exact
+        to 1e-6 K; lean on [0, stoichiometric], rich on [stoichiometric, 10 x].
         It finds a target a fraction of a kelvin above the no-fuel Tt, which
-        a coarse search returns as no fuel."""
+        a coarse search returns as no fuel.
+
+        Rich of stoichiometric the two models part far: at phi 2.2, 1500 K by
+        equilibrium is 2020 K complete, so a complete-combustion start for an
+        equilibrium combustor began at about twice the root's fuel flow and
+        reached the rich root only through the LM fallback, or not at all."""
+        comb = self.network.nodes.get(node.combustor)
+        equilibrium = getattr(comb, "method", "complete") == "equilibrium"
         ox = self._as_stream(m_air, T_ox, Y_ox)
         X_ox = list(ox.X)
         own = float(cb.oxygen_required_per_kg_mixture(X_ox))
@@ -1681,6 +1690,8 @@ class NetworkSolver:
                     return float(cb.complete_combustion(ox.T, X_ox, ox.P).T)
                 return float(ox.T)
             mixed = cb.mix([ox, self._as_stream(m, float(node.Tt), Y_f)])
+            if equilibrium:
+                return float(cb.combustion_equilibrium(mixed.T, list(mixed.X), mixed.P).state.T)
             return float(cb.complete_combustion(mixed.T, list(mixed.X), mixed.P).T)
 
         lo, hi = (0.0, m_st) if node.branch == "lean" else (m_st, 10.0 * m_st)
