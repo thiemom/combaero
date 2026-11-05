@@ -86,6 +86,13 @@ EXPECTED_FAILURES: dict[tuple[str, str, float], str] = {
     ("ejector", "incompressible (jet pump)", -0.5): "ejector backflow",
     # A Tt_target heat on a node with no through-flow is undetermined: refused.
     ("heat_source", "outlet Tt (total)", 0.0): "Tt_target with no through-flow",
+    # An effusion plate with no coolant and no gas flow has no cooling path:
+    # its wall T is undetermined, refused (#998).
+    ("effusion_plate", "palette", 0.0): "no cooling path",
+    ("effusion_plate", "on a gas-side chamber", 0.0): "no cooling path",
+    ("effusion_plate", "on a gas-side chamber, baldauf_sellers film", 0.0): "no cooling path",
+    ("effusion_liner", "palette", 0.0): "no cooling path",
+    ("effusion_liner", "baldauf_sellers film", 0.0): "no cooling path",
 }
 
 #: [s] the solver budget at a listed failing point: it only has to show

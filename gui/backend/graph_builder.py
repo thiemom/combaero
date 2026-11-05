@@ -1291,6 +1291,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 turbulence_intensity=_ld.turbulence_intensity,
                 gas_heat_flux=_ld.gas_heat_flux,
                 film_direction=_ld.film_direction,
+                material=_ld.material or None,
             )
             liner.add_to(net, _ends[0], _ends[1], _ends[2])
             gui_arrays[elem_id] = liner
@@ -1470,6 +1471,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 gas_augmentation=data.gas_augmentation,
                 turbulence_intensity=data.turbulence_intensity,
                 gas_heat_flux=data.gas_heat_flux,
+                material=data.material or None,
             )
             net.add_element(elem)
         elif elem_type == "film_cooling":

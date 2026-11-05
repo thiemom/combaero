@@ -727,6 +727,31 @@ The plate IS the wall the coolant passes through, so it owns it: no
 | `MomentumChamberNode` (flow) | the chamber's own surface correlation is the unblown `h_gas_unblown` (so the chamber's surface model IS the baseline); which baseline that is, and where, is reported beside it as `h_gas_unblown_model` (e.g. `SmoothModel(gnielinski)`, fully developed) and `h_gas_unblown_Re` / `_Pr` / `_Nu` (#476); its velocity gives `blowing_ratio`; `gas_augmentation` (the caller's, 1.0) scales h. `T_gas` is the approaching MAIN stream when the chamber has one -- its own state is the mixed outlet, diluted by the effused coolant |
 | a plenum (state, no flow) | the imposed `gas_heat_flux` [W/m^2], 0 by default (adiabatic) |
 
+**No coolant flow (#998)** (below `cb.MIXER_HEAT_MDOT_FLOOR`, the network's
+no-through-flow floor): `Re_hole` is 0 and the coolant-side `Nu`/`h` are NaN.
+A gas-side chamber below the same floor has no gas flow.
+
+- **Hot gas, no coolant** (a chamber with gas flow): the adiabatic limit,
+  q = 0 and both faces at the gas side's `T_adiabatic_wall`, no film.
+- **No coolant and no gas-side flow** (a plenum, or a chamber with none): no
+  cooling path. The wall temperatures are NaN, `no_cooling_path` is 1, and
+  the solver refuses the root (`__success__` False, INCONSISTENT) with
+  `EffusionPlateElement 'id': no cooling path: wall T undetermined (heats
+  until failure)` in `__message__`, the plates listed in
+  `__wall_undetermined__`. Radiation, backside convection without hole
+  through-flow and conduction to the mounts are not modelled; the comment at
+  `wall_heat_transfer` says how each could be, and #898 is the path for a
+  locally starved plate.
+- **Temperature limit, always reported.** `T_wall_limit` [K] is the hot end
+  of the plate material's #882 envelope (its solidus) when `material=` names
+  one from `cb.list_materials()`, else `cb.GENERIC_METAL_SOLIDUS` (1533.15
+  K). `wall_above_limit` is 1 when a face is hotter, 0 when not, NaN when the
+  wall temperature is undefined; the solve lists such plates in
+  `__wall_above_limit__` (reported only). `material` sets the limit only: the
+  conduction stays `wall_conductivity`, a constant k. `EffusionLiner` takes
+  `material` for its panels and reports `no_cooling_path`, `T_wall_limit` and
+  `wall_above_limit` over them.
+
 ```python
 panel = EffusionPlateElement("eff", "coolant", "liner", hole_diameter=3.27e-3,
                              wall_thickness=6.3e-3, pitch=15.24e-3,
@@ -734,7 +759,8 @@ panel = EffusionPlateElement("eff", "coolant", "liner", hole_diameter=3.27e-3,
                              wall_conductivity=20.0,      # one layer, t/k
                              gas_augmentation=1.0,        # the caller's
                              gas_film="none",             # or "baldauf_sellers"
-                             gas_heat_flux=0.0)           # plenum discharge only
+                             gas_heat_flux=0.0,           # plenum discharge only
+                             material=None)               # T_wall_limit only (#998)
 diag["T_wall_hot"], diag["T_wall_cold"], diag["q_wall"], diag["eta_overall"]
 ```
 
@@ -1491,6 +1517,8 @@ bookkeeping keys. Five of them say what happened:
 | `__inconsistent_elements__` | `list[str]` | ids of the elements that rejected the solution |
 | `__P_nonpositive__` | `list[str]` | nodes whose pressure (`P` or `Pt`) is at or below zero at the root: not a gas state, though an element's continuation can close its row there (a Fanno kernel below the sonic static). Reported INCONSISTENT, checked before any diagnostics evaluate the state (#810). |
 | `__T_clamped__` | `list[str]` | nodes with flow whose temperature is at or below 0 K at the solution: more heat out than the stream holds as a gas (the thermo is an ideal gas down to 0 K). Reported INCONSISTENT (`__success__` False). The name is kept from the [200, 5000] K node clamp this replaced (#626). |
+| `__wall_undetermined__` | `list[str]` | effusion plates with no cooling path at the root (#998): no coolant flow through the holes and no gas flow on the other side, so the wall temperature is undetermined (`no_cooling_path` 1, wall keys NaN). Reported INCONSISTENT, the plate named in `__message__`. |
+| `__wall_above_limit__` | `list[str]` | effusion plates with a face above `T_wall_limit`, their material's envelope hot end (#998; `wall_above_limit` 1). Reported only. |
 | `__heat_faded__` | `list[str]` | heated nodes at a root inside the heat fade below `MIXER_HEAT_MDOT_FLOOR`, taking up part of their heat: neither flowing nor stagnant, a root the fade makes. Reported INCONSISTENT. |
 | `__supersonic_chambers__` | `list[str]` | compressible momentum chambers at a root past the sonic limit of their area, REFUSED: the chamber's Pt is below the sonic Pt* of its mass flux at its area, so no state of that area carries the flow (since #788 the closure has one root per Pt, so this is the only way past the sonic point; the supersonic root Newton once landed on is gone). Not a choked-bounded junction (below): the reason is in `__message__` (`'e1' (LosslessConnectionElement) feeds it, not a choked channel`, `row(s) [...] read its static pressure`, a channel wider than the chamber). Usually the element downstream is no restriction for that flow, or the chamber's area is too small for it. Reported INCONSISTENT. |
 | `__choked_bounded_junctions__` | `list[str]` | momentum chambers ACCEPTED past their sonic limit (#788): a choked compressible channel of no larger area discharges into the chamber, which is its under-expanded exit -- the "choked bounded" exit a pressure boundary takes (#636) -- and no row but the chamber's own reads its static pressure. The root is the one a `PlenumNode` in its place gives; the expansion loss Pt* - Pt sits in the channel's control volume (its sigma). The chamber reports as that plenum: `P` = `Pt`, `mach` 0, `T` = `Tt`, with `choked_bounded` 1, `P_sonic` / `Pt_sonic` (the sonic state of its flux at its area) and `expansion_loss` = Pt* - Pt; the channel reports its own choked exit (`mach_out` 1). `__x_solution__` keeps the chamber's P unknown, on the closure's continuation. |
@@ -2889,6 +2917,9 @@ k, dk_dT = cb.get_material_conductivity_and_slope("ss310", 900.0)
 # The record: sourced range, source, and the solidus [K] its source prints
 # (NaN where none does), the hot end of the #882 envelope.
 info = cb.get_material_info("haynes230")  # T_min, T_max, T_solidus = 1574.15, solidus_source, ...
+# The hot end for a metal whose source prints no solidus [K]: the lowest
+# sourced solidus in the database. An effusion plate's limit without a material.
+cb.GENERIC_METAL_SOLIDUS  # 1533.15
 ```
 
 ### Advanced Geometry Functions

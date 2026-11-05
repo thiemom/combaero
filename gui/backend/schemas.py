@@ -434,6 +434,9 @@ class EffusionLinerData(BaseModel):
     # Which way the hot gas runs past the panels, for the film the liner lays
     # on a wall downstream (#695).
     film_direction: Literal["with_coolant", "against_coolant"] = "with_coolant"
+    # The plates' alloy, for their wall temperature limit only (#998); None
+    # is the generic metal cap.
+    material: str | None = None
     label: str | None = None
 
 
@@ -465,6 +468,9 @@ class EffusionPlateData(BaseModel):
     gas_augmentation: float = Field(default=1.0, gt=0.0)
     turbulence_intensity: float = Field(default=0.05, gt=0.0)
     gas_heat_flux: float = 0.0
+    # The plate's alloy, for its wall temperature limit only (#998): the hot
+    # end of its k(T) envelope. None is the generic metal cap.
+    material: str | None = None
     label: str | None = None
 
 

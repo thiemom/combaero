@@ -290,6 +290,9 @@ UNIT_MAP: dict[str, str] = {
     "pitch_over_d": "-",
     "porosity": "-",
     "wall_conductivity": "W/m/K",
+    "T_wall_limit": "K",  # the plate material's envelope hot end (#998)
+    "wall_above_limit": "-",
+    "no_cooling_path": "-",
     # Effusion liner (#471)
     "crossflow_cd_beyond_8pct": "-",
     "crossflow_cd_degraded": "-",
