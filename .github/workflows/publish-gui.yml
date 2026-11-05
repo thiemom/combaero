@@ -113,8 +113,11 @@ jobs:
           # 0.6.0 while uv, resolving against the JSON variant one second
           # later, still saw only <=0.5.0 and failed with "No solution found".
           # Waiting on the wrong representation is waiting on nothing.
+          #
+          # 30 min, not 10: on v0.9.0 publish.yml took 10m43s end to end and
+          # this loop gave up 8 s after it finished (rerun --failed published).
           echo "Waiting for combaero==$VERSION on the PyPI simple index..."
-          for i in $(seq 1 40); do
+          for i in $(seq 1 120); do
             if curl -fsS -H "Accept: application/vnd.pypi.simple.v1+json" \
                  "https://pypi.org/simple/combaero/" 2>/dev/null \
                | grep -q "\"$VERSION\""; then
@@ -123,7 +126,7 @@ jobs:
             fi
             sleep 15
           done
-          echo "FAIL: combaero==$VERSION did not appear on PyPI within 10 minutes"
+          echo "FAIL: combaero==$VERSION did not appear on PyPI within 30 minutes"
           exit 1
 
       - name: Install wheel and smoke-test server
