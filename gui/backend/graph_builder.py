@@ -161,16 +161,16 @@ class GuiFlowSplitter:
         }
         for key in SPLITTER_ROW_KEYS:
             out[f"rows_{key}"] = [float(r[key]) if r.get(key) is not None else None for r in rows]
+        # Always reported, NaN when no outlet row carries one (no flow to
+        # split): a result's keys follow the network, not the operating point.
         dpt = [float(r["valve_dPt"]) for r in rows if "valve_dPt" in r]
-        if dpt:
-            out["valve_dPt_max"] = max(dpt)
+        out["valve_dPt_max"] = max(dpt) if dpt else _math.nan
         err = [
             abs(float(r["fraction_achieved"]) - float(r["fraction"]))
             for r in rows
             if "fraction_achieved" in r
         ]
-        if err:
-            out["fraction_error_max"] = max(err)
+        out["fraction_error_max"] = max(err) if err else _math.nan
         return out
 
 
