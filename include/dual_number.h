@@ -165,6 +165,23 @@ template <int N> DualN<N> dlog(const DualN<N>& a) {
   for (int i = 0; i < N; ++i) r.d[i] = a.d[i] * inv;
   return r;
 }
+// d/dx log(1 + u) = u'/(1 + u): log near 1 without the cancellation of
+// log(1 + u) for |u| ~ machine epsilon.
+template <int N> DualN<N> dlog1p(const DualN<N>& a) {
+  DualN<N> r;
+  r.v = std::log1p(a.v);
+  double inv = 1.0 / (1.0 + a.v);
+  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] * inv;
+  return r;
+}
+// d/dx (exp(u) - 1) = exp(u) u'
+template <int N> DualN<N> dexpm1(const DualN<N>& a) {
+  DualN<N> r;
+  r.v = std::expm1(a.v);
+  const double e = std::exp(a.v);
+  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] * e;
+  return r;
+}
 // d/dx sin(u) = cos(u) u'
 template <int N> DualN<N> dsin(const DualN<N>& a) {
   DualN<N> r;

@@ -12,9 +12,8 @@ rounding, and differed between macOS and Linux.
 
 The test asserts keys, not convergence. Whether a hard point converges
 depends on wall clock (the stall detector's window, the timeout): CI's
-runners stalled two impingement arrays at 30x that converge on a desktop,
-and a loaded VM converged the listed zero-flow orifices in a pipe that fail
-serially. So every point that converges is compared, listed or not, and only
+runners stalled two impingement arrays at 30x that converge on a desktop.
+So every point that converges is compared, listed or not, and only
 the network's own point plus one other must converge for the check to mean
 anything.
 
@@ -47,15 +46,6 @@ EXPECTED_FAILURES: dict[tuple[str, str, float], str] = {
     # A combustor with no oxidizer has nothing to burn with (#892): refused.
     ("fuel_boundary", "palette", 0.0): "no oxidizer",
     ("fuel_boundary", "palette", -0.5): "no oxidizer",
-    # Issue to file: chamber_static_state returns NaN at the start point of an
-    # orifice in a pipe at zero flow (the bare palette orifice solves).
-    ("orifice", "in a pipe", 0.0): "issue to file: chamber_static_state NaN",
-    ("orifice", "in a pipe, jobson1955", 0.0): "issue to file: chamber_static_state NaN",
-    ("orifice", "in a pipe, Lichtarowicz", 0.0): "issue to file: chamber_static_state NaN",
-    ("orifice", "in a pipe, IdelchikThick", 0.0): "issue to file: chamber_static_state NaN",
-    # Converges outside pytest only through the outlet-referenced retry, which
-    # COMBAERO_SOLVER_STRICT (conftest) turns off: the same NaN.
-    ("orifice", "in a pipe, McGreehanSchotsch", 0.0): "issue to file: chamber_static_state NaN",
     # A turbomachine outside its operating range (#893: power > 0, a pressure
     # ratio, no reverse flow).
     ("compressor", "palette", -0.5): "reverse flow through a compressor",

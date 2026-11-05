@@ -468,16 +468,21 @@ DuctStaticState duct_static_state(double Tt, double Pt, double G,
   const double R = specific_gas_constant(X);
   const double lnP0 = std::log(Pt);
   G = std::abs(G);
-  // L(u) = lnPtP(Tt, e^u, G) + u - ln Pt, increasing in u on [ln P*, ln Pt].
+  // u = ln(P / Pt), P = Pt e^u: L(u) = lnPtP(Tt, P, G) + u, increasing in u on
+  // [ln(P* / Pt), 0]. Relative to Pt, not ln P itself, so that u = 0 is P = Pt
+  // to the bit and P <= Pt throughout: exp(log(Pt)) came back one ulp ABOVE
+  // Pt at G = 0, a static above its own total, and the in-pipe orifice's
+  // drive p1 - p then exceeded the jet's p0 - p at zero flow (#997).
+  auto P_of = [&](double u) { return Pt * std::exp(u); };
   auto eval = [&](double u, ChamberStaticState &cs) {
-    cs = chamber_static_state(Tt, std::exp(u), G, X);
-    return cs.lnPtP + u - lnP0;
+    cs = chamber_static_state(Tt, P_of(u), G, X);
+    return cs.lnPtP + u;
   };
   DuctStaticState out{};
   ChamberStaticState cs{};
   const double P_star = critical_pressure_ratio(Tt, Pt, X) * Pt;
-  double u_lo = std::log(P_star);
-  double u_hi = lnP0;
+  double u_lo = std::log(P_star / Pt);
+  double u_hi = 0.0;
   if (eval(u_lo, cs) > 0.0) {
     // Beyond choke: the sonic state, independent of G. T* from the energy
     // balance at M = 1 (sonic_static_state, Newton to 1e-13 Tt) and P* on
@@ -525,7 +530,7 @@ DuctStaticState duct_static_state(double Tt, double Pt, double G,
     } else {
       u_lo = u;
     }
-    const double dL = 1.0 + std::exp(u) * cs.dln_dP;
+    const double dL = 1.0 + P_of(u) * cs.dln_dP;
     double u_new = (dL > 0.0) ? u - L / dL : 0.5 * (u_lo + u_hi);
     if (!(u_new > u_lo && u_new < u_hi)) {
       u_new = 0.5 * (u_lo + u_hi);
@@ -541,16 +546,17 @@ DuctStaticState duct_static_state(double Tt, double Pt, double G,
       // Cap rule (#868 R9): the last step closed to rounding is a root;
       // anything wider is not, and the implicit derivatives below would
       // describe a non-root.
-      if (inner_solve::cap_exit_is_root(step, std::max(1.0, std::abs(u)))) {
+      if (inner_solve::cap_exit_is_root(step, std::max(1.0, std::abs(u + lnP0)))) {
         break;
       }
       inner_solve::throw_no_convergence("duct_static_state", inner_solve::kDuctStaticStateMaxIter,
                                         "ln P step", step);
     }
   }
-  const double P = std::exp(u);
+  const double P = P_of(u);
   const double dL_du = 1.0 + P * cs.dln_dP;
-  // du/dx = -(dL/dx) / (dL/du); dL/dT0 = dln_dTt, dL/dP0 = -1/Pt, dL/dG = dln_dG.
+  // In v = ln P = u + ln Pt, L(v) = lnPtP + v - ln Pt: dv/dx = -(dL/dx) /
+  // (dL/dv), dL/dT0 = dln_dTt, dL/dP0 = -1/Pt, dL/dG = dln_dG, dL/dv = dL/du.
   const double du_dT0 = -cs.dln_dTt / dL_du;
   const double du_dP0 = (1.0 / Pt) / dL_du;
   const double du_dG = -cs.dln_dG / dL_du;
