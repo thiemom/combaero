@@ -979,6 +979,11 @@ class EjectorElement(MultiPortChamberBase):
             # jet-pump regimes, where the outlet pressure sets the operating
             # point.
             critical_mode = 0.0
+            # The choking anchors exist only for a choked primary: NaN, not
+            # absent, otherwise (a result's keys never follow its regime).
+            diag["entrainment_ratio_critical"] = math.nan
+            diag["P_c_star"] = math.nan
+            diag["P_b0"] = math.nan
             if s_choke > 0.0:
                 omega_c = self._critical_omega(primary, secondary, gamma)
                 p_c_star = self._critical_back_pressure(primary, secondary, gamma, r_gas)
@@ -1021,6 +1026,9 @@ class EjectorElement(MultiPortChamberBase):
         a_p = float(cb.speed_of_sound(primary.T, primary.X))
         diag["mach_jet"] = abs(mp) / (rho_p * self.nozzle_exit_area) / a_p if a_p > 0 else 0.0
         drive = float(primary.Pt) - float(outlet.Pt)
+        # Undefined without a drive (or a primary flow): NaN, not absent.
+        diag["head_ratio_N"] = math.nan
+        diag["efficiency"] = math.nan
         if drive != 0.0:
             N = (float(outlet.Pt) - float(secondary.Pt)) / drive
             diag["head_ratio_N"] = N

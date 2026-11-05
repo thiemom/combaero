@@ -39,6 +39,7 @@ from .components import (
     PlenumNode,
     ThermalWall,
     WallLayer,
+    _max_over_min,
 )
 
 if TYPE_CHECKING:
@@ -264,11 +265,7 @@ class ImpingementArray:
             "Cd": float(plates[0]["Cd"]),
             "Cd_in_range": float(all(p["Cd_in_range"] for p in plates)),
             "surface_extrapolated": float(any(p["surface_extrapolated"] for p in plates)),
-            "jet_flow_nonuniformity": float(
-                max(p["m_dot"] for p in plates) / min(p["m_dot"] for p in plates)
-                if min(p["m_dot"] for p in plates) > 0.0
-                else float("inf")
-            ),
+            "jet_flow_nonuniformity": _max_over_min([p["m_dot"] for p in plates]),
         }
         for key in ("m_dot", "Re_j", "Gc_Gj", "Nu", "htc", "T_aw", "eta_r", "bypass_fraction"):
             out[f"rows_{key}"] = [float(p[key]) for p in plates]

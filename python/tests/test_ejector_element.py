@@ -323,8 +323,10 @@ def test_diagnostics_reports_jet_pump_regime():
     assert diag["s_choke"] == pytest.approx(0.0)
     assert diag["critical_mode"] == 0.0
     assert diag["entrainment_ratio"] == pytest.approx(0.0338 / 0.0051)
-    # Critical-only diagnostics are NaN here and are not reported.
-    assert "P_c_star" not in diag
+    # Critical-only diagnostics have no value here: present, NaN (a result's
+    # keys never follow its regime).
+    for key in ("P_c_star", "P_b0", "entrainment_ratio_critical"):
+        assert math.isnan(diag[key])
 
 
 def test_verify_solution_consistent_always_true_all_regimes_modeled():

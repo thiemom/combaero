@@ -456,6 +456,25 @@ class MultiPortChamberElement(MultiPortChamberBase):
         if port_mdots is None or len(port_mdots) != self.N:
             return diag
 
+        # Every K key is present whatever the converged flow pattern, NaN
+        # where Mynard is not evaluated (a degenerate split, the common
+        # port's own K): a result's keys never follow its operating point.
+        for i in range(self.N):
+            diag[f"port_{i}_K"] = math.nan
+        if self.N == 3:
+            if self.flow_direction == "branch":
+                diag["K_straight"] = diag["K_branch"] = math.nan
+                m_com = abs(float(port_mdots[0]))
+                m_branch = abs(float(port_mdots[2]))
+            else:  # "merge"
+                diag["K11"] = diag["K12"] = math.nan
+                m_com = abs(float(port_mdots[2]))
+                m_branch = abs(float(port_mdots[1]))
+            diag["mass_flow_ratio"] = m_branch / m_com if m_com > 1e-12 else math.nan
+            diag["m_dot_com"] = m_com
+            diag["m_dot_branch"] = m_branch
+            diag["m_dot_straight"] = max(m_com - m_branch, 0.0)
+
         # Per-port mdot in junction convention is already in `port_mdots`.
         # Convert to Mynard's U (positive = supplier into junction).
         rho_port = np.array([r for r, _ in self.port_densities(states)])
@@ -516,19 +535,10 @@ class MultiPortChamberElement(MultiPortChamberBase):
             if self.flow_direction == "branch":
                 diag["K_straight"] = float(K_per_port[1])
                 diag["K_branch"] = float(K_per_port[2])
-                m_com = abs(float(port_mdots[0]))
-                m_branch = abs(float(port_mdots[2]))
             else:  # "merge"
                 # K11 (straight->common), K12 (branch->common)
                 diag["K11"] = float(K_per_port[0])
                 diag["K12"] = float(K_per_port[1])
-                m_com = abs(float(port_mdots[2]))
-                m_branch = abs(float(port_mdots[1]))
-            if m_com > 1e-12:
-                diag["mass_flow_ratio"] = m_branch / m_com
-            diag["m_dot_com"] = m_com
-            diag["m_dot_branch"] = m_branch
-            diag["m_dot_straight"] = max(m_com - m_branch, 0.0)
         return diag
 
     def _soft_barrier_residual(
@@ -1160,8 +1170,10 @@ class ConstantKTeeElement(MultiPortChamberElement):
         if self.N == 3:
             diag["K_straight"] = float(self.K_ports.get(noncommon[0], 0.0))
             diag["K_branch"] = float(self.K_ports.get(noncommon[1], 0.0))
-        if port_mdots is not None and len(port_mdots) == self.N:
+        if port_mdots is not None and len(port_mdots) == self.N and self.N == 3:
+            # NaN, not absent, without a common flow to be a ratio of.
             m_c = float(port_mdots[common])
-            if abs(m_c) > 1e-12 and self.N == 3:
-                diag["mass_flow_ratio"] = abs(float(port_mdots[noncommon[1]])) / abs(m_c)
+            diag["mass_flow_ratio"] = (
+                abs(float(port_mdots[noncommon[1]])) / abs(m_c) if abs(m_c) > 1e-12 else math.nan
+            )
         return diag
