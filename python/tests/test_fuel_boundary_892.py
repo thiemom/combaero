@@ -3,6 +3,7 @@ combustor's exit at a target total temperature, on the branch asked for."""
 
 from __future__ import annotations
 
+import math
 import warnings
 
 import numpy as np
@@ -333,6 +334,23 @@ def test_an_equilibrium_combustor_is_controlled_too(target: float, branch: str) 
     assert r["__success__"], r["__message__"]
     assert r["burner.Tt"] == pytest.approx(target, abs=1e-3)
     assert (r["fuel.phi"] < 1.0) if branch == "lean" else (r["fuel.phi"] > 1.0)
+
+
+@pytest.mark.parametrize(
+    ("target", "branch"), [(1200.0, "lean"), (1500.0, "rich"), (2000.0, "rich")]
+)
+def test_an_equilibrium_combustor_starts_on_its_own_curve(target: float, branch: str) -> None:
+    """The fuel start burns by the combustor's own model. Rich of
+    stoichiometric, complete combustion runs hundreds of kelvin hotter than
+    equilibrium (2020 K against 1500 K at phi 2.2), so a complete-combustion
+    start for 1500 K rich began near twice the root's flow and reached the
+    rich root only through the LM fallback -- on Linux CI, the lean one."""
+    net = _with_fuel(_adiabatic_base(method="equilibrium"), "fuel", target=target, branch=branch)
+    s, r = _solve(net)
+    assert r["__success__"], r["__message__"]
+    x0 = s._build_x0()
+    m_start = math.exp(x0[s.unknown_names.index(net.nodes["fuel"].m_dot_unknown)])
+    assert m_start == pytest.approx(r["fuel.m_dot"], rel=1e-3)
 
 
 @pytest.mark.parametrize("guess", [None, 1e-6, 1e-10, 1e-14])

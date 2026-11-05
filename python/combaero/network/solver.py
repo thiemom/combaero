@@ -153,6 +153,14 @@ SEED_MAX_ITER = 200
 SEED_RELAX = 0.5
 SEED_MDOT_FLOOR = 1.0e-4
 SEED_LOSSLESS_FRACTION = 1.0e-2
+#: Passes that re-fit a compressible element's seed K to the flow its own
+#: kernel passes at the seed's pressures (#971), and the change in ln K under
+#: which they stop.
+SEED_COMPRESSIBLE_PASSES = 4
+SEED_COMPRESSIBLE_RTOL = 0.05
+#: Seed flux, as a fraction of the sonic flux at the upstream Pt, from which
+#: an element's seed K is re-fitted to its compressible kernel (about M 0.2).
+SEED_COMPRESSIBLE_FLUX_GATE = 0.3
 _SEED_NODE_TYPES = (
     PlenumNode,
     MomentumChamberNode,
@@ -1384,50 +1392,100 @@ class NetworkSolver:
         a_fix = np.array([fixed.get(e.from_node, 0.0) for e in els])
         b_fix = np.array([fixed.get(e.to_node, 0.0) for e in els])
 
-        m = np.full(len(els), m_ref)
-        p = np.full(len(free), P_ref)
-        if not free:
-            # Every pressure fixed (by boundaries and machines): each element's
-            # flow follows from its own drop, dPt = K m |m|.
-            dp = a_fix - b_fix
-            m = np.sign(dp) * np.sqrt(np.abs(dp) / K)
-        for _ in range(SEED_MAX_ITER if free else 0):
-            G = 1.0 / (K * (np.abs(m) + SEED_MDOT_FLOOR))
-            L = np.zeros((len(free), len(free)))
-            b = inj.copy()
-            for k, g in enumerate(G):
-                i, j = a_ix[k], b_ix[k]
-                if i is not None:
-                    L[i, i] += g
-                    if j is not None:
-                        L[i, j] -= g
-                    else:
-                        b[i] += g * b_fix[k]
-                if j is not None:
-                    L[j, j] += g
+        def picard(
+            K: np.ndarray, m: np.ndarray
+        ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
+            """(p, m, pa, pb): the quadratic-resistance root for K, from m."""
+            p = np.full(len(free), P_ref)
+            if not free:
+                # Every pressure fixed (by boundaries and machines): each
+                # element's flow follows from its own drop, dPt = K m |m|.
+                dp = a_fix - b_fix
+                return p, np.sign(dp) * np.sqrt(np.abs(dp) / K), a_fix, b_fix
+            pa, pb = a_fix, b_fix
+            for _ in range(SEED_MAX_ITER):
+                G = 1.0 / (K * (np.abs(m) + SEED_MDOT_FLOOR))
+                L = np.zeros((len(free), len(free)))
+                b = inj.copy()
+                for k, g in enumerate(G):
+                    i, j = a_ix[k], b_ix[k]
                     if i is not None:
-                        L[j, i] -= g
-                    else:
-                        b[j] += g * a_fix[k]
-            # A free node no element reaches (or one only through walls)
-            # keeps the reference pressure.
-            diag = np.diag(L).copy()
-            lone = diag == 0.0
-            L[lone, lone] = 1.0
-            b[lone] = P_ref
-            try:
-                p = np.linalg.solve(L, b)
-            except np.linalg.LinAlgError:
+                        L[i, i] += g
+                        if j is not None:
+                            L[i, j] -= g
+                        else:
+                            b[i] += g * b_fix[k]
+                    if j is not None:
+                        L[j, j] += g
+                        if i is not None:
+                            L[j, i] -= g
+                        else:
+                            b[j] += g * a_fix[k]
+                # A free node no element reaches (or one only through walls)
+                # keeps the reference pressure.
+                diag = np.diag(L).copy()
+                lone = diag == 0.0
+                L[lone, lone] = 1.0
+                b[lone] = P_ref
+                try:
+                    p = np.linalg.solve(L, b)
+                except np.linalg.LinAlgError:
+                    return None
+                pa = np.array([p[i] if i is not None else a_fix[k] for k, i in enumerate(a_ix)])
+                pb = np.array([p[j] if j is not None else b_fix[k] for k, j in enumerate(b_ix)])
+                m_new = G * (pa - pb)
+                if not np.all(np.isfinite(m_new)):
+                    return None
+                done = np.max(np.abs(m_new - m)) <= 1e-6 * (np.max(np.abs(m_new)) + SEED_MDOT_FLOOR)
+                m = SEED_RELAX * m + (1.0 - SEED_RELAX) * m_new
+                if done:
+                    m = m_new
+                    break
+            return p, m, pa, pb
+
+        root = picard(K, np.full(len(els), m_ref))
+        if root is None:
+            return None
+        p, m, pa, pb = root
+        # Compressible elements (#971): the incompressible K misses what their
+        # residual's own kernel does past low Mach -- a short duct between
+        # plenums passes the choked flux on a small Pt difference. An element
+        # whose seed flux reaches SEED_COMPRESSIBLE_FLUX_GATE of the sonic flux
+        # at its upstream Pt joins the re-fit (and stays in it); each pass sets
+        # its K to the drop over the flow its kernel passes at the seed's
+        # pressures (``_seed_flow``), then re-solves. Below the gate the
+        # incompressible K stands, so a low-Mach network keeps its start.
+        kernels = [k for k, e in enumerate(els) if e._seed_flow_applies()]
+        T_seed = float(ref["T"])
+        Y_ref = [float(v) for v in ref["Y"]]
+        active: set[int] = set()
+        for _ in range(SEED_COMPRESSIBLE_PASSES if kernels else 0):
+            for k in kernels:
+                if k in active:
+                    continue
+                hi = float(max(pa[k], pb[k]))
+                area = float(getattr(els[k], "area", 0.0) or 0.0)
+                if hi > 0.0 and area > 0.0:
+                    sonic = area * float(cb.fanno_sonic_mass_flux(hi, T_seed, X_ref))
+                    if abs(m[k]) >= SEED_COMPRESSIBLE_FLUX_GATE * sonic:
+                        active.add(k)
+            if not active:
+                break
+            K_new = K.copy()
+            for k in active:
+                hi, lo = max(pa[k], pb[k]), min(pa[k], pb[k])
+                if not hi - lo > 0.0:
+                    continue
+                m_c = els[k]._seed_flow(float(hi), float(lo), T_seed, X_ref, Y_ref)
+                if m_c is not None and m_c > 0.0 and math.isfinite(m_c):
+                    K_new[k] = (hi - lo) / (m_c * m_c)
+            moved = np.max(np.abs(np.log(K_new / K)))
+            K = K_new
+            root = picard(K, m)
+            if root is None:
                 return None
-            pa = np.array([p[i] if i is not None else a_fix[k] for k, i in enumerate(a_ix)])
-            pb = np.array([p[j] if j is not None else b_fix[k] for k, j in enumerate(b_ix)])
-            m_new = G * (pa - pb)
-            if not np.all(np.isfinite(m_new)):
-                return None
-            done = np.max(np.abs(m_new - m)) <= 1e-6 * (np.max(np.abs(m_new)) + SEED_MDOT_FLOOR)
-            m = SEED_RELAX * m + (1.0 - SEED_RELAX) * m_new
-            if done:
-                m = m_new
+            p, m, pa, pb = root
+            if moved <= SEED_COMPRESSIBLE_RTOL:
                 break
         # An imposed flow past what the resistances pass at the drawn
         # pressures can put a node below zero; the start stays positive.
@@ -1626,9 +1684,10 @@ class NetworkSolver:
             # No root on that branch at the guessed oxidizer state: start lean
             # and small; the solve then reports whether the target is
             # reachable, with this reason.
+            method = getattr(self.network.nodes.get(comb), "method", "complete")
             node._guess_note = (
                 f"No {node.branch} root at the start ({exc}; oxidizer {T_ox:.1f} K, "
-                "complete combustion)."
+                f"{method} combustion)."
             )
             return 0.01 * m_air
 
@@ -1662,10 +1721,18 @@ class NetworkSolver:
     ) -> float:
         """The fuel flow that burns ``m_air`` of oxidizer to the target on the
         node's branch by the combustor's own model (mix, then
-        complete_combustion with its smooth phi blending): bisection, exact to
-        1e-6 K; lean on [0, stoichiometric], rich on [stoichiometric, 10 x].
+        complete_combustion with its smooth phi blending, or
+        combustion_equilibrium for an equilibrium combustor): bisection, exact
+        to 1e-6 K; lean on [0, stoichiometric], rich on [stoichiometric, 10 x].
         It finds a target a fraction of a kelvin above the no-fuel Tt, which
-        a coarse search returns as no fuel."""
+        a coarse search returns as no fuel.
+
+        Rich of stoichiometric the two models part far: at phi 2.2, 1500 K by
+        equilibrium is 2020 K complete, so a complete-combustion start for an
+        equilibrium combustor began at about twice the root's fuel flow and
+        reached the rich root only through the LM fallback, or not at all."""
+        comb = self.network.nodes.get(node.combustor)
+        equilibrium = getattr(comb, "method", "complete") == "equilibrium"
         ox = self._as_stream(m_air, T_ox, Y_ox)
         X_ox = list(ox.X)
         own = float(cb.oxygen_required_per_kg_mixture(X_ox))
@@ -1681,6 +1748,8 @@ class NetworkSolver:
                     return float(cb.complete_combustion(ox.T, X_ox, ox.P).T)
                 return float(ox.T)
             mixed = cb.mix([ox, self._as_stream(m, float(node.Tt), Y_f)])
+            if equilibrium:
+                return float(cb.combustion_equilibrium(mixed.T, list(mixed.X), mixed.P).state.T)
             return float(cb.complete_combustion(mixed.T, list(mixed.X), mixed.P).T)
 
         lo, hi = (0.0, m_st) if node.branch == "lean" else (m_st, 10.0 * m_st)

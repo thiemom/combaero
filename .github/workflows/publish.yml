@@ -16,7 +16,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # macos-15 pinned as in ci.yml (macos-latest jobs went unassigned).
+        os: [ubuntu-latest, macos-15, windows-latest]
 
     steps:
       - uses: actions/checkout@v7
