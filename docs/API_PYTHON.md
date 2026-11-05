@@ -1920,6 +1920,10 @@ panel = EffusionPlateElement(
 # Connection elements
 effective_area = EffectiveAreaConnectionElement("ea", "node3", "node4", diameter=0.015958)
 lossless = LosslessConnectionElement("lossless", "node4", "node5")
+# validate() refuses a closed loop of lossless connections only -- two in
+# parallel between the same nodes, or a ring (#988): Pt is equal all round
+# it, so its circulation is not determined. Any loss element in the loop
+# fixes it. In the GUI a plain (untyped) edge is a lossless connection.
 # A momentum chamber discharging into a PressureBoundary (#637): static
 # coupling (the chamber's static P is the boundary's, its head lost) and,
 # choked, under-expanded at the sonic static pressure of its flux. Inflow and

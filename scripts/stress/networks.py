@@ -202,6 +202,18 @@ class _Layered:
             )
         else:
             e = LosslessConnectionElement(eid, a, b)
+        if isinstance(e, LosslessConnectionElement) and _closes_a_lossless_loop(self.net, a, b):
+            # A loop of lossless joints leaves its circulation undetermined and
+            # the network refuses it (#988): a 1 % fraction loss instead, with
+            # no draw, so no seed changes (random 5, 14 and 47 of 0:200).
+            both_theta = getattr(na, "has_theta", False) and getattr(nb, "has_theta", False)
+            e = PressureLossElement(
+                eid,
+                a,
+                b,
+                correlation=ConstantFractionLoss(xi=0.01),
+                theta_source=a if both_theta else None,
+            )
         self.net.add_element(e)
 
     def build(self) -> FlowNetwork:
@@ -309,6 +321,25 @@ class _Layered:
             self.tags.append("thermal_wall")
         _lump_orifices_at_or_above_their_pipe(net)
         return net
+
+
+def _closes_a_lossless_loop(net: FlowNetwork, a: str, b: str) -> bool:
+    """Whether a and b are already joined by lossless joints alone (#988)."""
+    adj: dict[str, list[str]] = {}
+    for e in net.elements.values():
+        if isinstance(e, LosslessConnectionElement):
+            adj.setdefault(e.from_node, []).append(e.to_node)
+            adj.setdefault(e.to_node, []).append(e.from_node)
+    seen, stack = {a}, [a]
+    while stack:
+        n = stack.pop()
+        if n == b:
+            return True
+        for nb in adj.get(n, []):
+            if nb not in seen:
+                seen.add(nb)
+                stack.append(nb)
+    return False
 
 
 def _lump_orifices_at_or_above_their_pipe(net: FlowNetwork) -> None:
