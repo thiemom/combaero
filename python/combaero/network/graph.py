@@ -176,13 +176,13 @@ class FlowNetwork:
                         queue.append(nb)
         return visited
 
-    def _lossless_loop(self) -> list[str] | None:
-        """The element ids of one closed loop made only of lossless connections
-        (#988), or None. Union-find over the nodes: a lossless edge whose ends
-        are already joined by lossless edges closes a loop, and the tree path
-        between its ends completes it."""
-        from .components import LosslessConnectionElement
-
+    def _flow_independent_loop(self) -> list[str] | None:
+        """The element ids of one closed loop made only of elements whose
+        total-pressure relation does not depend on their own flow
+        (``_flow_independent_dpt``; #988 for lossless connections), or None.
+        Union-find over the nodes: such an edge whose ends are already joined
+        by such edges closes a loop, and the tree path between its ends
+        completes it."""
         parent: dict[str, str] = {}
 
         def root(n: str) -> str:
@@ -194,7 +194,7 @@ class FlowNetwork:
 
         tree: dict[str, list[tuple[str, str]]] = {}
         for eid, elem in self.elements.items():
-            if not isinstance(elem, LosslessConnectionElement):
+            if _flow_independent_dpt(elem) is None:
                 continue
             a, b = elem.from_node, elem.to_node
             ra, rb = root(a), root(b)
@@ -229,8 +229,10 @@ class FlowNetwork:
         - Must have at least one node and one element.
         - Must have at least one PressureBoundary.
         - Must contain at least one element with losses (to prevent infinite flow).
-        - No closed loop made only of lossless connections (#988): its
-          circulation is not determined.
+        - No closed loop made only of lossless connections (#988), or more
+          generally of elements whose Pt relation does not depend on their
+          own flow (``_flow_independent_dpt``): no solution, or an
+          undetermined split.
         - No isolated subgraphs (all nodes reachable from first node).
         - Every interior node must be connected to at least one element.
         """
@@ -262,18 +264,37 @@ class FlowNetwork:
         # holds Pt equal all round it, so any flow circulating around it meets
         # every row: the steady problem has a one-parameter family of roots
         # and the solver returns whichever its start lies nearest (#988).
-        loop = self._lossless_loop()
+        # The same holds for any loop of elements whose Pt relation does not
+        # depend on their own flow (a fraction loss without m_ref, a fixed
+        # pressure ratio): the product of their Pt ratios round the loop is
+        # fixed, so either it is not 1 and there is no root, or it is and the
+        # circulation is free. A fraction loss's only "root" at a mismatch is
+        # its zero-flow blend, where the forward and reverse forms cancel.
+        loop = self._flow_independent_loop()
         if loop is not None:
+            members = [self.elements[eid] for eid in loop]
+            if all(isinstance(e, LosslessConnectionElement) for e in members):
+                described = ", ".join(f"{e.id!r} ({e.from_node} -> {e.to_node})" for e in members)
+                raise ValueError(
+                    f"FlowNetwork validation failed: the lossless connections {described} "
+                    "form a closed loop. Total pressure is equal all around it, so the flow "
+                    "circulating around it is not determined: any value is a root, and the "
+                    "solve would return an arbitrary one. Remove one of the connections, or "
+                    "give one path a loss element (a real duct has one)."
+                )
             described = ", ".join(
-                f"{eid!r} ({self.elements[eid].from_node} -> {self.elements[eid].to_node})"
-                for eid in loop
+                f"{e.id!r} ({e.from_node} -> {e.to_node}, {_flow_independent_dpt(e)})"
+                for e in members
             )
             raise ValueError(
-                f"FlowNetwork validation failed: the lossless connections {described} form a "
-                "closed loop. Total pressure is equal all around it, so the flow circulating "
-                "around it is not determined: any value is a root, and the solve would return "
-                "an arbitrary one. Remove one of the connections, or give one path a loss "
-                "element (a real duct has one)."
+                f"FlowNetwork validation failed: the elements {described} form a closed loop "
+                "in which every total-pressure relation is fixed independently of the flow. "
+                "Around such a loop the pressure ratios either fail to close (no solution: "
+                "the solve can only sit where a fraction loss blends to zero flow, or fail) "
+                "or close exactly (the split between the paths is not determined). Put a "
+                "flow-dependent loss (an orifice, a channel, a head loss) on one path, or "
+                "give each fraction loss on the loop an m_ref (set it wherever the flow may "
+                "run low or reverse), or remove one of the elements."
             )
 
         # Per-element specific validation
@@ -471,3 +492,59 @@ class FlowNetwork:
             network.add_wall(WallClass(**w_data["kwargs"]))
 
         return network
+
+
+def _flow_independent_dpt(element: NetworkElement) -> str | None:
+    """Why this element's total-pressure relation does not depend on its own
+    flow, or None if it does (or cannot be told).
+
+    These are the edges of ``FlowNetwork._flow_independent_loop``: a closed
+    loop made only of them has no solution or an undetermined split.
+
+    - ``LosslessConnectionElement``, ``VortexElement`` (a free vortex
+      conserves Pt, #661) and a flow splitter's reference outlet (its valve
+      open): Pt_out = Pt_in.
+    - ``CompressorElement`` / ``TurbineElement``: Pt_out = PR^(+-1) Pt_in at a
+      fixed pressure ratio (#893).
+    - A ``PressureLossElement`` with ``ConstantFractionLoss`` or
+      ``LinearThetaFractionLoss`` and ``m_ref`` None: Pt_out = (1 - xi) Pt_in
+      at every flow in either direction (``k theta + xi0`` for the linear
+      form: theta is a temperature ratio at its source node, not this
+      element's flow). With m_ref set the loss fades to zero at zero flow, so
+      it is flow-dependent, unless its xi is zero at every flow.
+
+    Not included: head losses (they scale with the flow's dynamic head), user
+    callables (their dependence is not known before a solve), metered
+    splitter outlets (their row fixes the flow and leaves Pt free) and every
+    other element, whose drop depends on its flow.
+    """
+    from .components import (
+        LosslessConnectionElement,
+        PressureLossElement,
+        SplitterOutletElement,
+        TurbomachineElement,
+        VortexElement,
+    )
+    from .pressure_loss import ConstantFractionLoss, LinearThetaFractionLoss
+
+    if isinstance(element, LosslessConnectionElement):
+        return "lossless"
+    if isinstance(element, VortexElement):
+        return "free vortex, Pt conserved"
+    if isinstance(element, SplitterOutletElement) and element.reference:
+        return "splitter reference outlet, Pt conserved"
+    if isinstance(element, TurbomachineElement):
+        return f"{type(element).__name__} at fixed pressure ratio {element.pressure_ratio:g}"
+    if isinstance(element, PressureLossElement):
+        c = element.correlation
+        if isinstance(c, ConstantFractionLoss):
+            zero = c.xi == 0.0
+        elif isinstance(c, LinearThetaFractionLoss):
+            zero = c.k == 0.0 and c.xi0 == 0.0
+        else:
+            return None
+        if zero:
+            return f"{type(c).__name__} with zero loss"
+        if c.m_ref is None:
+            return f"{type(c).__name__} without m_ref"
+    return None
