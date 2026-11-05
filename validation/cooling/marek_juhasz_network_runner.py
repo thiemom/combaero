@@ -21,9 +21,9 @@ there is no passage network, and each wall's side B is adiabatic
 (``ThermalWall(element_b=None, side_b="adiabatic")``, #970), so the wall
 sits at the film's adiabatic wall temperature. The predicted wall
 temperature is each wall's hot-face temperature, where the thermocouples
-sit. Every solve starts from the outlet-referenced warm start: the default
-cold start fails on these networks and then retries the same way, at
-about four times the cost.
+sit. Every solve starts from the outlet-referenced warm start. The default
+cold start now converges on all 62 runs without the warm-start retry
+(#987, #990), to the same wall temperatures within 1e-7 K.
 
 The slot discharges into g0, at the head of the walled duct, as a user would
 build it. Segments 2-10 therefore read gas that already holds the film's
