@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Highlights
 
-The 0.9 release (63 commits since 0.8.0), the first from the `thirox-lab`
+The 0.9 release (66 commits since 0.8.0), the first from the `thirox-lab`
 organisation; the sections below are the record. What changes numbers or code
 on upgrade:
 
@@ -31,7 +31,8 @@ on upgrade:
 New: compressor and turbine elements, a fuel controller, a flow splitter,
 liner radiation, ThermalWall per-side areas and a side with no stream
 (adiabatic or heat loss), `ss304`/`ss310` materials, the NASA TN D-7156 and
-C3X vane cases, and GUI nodes for the new elements.
+C3X vane cases, GUI nodes for the new elements, and cold starts that converge
+without the retry on channel chains (#971).
 
 ### Added
 
@@ -208,6 +209,10 @@ C3X vane cases, and GUI nodes for the new elements.
 
 ### Fixed
 
+- **Cold start of channel chains and compressible elements (#971).** The resistance-network seed now matches what each element's residual does.
+  - **Before:** every `ChannelElement` was charged one exit head, which its residual loses only into a static-coupled pressure boundary (#360). The D-7156 film rig's ten 1.22 cm segments started 14 kPa high against a 13 Pa root. All 62 runs stalled cold, at |F| ~ 9, and needed the warm-start retry (10-27 s).
+  - **Now:** a channel's seed charges the head only where its residual does. A `CrossflowSegmentElement` always charges it. A compressible channel or orifice whose seed flux reaches 0.3 of the sonic flux has its seed resistance re-fitted to the flow its own C++ kernel (Fanno, or the orifice's compressible model) passes at the seed's pressures. 61 of the 62 D-7156 runs converge cold, in a median 3.6 s. Run 19 (coolant passage at Mach 0.7) still retries.
+- **A `FuelBoundary` on an equilibrium combustor starts on the equilibrium curve (#991).** Its start burned the guessed oxidizer by complete combustion whatever the combustor's `method`; rich of stoichiometric that runs hundreds of kelvin hotter (2020 K against 1500 K at phi 2.2), so a rich target started near twice its fuel flow and reached the rich root only through the LM fallback, or landed lean. The start now uses `combustion_equilibrium` for `method="equilibrium"` and lands on the root; complete-combustion combustors are unchanged.
 - **Orifice Jacobian: composition columns and the Reynolds-dependent Cd (#964).** Only the Jacobian changes; residuals and solved values are unchanged.
   - **Reynolds-dependent Cd and composition.** Re ~ |m| / mu, and mu depends on the composition. The derivative carried mu's temperature column but not its composition column. This affects Reader-Harris/Gallagher, Stolz, the Idelchik holes, McGreehan-Schotsch and Lichtarowicz. With an RHG orifice downstream of a combustor, the orifice row's fuel-flow column was 7e-4 off past the approach pipe's sonic limit. The Rogers-Hersh crossflow Cd on `ImpingementPlateElement` had the same gap in its density.
   - **Kernel composition (Y) columns.** These were forward differences, up to 3e-3 of the row off a central difference. They are now analytic in all orifice kernels and in `approach_static_pressure`:
