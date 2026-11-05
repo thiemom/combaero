@@ -3132,6 +3132,19 @@ class NetworkElement(ABC):
         element keeps the propagated start."""
         return None
 
+    def _seed_flow_applies(self) -> bool:
+        """START GUESS ONLY: whether ``_seed_flow`` re-fits this element's
+        seed resistance to its own compressible kernel (#971)."""
+        return False
+
+    def _seed_flow(
+        self, Pt_up: float, Pt_dn: float, Tt: float, X: list[float], Y: list[float]
+    ) -> float | None:
+        """START GUESS ONLY: |m_dot| [kg/s] the element passes from Pt_up to
+        Pt_dn at Tt (mole fractions X, mass fractions Y); None for no
+        estimate."""
+        return None
+
     def validate(self) -> None:
         """Perform element-specific validation checks.
         Should raise ValueError with a clear message if validation fails.
@@ -4789,6 +4802,45 @@ class OrificeElement(NetworkElement):
         if not self.area:
             return None
         return 1.0 / (2.0 * rho * (self._seed_Cd * self.area) ** 2)
+
+    def _seed_flow_applies(self) -> bool:
+        """A compressible orifice (#971): its kernel chokes, which the
+        incompressible K does not."""
+        return self.regime == "compressible" and not self._pass_through and bool(self.area)
+
+    def _seed_flow(
+        self, Pt_up: float, Pt_dn: float, Tt: float, X: list[float], Y: list[float]
+    ) -> float | None:
+        """The flow the residual's own compressible kernel (``_kernel_from``)
+        passes plenum to plenum at the seed's Cd: no approach velocity, no
+        recovering pipe."""
+        model = getattr(self, "compressible_model", "nozzle")
+        cd = self._seed_Cd
+        try:
+            if model == "jobson1955":
+                r = _solver_tools.orifice_jobson_residuals_and_jacobian(
+                    0.0,
+                    Pt_up,
+                    Pt_up,
+                    Tt,
+                    Y,
+                    Pt_dn,
+                    max(cd, _JOBSON_CD_MIN),
+                    self.area,
+                    0.0,
+                    self.Cv,
+                )
+            elif model == "iso5167":
+                r = _solver_tools.orifice_iso5167_residuals_and_jacobian(
+                    0.0, Pt_up, Pt_up, Tt, Y, Pt_dn, cd, self.area, 0.0
+                )
+            else:
+                r = _solver_tools.orifice_compressible_residuals_and_jacobian(
+                    0.0, Pt_up, Pt_up, Tt, Y, Pt_dn, cd, self.area, 0.0
+                )
+        except (ValueError, RuntimeError):
+            return None
+        return abs(float(r.m_dot_calc))
 
     @property
     def residual_scale_kind(self) -> str:
@@ -10448,12 +10500,59 @@ class ChannelElement(NetworkElement):
         )
 
     def _seed_resistance(self, rho: float, P_ref: float, m_ref: float) -> float | None:
-        """Start guess: a turbulent friction factor and one exit head."""
+        """Start guess: a turbulent friction factor, plus the exit head where
+        the residual loses it -- the declared exit a static-coupled pressure
+        boundary (``_exit_head_lost``, #360). Charged on every segment, a
+        chain of N short ducts between plenums started N heads high: the
+        D-7156 film rig's ten 1.22 cm segments 14 kPa against a 13 Pa root,
+        and its cold solve stalled (#971)."""
         dh = self.Dh or self.diameter
         if not dh or not self.area or not self.length:
             return None
         f = SEED_FRICTION_FACTOR * getattr(self.surface, "f_multiplier", 1.0)
-        return (f * self.length / dh + 1.0) / (2.0 * rho * self.area**2)
+        head = 1.0 if self._seed_exit_head() else 0.0
+        return (f * self.length / dh + head) / (2.0 * rho * self.area**2)
+
+    def _seed_exit_head(self) -> bool:
+        """Whether the start guess charges one exit head: where the residual
+        loses it at the declared exit. Before topology is resolved the exit
+        is unknown, and the head is charged, as it always was: an estimate
+        made while a network is built (the stress splitter sizes its supply
+        from it) keeps its value."""
+        if not hasattr(self, "_downstream_node"):
+            return True
+        return self._exit_head_lost(1.0)
+
+    def _seed_flow_applies(self) -> bool:
+        """The compressible mass-flow form (#481): its Fanno kernel saturates
+        at the choked flux, which the incompressible K does not."""
+        return self.residual_scale_kind == "mdot"
+
+    def _seed_flow(
+        self, Pt_up: float, Pt_dn: float, Tt: float, X: list[float], Y: list[float]
+    ) -> float | None:
+        """The flow the residual's own adiabatic Fanno kernel passes in the
+        declared direction (``_compressible_flow``), no derivatives (#971)."""
+        f_mult = self.surface.f_multiplier if self.surface else 1.0
+        try:
+            flow = cb.fanno_channel_flow(
+                Pt_up,
+                Tt,
+                X,
+                Pt_dn,
+                not self._exit_head_lost(1.0),
+                self.length,
+                self.diameter,
+                self.roughness,
+                self.friction_model,
+                f_mult,
+                -1.0,
+                [],
+                False,
+            )
+        except (ValueError, RuntimeError):
+            return None
+        return self.area * float(flow.G)
 
     def n_equations(self) -> int:
         return 1
@@ -10857,6 +10956,16 @@ class CrossflowSegmentElement(ChannelElement):
         is lost by construction. ChannelElement's exit head at a pressure
         boundary would charge it a second time (#588).
         """
+        return False
+
+    def _seed_exit_head(self) -> bool:
+        """Always: static continuity at the stations loses the head by
+        construction (``_exit_head_lost``), so the start guess charges it."""
+        return True
+
+    def _seed_flow_applies(self) -> bool:
+        """No: the stations hold static pressures, not the Pt the plain
+        channel's kernel reads."""
         return False
 
     def _momentum_drop_value(self, state_in, state_out, flows) -> float:

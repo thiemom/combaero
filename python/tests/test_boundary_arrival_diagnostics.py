@@ -43,8 +43,11 @@ def _chamber_to_outlet(T_outlet: float, regime: str) -> dict:
 def test_exit_diagnostics_do_not_follow_the_outlet_setting(regime: str) -> None:
     cold = _chamber_to_outlet(300.0, regime)
     hot = _chamber_to_outlet(900.0, regime)
-    # The solve itself never depended on the outlet's Tt.
-    assert cold["ch.P"] == pytest.approx(hot["ch.P"], rel=1e-12)
+    # The solve itself never depended on the outlet's Tt: the same root. The
+    # cold START does (its reference T averages the boundaries'), so the two
+    # solves stop at different iterates of that root: equal to hybr's own
+    # step tolerance (xtol 1.49e-8, relative), not to the last digit.
+    assert cold["ch.P"] == pytest.approx(hot["ch.P"], rel=1.5e-8)
     for sol in (cold, hot):
         assert sol["c2.Tt_out"] == pytest.approx(600.0, rel=1e-9)
         assert sol["c2.T_out"] == pytest.approx(600.0, rel=1e-9)
