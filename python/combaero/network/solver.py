@@ -6932,6 +6932,8 @@ class NetworkSolver:
                 sol_dict[f"{nid}.Q_fraction"] = (
                     frac * m_in * (h_out - h_ref - q_given * phi) / (1.0 + frac)
                 )
+            # No fraction, or no flow for it to be a fraction of: none applied.
+            sol_dict.setdefault(f"{nid}.Q_fraction", 0.0)
             # The heat each user boundary applied, in every mode (#792): the
             # declared Q, a Tt_target's SOLVED Q (its unknown at final_x, NaN
             # when no through-flow determines it), plus its share of the
