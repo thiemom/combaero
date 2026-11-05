@@ -7151,6 +7151,45 @@ class NetworkSolver:
                             f"this fuel burns in this oxidizer (complete combustion){where}."
                         )
 
+        # An effusion plate with no cooling path (#998): no coolant through its
+        # holes and no gas flow on its other side, so nothing takes heat from
+        # it and its wall temperature is undetermined (NaN in its keys). The
+        # flow root is fine; the plate's answer is not one. Refused like a
+        # Tt_target with no through-flow (#792): a converged solve is demoted,
+        # a failed one says why. What would model it: the comment at
+        # EffusionPlateElement.wall_heat_transfer.
+        _wall_undetermined = sorted(
+            eid
+            for eid, diag in (sol_dict.get("__element_diag__") or {}).items()
+            if float(diag.get("no_cooling_path", 0.0)) == 1.0
+        )
+        if _wall_undetermined:
+            note = (
+                "EffusionPlateElement "
+                + ", ".join(f"'{eid}'" for eid in _wall_undetermined)
+                + ": no cooling path: wall T undetermined (heats until failure). No "
+                "coolant flows through its holes and its gas side has no flow (a "
+                "plenum, or a chamber with none), so nothing takes heat from the "
+                "plate; radiation, backside convection and conduction to its mounts "
+                "are not modelled. Drive coolant through it, or discharge it into a "
+                "flowing chamber."
+            )
+            if success:
+                success = False
+                consistent = False
+                outcome = SolveOutcome.INCONSISTENT
+                message = f"Converged, but {note}"
+                warnings.warn(f"NetworkSolver: {message}", stacklevel=2)
+            else:
+                message = f"{message} {note}"
+        # Reported only (#998): plates with a face above their material's
+        # limit -- in hot gas with no coolant, the adiabatic T_aw.
+        _wall_above_limit = sorted(
+            eid
+            for eid, diag in (sol_dict.get("__element_diag__") or {}).items()
+            if float(diag.get("wall_above_limit", 0.0)) == 1.0
+        )
+
         # Incompressible validity (#588): each element on an incompressible
         # closure against one Mach limit. REPORTED only.
         validity: dict[str, dict[str, Any]] = {}
@@ -7182,6 +7221,8 @@ class NetworkSolver:
         sol_dict["__T_clamped__"] = list(_T_clamped)
         sol_dict["__heat_faded__"] = list(_heat_faded)
         sol_dict["__heat_undetermined__"] = list(_target_stagnant)
+        sol_dict["__wall_undetermined__"] = _wall_undetermined
+        sol_dict["__wall_above_limit__"] = _wall_above_limit
         sol_dict["__supersonic_chambers__"] = list(_supersonic)
         sol_dict["__choked_bounded_junctions__"] = list(_choked_bounded)
         sol_dict["__outcome__"] = outcome

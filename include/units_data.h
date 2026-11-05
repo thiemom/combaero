@@ -126,6 +126,7 @@ inline constexpr Entry function_units[] = {
     {"get_material_info", "name: str",
      "dict: T_min, T_max, T_solidus, T_envelope_min, T_envelope_max [K]; source, notes, solidus_source"},
     {"material_in_range", "name: str, T: K", "bool"},
+    {"GENERIC_METAL_SOLIDUS", "-", "K"},
 
     // -------------------------------------------------------------------------
     // cooling_correlations.h - Advanced Cooling Correlations

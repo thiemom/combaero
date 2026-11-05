@@ -84,7 +84,7 @@ class EffusionLiner:
     entry_K : float
         Loss on entering the duct from ``coolant_in`` (0.5 sharp).
     wall_conductivity, gas_film, gas_augmentation, turbulence_intensity,
-    gas_heat_flux, internal_Nu_multiplier, edge_radius :
+    gas_heat_flux, internal_Nu_multiplier, edge_radius, material :
         As ``EffusionPlateElement``.
     film_direction : {"with_coolant", "against_coolant"}
         Which way the hot gas runs past the panels, for the film the liner
@@ -112,6 +112,7 @@ class EffusionLiner:
     gas_heat_flux: float = 0.0
     internal_Nu_multiplier: float = 1.0
     film_direction: Literal["with_coolant", "against_coolant"] = "with_coolant"
+    material: str | None = None
 
     def __post_init__(self) -> None:
         if int(self.n_segments) != self.n_segments or self.n_segments < 1:
@@ -211,6 +212,7 @@ class EffusionLiner:
                     gas_heat_flux=self.gas_heat_flux,
                     crossflow_segments=(self.segment_id(i - 1), self.segment_id(i)),
                     crossflow_area=A,
+                    material=self.material,
                 )
             )
         panels = [net.elements[self.panel_id(i)] for i in range(1, n + 1)]
@@ -244,7 +246,19 @@ class EffusionLiner:
             "station_psi_beyond_bassett": float(min(psi) > BASSETT_PSI_MEASURED_MAX),
             "coolant_ht_plenum_assumed": 1.0,
             "is_ingesting": float(any(p.get("is_ingesting", 0.0) for p in panels)),
+            # #998: any panel with no cooling path (the solver refuses such a
+            # root), and any panel face above the material's limit (NaN when
+            # a panel's wall temperature is undefined).
+            "no_cooling_path": float(any(p.get("no_cooling_path", 0.0) for p in panels)),
         }
+        if all("wall_above_limit" in p for p in panels):
+            above = [float(p["wall_above_limit"]) for p in panels]
+            out["T_wall_limit"] = float(panels[0]["T_wall_limit"])
+            out["wall_above_limit"] = (
+                1.0
+                if any(a == 1.0 for a in above)
+                else (0.0 if all(math.isfinite(a) for a in above) else math.nan)
+            )
         if all("T_wall_hot" in p for p in panels):
             out["T_wall_hot_max"] = float(max(p["T_wall_hot"] for p in panels))
             out["rows_T_wall_hot"] = [float(p["T_wall_hot"]) for p in panels]

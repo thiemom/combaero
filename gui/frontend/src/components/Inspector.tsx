@@ -49,6 +49,7 @@ import CompositionEditor from "./CompositionEditor";
 import GeometryFields from "./GeometryFields";
 import LengthInput from "./LengthInput";
 import NumericInput from "./NumericInput";
+import PlateMaterialSelect from "./PlateMaterialSelect";
 import SurfaceEnhancementInspector from "./SurfaceEnhancementInspector";
 import UnitInput from "./UnitInput";
 import WallLayersEditor from "./WallLayersEditor";
@@ -1810,6 +1811,10 @@ const Inspector = () => {
 								{num("angle_deg", "Hole Angle to Wall [deg]", 90)}
 								{num("entry_K", "Duct Entry Loss K", 0.5)}
 								{num("wall_conductivity", "Wall Conductivity [W/m/K]", 20)}
+								<PlateMaterialSelect
+									value={d.material}
+									onChange={(material) => set({ material })}
+								/>
 								<div className="text-[10px] font-bold text-gray-500 uppercase mt-2">
 									Gas Side
 								</div>
@@ -1917,6 +1922,12 @@ const Inspector = () => {
 												At least one station ingests hot gas.
 											</div>
 										)}
+										{r.wall_above_limit === 1 && (
+											<div className="text-[10px] text-red-600">
+												A panel's wall is above its material's limit (
+												{Number(r.T_wall_limit).toFixed(0)} K): it fails.
+											</div>
+										)}
 									</div>
 								)}
 							</>
@@ -1993,6 +2004,10 @@ const Inspector = () => {
 								</div>
 								{d.correlation === "fixed" && num("Cd", "Fixed Cd Value", 0.6)}
 								{num("wall_conductivity", "Wall Conductivity [W/m/K]", 20)}
+								<PlateMaterialSelect
+									value={d.material}
+									onChange={(material) => set({ material })}
+								/>
 								<div className="text-[10px] font-bold text-gray-500 uppercase mt-2">
 									Gas Side
 								</div>
@@ -2058,6 +2073,19 @@ const Inspector = () => {
 												Supply has crossflow: not modelled (plenum-fed plate)
 											</span>
 										)}
+										{r.wall_above_limit === 1 && (
+											<span className="text-red-600">
+												Wall above its material's limit (
+												{Number(r.T_wall_limit).toFixed(0)} K): it fails
+												{r.Re_hole === 0 ? " (no coolant: adiabatic)" : ""}.
+											</span>
+										)}
+									</div>
+								)}
+								{r && r.no_cooling_path === 1 && (
+									<div className="text-[10px] text-red-600 mt-2">
+										No cooling path: wall T undetermined (heats until failure).
+										No coolant flows and the gas side has no flow.
 									</div>
 								)}
 							</>

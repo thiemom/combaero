@@ -6078,6 +6078,11 @@ def _chamber_gas_side(node: Any, state: "NetworkMixtureState") -> dict[str, Any]
     """
     if not isinstance(node, MomentumChamberNode) or node.area <= 0.0:
         return None
+    # No gas flow below the network's no-through-flow floor (#792, #998): a
+    # zero-flow root leaves ~1e-13 kg/s in the chamber, whose coefficient
+    # would make a stagnant chamber an adiabatic gas side.
+    if not abs(float(getattr(node, "_total_m_dot", 0.0))) >= cb.MIXER_HEAT_MDOT_FLOOR:
+        return None
     gas = node.htc_and_T(state)
     if gas is None:
         return None
@@ -6192,6 +6197,18 @@ class EffusionPlateElement(OrificeElement):
     PLENUM-FED. This 2-port plate leaves McGreehan-Schotsch's U1/Vi at 0 and
     uses Andrews' still-plenum coolant side; `coolant_crossflow_ignored`
     flags a supply node a channel runs through.
+
+    WALL TEMPERATURE LIMIT (#998). `material` names the plate's alloy from
+    the database (`cb.list_materials()`) for ONE purpose: its #882 envelope's
+    hot end (the solidus) is `T_wall_limit`, and `wall_above_limit` flags a
+    face hotter than that. Without a material the limit is
+    `cb.GENERIC_METAL_SOLIDUS`, the hot end #882 gives a metal with no printed
+    solidus. The conduction stays `wall_conductivity`, a constant k.
+
+    NO COOLING PATH (#998). With no coolant flow and no gas-side flow (a
+    plenum, or a chamber with none) nothing takes heat from the plate, so its
+    temperature is undetermined: `no_cooling_path` is 1 and the solver
+    refuses the root, naming the plate.
     """
 
     _selects_compressible_model = False  # keeps the nozzle (#861)
@@ -6221,9 +6238,23 @@ class EffusionPlateElement(OrificeElement):
         gas_heat_flux: float = 0.0,
         crossflow_segments: tuple[str | None, str | None] | None = None,
         crossflow_area: float | None = None,
+        material: str | None = None,
     ) -> None:
         if hole_diameter <= 0.0:
             raise ValueError("EffusionPlateElement: hole_diameter must be positive")
+        # The plate's alloy, for its temperature limit only (#998): the hot
+        # end of its #882 envelope, or the generic metal cap without one.
+        if material is not None and material not in cb.list_materials():
+            raise ValueError(
+                f"EffusionPlateElement: unknown material {material!r}; expected one "
+                f"of {cb.list_materials()}, or None for the generic metal cap."
+            )
+        self.material = material
+        self.T_wall_limit = (
+            float(cb.get_material_info(material)["T_envelope_max"])
+            if material is not None
+            else float(cb.GENERIC_METAL_SOLIDUS)
+        )
         if crossflow_segments is not None and not (crossflow_area and crossflow_area > 0.0):
             raise ValueError(
                 "EffusionPlateElement: a crossflow-fed panel needs the backside "
@@ -6475,9 +6506,12 @@ class EffusionPlateElement(OrificeElement):
         k = ts.k
         pr = ts.Pr
 
-        m_hole = abs(state_in.m_dot) / self.n_holes
-        if m_hole <= 0.0:
+        # No coolant flow below the network's no-through-flow floor (#792,
+        # #998): a zero-flow root ends with |m_dot| ~ 1e-31, not 0, and the
+        # coefficient there (Re ~ 1e-25) put the cold face at 5.7e11 K.
+        if not abs(state_in.m_dot) >= cb.MIXER_HEAT_MDOT_FLOOR:
             return {}
+        m_hole = abs(state_in.m_dot) / self.n_holes
         Re = 4.0 * m_hole / (math.pi * self.hole_diameter * mu)
 
         X = self.pitch_actual
@@ -6700,8 +6734,14 @@ class EffusionPlateElement(OrificeElement):
 
         WITHOUT COOLANT FLOW the keys stay. On a gas-side chamber the plate is
         then adiabatic (no coolant takes heat): q = 0, both faces at the gas
-        side's adiabatic wall temperature, no film. On a plenum the wall
-        temperatures are undefined (NaN): nothing sets them.
+        side's adiabatic wall temperature, no film. On a plenum, or a chamber
+        with no gas flow, the wall temperatures are undefined (NaN): nothing
+        sets them, and `no_cooling_path` is 1 (the solver refuses the root).
+
+        LIMIT (#998): `T_wall_limit` is the plate material's envelope hot end
+        (`cb.GENERIC_METAL_SOLIDUS` without a material); `wall_above_limit`
+        is 1 when the hotter face is above it, 0 when not, NaN when the wall
+        temperature is undefined.
         """
         internal = self.internal_heat_transfer(state_in)
         no_coolant = not internal
@@ -6720,6 +6760,26 @@ class EffusionPlateElement(OrificeElement):
         }
         node = getattr(self, "_discharge_node", None)
         gas = _chamber_gas_side(node, state_out)
+        # NO COOLING PATH (#998): no coolant through the holes and no gas
+        # flow on the other side. Nothing takes heat from the plate, so its
+        # temperature is undetermined: an imposed flux q != 0 has no steady
+        # state, and q = 0 sets no T. A real plate here heats until it fails,
+        # and the solver refuses the root, naming the plate. Not modelled,
+        # deliberately (no use case: an uncooled plate in a combustor does not
+        # survive). Where to start if one comes:
+        # * RADIATION: an emissivity and a surroundings T on each face. The
+        #   smallest term that always gives a steady T, since it grows as
+        #   T^4 (a ThermalWall face already carries GasRadiation, #793).
+        # * BACKSIDE CONVECTION on the coolant face without hole through-flow:
+        #   a user h, or a sourced plenum-circulation or natural-convection
+        #   correlation (register first: scripts/sources.py find).
+        # * CONDUCTION to the mounts, or laterally within the plate. A plate
+        #   starved over part of its area, or parallel patches of one plate
+        #   with some near zero flow, need the lateral path to the cooled
+        #   region: that is #898's wall-to-wall conduction (coarse 2-D walls
+        #   from 1-D ThermalWalls), applied to effusion plates, rather than a
+        #   plate-specific no-flow model.
+        out["no_cooling_path"] = float(no_coolant and gas is None)
         if gas is None and isinstance(node, MomentumChamberNode) and node.area > 0.0:
             # A gas-side chamber with no gas flow: no coefficient, so nothing
             # on the gas side is defined. Its keys stay (the topology, not the
@@ -6727,7 +6787,7 @@ class EffusionPlateElement(OrificeElement):
             out["gas_side_chamber"] = 1.0
             for key in _EFFUSION_CHAMBER_SIDE_KEYS:
                 out[key] = math.nan
-            return out
+            return self._with_wall_limit(out)
         if gas is None:
             q = self.gas_heat_flux
             t_cold = math.nan if no_coolant else T_c + q / h_i
@@ -6741,7 +6801,7 @@ class EffusionPlateElement(OrificeElement):
                     "T_wall_hot": float(t_cold + q * t_over_k),
                 }
             )
-            return out
+            return self._with_wall_limit(out)
 
         rho_c, _ = _safe_rho(cb.density(T_c, state_out.P, state_in.X))
         U_g, rho_g, T_g = gas["U_gas"], gas["rho_gas"], gas["T_gas"]
@@ -6763,6 +6823,12 @@ class EffusionPlateElement(OrificeElement):
         T_aw_g = T_g - eta_film * (T_g - T_c)
         h_g = gas["h_unblown"] * self.gas_augmentation
         if no_coolant:
+            # HOT GAS, NO COOLANT (#998): the adiabatic limit is the honest
+            # answer -- nothing takes the heat, so both faces sit at the gas
+            # side's T_aw. In a combustor that is above any alloy's solidus:
+            # wall_above_limit flags it (_with_wall_limit). The same three
+            # terms as above (radiation, backside convection, conduction)
+            # would pull it below T_aw; none is modelled.
             t_hot, t_cold, q = T_aw_g, T_aw_g, 0.0  # adiabatic: nothing takes the heat
         else:
             t_hot, t_cold, q = _effusion_wall(h_i, T_c, h_g, T_aw_g, t_over_k)
@@ -6791,6 +6857,20 @@ class EffusionPlateElement(OrificeElement):
                 "density_ratio": float(rho_c / rho_g),
                 "velocity_ratio": float(G_jet / rho_c / U_g) if U_g > 0.0 else math.inf,
             }
+        )
+        return self._with_wall_limit(out)
+
+    def _with_wall_limit(self, out: dict[str, float]) -> dict[str, float]:
+        """The wall solution plus its temperature limit (#998): the plate
+        material's envelope hot end, and whether the hotter face is above it
+        (NaN when the wall temperature is undefined). Always present."""
+        faces = (float(out["T_wall_hot"]), float(out["T_wall_cold"]))
+        out["T_wall_limit"] = self.T_wall_limit
+        # Not max(): it drops a NaN in its second argument.
+        out["wall_above_limit"] = (
+            float(any(t > self.T_wall_limit for t in faces))
+            if all(math.isfinite(t) for t in faces)
+            else math.nan
         )
         return out
 

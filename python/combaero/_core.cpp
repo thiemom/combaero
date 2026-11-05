@@ -7028,6 +7028,11 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "printed point), the #882 envelope's fade, 0 where it holds or the\n"
       "1e-3 floor acts, the end slope with extrapolate=True.");
 
+  // The hot end #882 gives a metal whose source prints no solidus: the lowest
+  // sourced solidus in the database. An effusion plate with no material
+  // named is judged against it (#998).
+  m.attr("GENERIC_METAL_SOLIDUS") = combaero::materials::GENERIC_METAL_SOLIDUS;
+
   m.def("material_in_range", &combaero::materials::material_in_range, py::arg("name"),
         py::arg("T"),
         "Whether T [K] lies in the material's sourced conductivity range\n"
