@@ -79,8 +79,14 @@ Flux<N> flux(const DualN<N>& p0, const DualN<N>& rho0, const DualN<N>& p1, const
   out.choked = r.v < rc.v;
   const DualN<N> re = out.choked ? rc : r;
   // Jet velocity and density on the isentrope from the TOTAL state to re.
+  // 1 - re^((n-1)/n) as -expm1(((n-1)/n) log1p(re - 1)), re - 1 from the
+  // pressure difference itself (exact near p0): written 1 - pow(re, ...) it
+  // rounded to 0 a few ulp below p0, u = B = 0 against a drive p1 - p > 0,
+  // and g = 2 c / (B + root) was inf at zero flow (#997). Near p0 the
+  // closure then reads its small-drive limit, u^2 -> 2 (p0 - p) / rho0.
+  const DualN<N> ln_re = out.choked ? solver::dlog(rc) : solver::dlog1p((p - p0) / p0);
   const DualN<N> u =
-      solver::dsqrt(2.0 * n / (n - 1.0) * (p0 / rho0) * (1.0 - pow_dd(re, (n - 1.0) / n)));
+      solver::dsqrt(2.0 * n / (n - 1.0) * (p0 / rho0) * (-solver::dexpm1((n - 1.0) / n * ln_re)));
   out.G = rho0 * pow_dd(re, 1.0 / n) * u;
   const DualN<N> B = out.choked ? u + (re * p0 - p) / out.G : u;
   const DualN<N> c = p1 - p;
