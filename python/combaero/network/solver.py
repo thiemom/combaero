@@ -849,6 +849,9 @@ class NetworkSolver:
 
         ref_P = float(min(pressures)) if pressures else 101325.0
         ref_T = float(np.mean(temperatures)) if temperatures else 300.0
+        # The component's own boundary mean, before the thermal-group
+        # override below: the resistance-network seed runs at it (#990).
+        own_T = ref_T
         # Per thermal group in a network of several flow components (#899).
         if getattr(self, "_ref_T_override", None) is not None:
             ref_T = float(self._ref_T_override)
@@ -863,7 +866,7 @@ class NetworkSolver:
         else:
             ref_mdot = self._bernoulli_reference_mdot(pressures, ref_P, ref_T, ref_Y)
 
-        return {"P": ref_P, "T": ref_T, "Y": ref_Y, "m_dot": ref_mdot}
+        return {"P": ref_P, "T": ref_T, "T_own": own_T, "Y": ref_Y, "m_dot": ref_mdot}
 
     def _bernoulli_reference_mdot(
         self,
@@ -1370,7 +1373,16 @@ class NetworkSolver:
             return None
         P_ref = float(np.mean(list(fixed.values())))
         X_ref = list(cb.mass_to_mole(ref["Y"]))
-        rho = float(cb.density(ref["T"], P_ref, X_ref))
+        # The seed runs at the flow component's own boundary Tt ("T_own"), not
+        # its thermal group's mean (#990): the resistances (density) and the
+        # compressible kernels below. D-7156 run 19's Mach 0.7 coolant passage
+        # (297 K) seeded at the group's 446 K started its pressures 19% high
+        # (172.8 against a 145.2 kPa root) and its hot path 24% low on drop,
+        # and the cold solve took the warm-start retry; at its own Tt they
+        # start 0.6% and 1.3% off. Every other start estimate (node Tt, the
+        # reference m_dot, the propagated start) keeps the group's mean (#899).
+        T_seed = float(ref.get("T_own", ref["T"]))
+        rho = float(cb.density(T_seed, P_ref, X_ref))
         m_ref = max(float(ref["m_dot"]), SEED_MDOT_FLOOR)
         K_list = []
         for e in els:
@@ -1462,7 +1474,6 @@ class NetworkSolver:
         # pressures (``_seed_flow``), then re-solves. Below the gate the
         # incompressible K stands, so a low-Mach network keeps its start.
         kernels = [k for k, e in enumerate(els) if e._seed_flow_applies()]
-        T_seed = float(ref["T"])
         Y_ref = [float(v) for v in ref["Y"]]
         active: set[int] = set()
         for _ in range(SEED_COMPRESSIBLE_PASSES if kernels else 0):
@@ -1898,8 +1909,10 @@ class NetworkSolver:
         # through a wall ends between its own and its partner's boundary
         # temperatures. Its own alone made the cold stream of a hot/cold pair
         # too dense, its Bernoulli start 60% high, and its solve 4-7x slower
-        # (stress hotcold seeds 10, 18, 26). A network of one component takes
-        # the global path unchanged.
+        # (stress hotcold seeds 10, 18, 26). The resistance-network seed is the
+        # exception: it runs at the component's own Tt (#990, see
+        # _resistance_network_guess). A network of one component takes the
+        # global path unchanged.
         comps = self._flow_components()
         ref_of: dict[str, dict[str, Any]] = {}
         if len(comps) <= 1:

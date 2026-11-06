@@ -106,24 +106,55 @@ def test_each_component_starts_as_it_would_alone() -> None:
         assert joint[k] == alone[k], k
 
 
-def test_a_wall_shares_the_reference_temperature_only() -> None:
-    """Joined by a wall, the two streams start at their thermal group's mean
-    boundary Tt -- each ends between its own and its partner's -- and keep
-    their own pressures and flows: the joint start is each part's start
-    alone with its boundaries at that mean Tt."""
-    group_T = (808.0 + 808.0 + 358.0 + 358.0) / 4
+GROUP_T = (808.0 + 808.0 + 358.0 + 358.0) / 4
+
+
+def _parts_at(T: float | None) -> dict[str, float]:
+    """Each part's start alone, its boundaries at T (None: their own)."""
     gas, cool = FlowNetwork(), FlowNetwork()
     _gas(gas)
     _coolant(cool)
-    for net in (gas, cool):
-        for node in net.nodes.values():
-            if isinstance(node, (PressureBoundary, MassFlowBoundary)):
-                node.Tt = group_T
-    alone = {**_x0(gas), **_x0(cool)}
+    if T is not None:
+        for net in (gas, cool):
+            for node in net.nodes.values():
+                if isinstance(node, (PressureBoundary, MassFlowBoundary)):
+                    node.Tt = T
+    return {**_x0(gas), **_x0(cool)}
+
+
+def test_a_wall_leaves_the_resistance_seed_at_each_streams_own_temperature() -> None:
+    """Joined by a wall, the streams share their thermal group's mean Tt
+    (#899), but the resistance-network seed -- here every pressure and flow
+    -- runs at each component's own (#990): the joint start is each part's
+    start alone. At the group's 583 K the coolant's pressures started 22%
+    high (3.68 against 3.02 bar), its kernel's flux too low at that Tt; the
+    group's Tt now enters only the seed's first Picard iterate (the reference
+    m_dot), hence the tolerance."""
+    own = _parts_at(None)
+    group = _parts_at(GROUP_T)
     joint = _x0(_both(wall=True))
-    assert joint.keys() == alone.keys()
+    assert joint.keys() == own.keys()
     for k in joint:
-        assert joint[k] == alone[k], k
+        assert joint[k] == pytest.approx(own[k], rel=1e-12), k
+    assert group["c_in.P"] > 1.2 * own["c_in.P"]
+
+
+def test_the_group_temperature_stays_the_reference_tt() -> None:
+    """Everything else keeps the thermal group's mean (#899): the reference
+    state carries it as T, and the component's own boundary mean as T_own."""
+    s = NetworkSolver(_both(wall=True))
+    comps = s._flow_components()
+    group_T = s._thermal_group_T(comps)
+    refs = []
+    for ci, (nodes, elems) in enumerate(comps):
+        s._ref_T_override = group_T[ci]
+        try:
+            with s._component_view(nodes, elems):
+                refs.append(s._infer_reference_state())
+        finally:
+            s._ref_T_override = None
+    assert [r["T"] for r in refs] == [GROUP_T, GROUP_T]
+    assert [r["T_own"] for r in refs] == [808.0, 358.0]
 
 
 def test_a_wall_does_not_join_two_flow_components() -> None:

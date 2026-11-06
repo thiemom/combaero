@@ -173,3 +173,25 @@ def test_the_wall_k_is_immaterial() -> None:
     hi = mj.solve(run, mj.Options(wall_k=22.5)).T_wall
     assert max(abs(a - b) for a, b in zip(lo, hi, strict=True)) < 1.0
     assert not math.isclose(lo[-1], hi[-1], abs_tol=1e-6)
+
+
+def test_run_19_starts_at_its_root_and_converges_cold() -> None:
+    """Run 19's coolant passage runs at up to Mach 0.7 at 297 K. Seeded at its
+    thermal group's mean 446 K, its pressures started 19% high (172.8 against
+    a 145.2 kPa root) and the default cold solve took the warm-start retry;
+    the resistance seed now runs at each stream's own Tt (#990)."""
+    import warnings
+
+    from combaero.network import NetworkSolver
+
+    net = mj.build(mj.runs()[19])
+    s = NetworkSolver(net)
+    net.resolve_all_topology()
+    seed = s._build_x0()
+    x0 = dict(zip(s.unknown_names, seed, strict=True))
+    assert x0["k1.P"] == pytest.approx(145.2e3, rel=0.02)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        r = NetworkSolver(mj.build(mj.runs()[19])).solve()
+    assert r["__success__"], r["__message__"]
+    assert not [w for w in caught if "auto-retrying" in str(w.message)]
