@@ -75,9 +75,13 @@ def _b541(
 
 
 def _solved(mc: float, law: str) -> tuple[NetworkSolver, dict, ImpingementArray]:
-    """Table 4.1 at the strongest crossflow (mc/mj 0.99) stalls from a cold
-    start (|F| 1.7e-2, its Jacobian exact there to 2e-7): it starts from the
-    default law's root, as a user scoring D.1 like for like would."""
+    """Table 4.1 at the strongest crossflow (mc/mj 0.99) starts from the
+    default law's root, as a user scoring D.1 like for like would. Cold, it
+    still fails the primary solve (|F| 4.5e-1) and the outlet-referenced
+    retry (1.7e-2); the solver's constant-Cd retry then reaches the same
+    root (max relative difference 7e-8 over all 45 unknowns), but in 16.9 s
+    against 2.7 s warm (measured after #1005). Every other case solves cold
+    on the primary path."""
     if law == "florschuetz_metzger_su_1982" and mc >= 0.99:
         _, res, _ = _b541(mc, "rogers_hersh_1976")
         return _b541(mc, law, np.array(res["__x_solution__"], dtype=float))
