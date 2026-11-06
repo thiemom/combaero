@@ -817,58 +817,26 @@ FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<do
   pb.P = Pt0 - kFannoFlowDriveFloor;
   pb.with_derivatives = true;  // sigma needs the slope at the floor
   const FannoChannelFlow at = raw_flow(pb);
-  auto exponent = [](const FannoChannelFlow& r) {
-    return (r.G > 0.0) ? std::clamp(-r.dG_dP_target * kFannoFlowDriveFloor / r.G, 0.0, 2.9)
-                       : 0.5;
-  };
-  const double sigma = exponent(at);
+  const double sigma =
+      (at.G > 0.0) ? std::clamp(-at.dG_dP_target * kFannoFlowDriveFloor / at.G, 0.0, 2.9) : 0.5;
   const double t = drive / kFannoFlowDriveFloor;
   const double h = 0.5 * (3.0 - sigma) * t + 0.5 * (sigma - 1.0) * t * t * t;
   const double dh = 0.5 * (3.0 - sigma) + 1.5 * (sigma - 1.0) * t * t;
   out = at;
   out.G = at.G * h;
   // d/dP_target through t only; d/dPt0 through t and through G0, whose own
-  // target Pt0 - floor moves with Pt0.
+  // target Pt0 - floor moves with Pt0. sigma(Pt0, Tt0, Y) is held fixed. Its
+  // own term, G0 (t^3 - t)/2 dsigma, is first order in sigma's variation, not
+  // second, but that variation is small: sigma moves only as f does with Re.
+  // Measured (#1019), it left dG/dTt0 0.6% off at t = 0.5 on a 5 cm duct and
+  // dG/dPt0 below 1e-6. Differencing sigma would cost 4 + 2 n_dirs raw solves
+  // per derivative evaluation (3x the Jacobian of a short-segment network),
+  // and slowed bleed_station solves 2-3x; so it stays fixed.
   out.dG_dP_target = -at.G * dh / kFannoFlowDriveFloor;
   out.dG_dPt0 = at.G * dh / kFannoFlowDriveFloor + h * (at.dG_dPt0 + at.dG_dP_target);
   out.dG_dTt0 = h * at.dG_dTt0;
   for (double& d : out.dG_ddir) {
     d *= h;
-  }
-  if (!with_derivatives) {
-    return out;
-  }
-  // And through sigma(Pt0, Tt0, Y), the floor state's exponent: dh/dsigma =
-  // (t^3 - t) / 2 is first order inside the floor, not second (#1019). Held
-  // fixed, it left dG/dTt0 0.6% off at t = 0.5 on a 5 cm duct, where f
-  // moves with Re and so sigma with Tt0. sigma is the floor state's own
-  // slope ratio, a smooth function of the inlet state: differenced here
-  // (each sample a raw solve at drive = floor, the slope exact there).
-  const double dh_dsigma = 0.5 * (t * t * t - t);
-  auto sigma_at = [&](double Pt0x, double Tt0x, const std::vector<double>& Xx) {
-    FlowProblem q = pb;
-    q.Pt0 = Pt0x;
-    q.Tt0 = Tt0x;
-    q.X = &Xx;
-    q.P = Pt0x - kFannoFlowDriveFloor;
-    q.dirs = &kNoDirections;
-    q.Me_guess = at.M_exit;
-    return exponent(raw_flow(q));
-  };
-  const double hP = 1e-5 * Pt0;
-  const double hT = 1e-5 * Tt0;
-  const double s_P = (sigma_at(Pt0 + hP, Tt0, X) - sigma_at(Pt0 - hP, Tt0, X)) / (2.0 * hP);
-  const double s_T = (sigma_at(Pt0, Tt0 + hT, X) - sigma_at(Pt0, Tt0 - hT, X)) / (2.0 * hT);
-  const double w = at.G * dh_dsigma;
-  out.dG_dPt0 += w * s_P;
-  out.dG_dTt0 += w * s_T;
-  if (!dirs.empty()) {
-    const auto s_v = d_ddir(X, dirs, [&](const std::vector<double>& Xk) {
-      return sigma_at(Pt0, Tt0, Xk);
-    });
-    for (std::size_t i = 0; i < dirs.size(); ++i) {
-      out.dG_ddir[i] += w * s_v[i];
-    }
   }
   return out;
 }
