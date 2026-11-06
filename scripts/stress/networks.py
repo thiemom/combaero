@@ -210,7 +210,10 @@ class _Layered:
             # follow-up): a head loss instead, which scales with the flow at
             # every flow (a fraction loss with m_ref is flat above it). No
             # draw, so no other seed changes (of 0:200, random 5, 14, 19, 34,
-            # 45, 47, 48, 81, 88, 95, 99, 113, 156 and 192 change).
+            # 45, 47, 48, 81, 88, 95, 99, 113, 156 and 192 change). The same
+            # for a path of them between two pressure boundaries (#1003): of
+            # 0:200, random 21, 37, 39, 43, 48, 49, 52, 58, 60, 75, 78, 89,
+            # 121, 125, 130, 131, 139, 148, 151, 178, 187 and 196 change.
             both_theta = getattr(na, "has_theta", False) and getattr(nb, "has_theta", False)
             e = PressureLossElement(
                 eid,
@@ -338,12 +341,20 @@ _LOOP_BREAK_AREA = 4e-3
 def _closes_a_flow_independent_loop(net: FlowNetwork, a: str, b: str) -> bool:
     """Whether a and b are already joined by elements whose Pt relation does
     not depend on their flow alone (``_flow_independent_dpt``: lossless
-    joints, fraction losses without m_ref; #988)."""
+    joints, fraction losses without m_ref; #988). Every PressureBoundary
+    fixes its Pt, so all of them count as one node, as in
+    ``FlowNetwork._flow_independent_loop`` (#1003): two boundaries are
+    always joined."""
+
+    def key(n: str) -> str:
+        return "<pressure boundaries>" if isinstance(net.nodes.get(n), PressureBoundary) else n
+
+    a, b = key(a), key(b)
     adj: dict[str, list[str]] = {}
     for e in net.elements.values():
         if _flow_independent_dpt(e) is not None:
-            adj.setdefault(e.from_node, []).append(e.to_node)
-            adj.setdefault(e.to_node, []).append(e.from_node)
+            adj.setdefault(key(e.from_node), []).append(key(e.to_node))
+            adj.setdefault(key(e.to_node), []).append(key(e.from_node))
     seen, stack = {a}, [a]
     while stack:
         n = stack.pop()

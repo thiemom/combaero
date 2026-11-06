@@ -1968,6 +1968,15 @@ lossless = LosslessConnectionElement("lossless", "node4", "node5")
 # either fail to close (no solution) or close exactly (the split is not
 # determined). A flow-dependent loss on one path (orifice, channel, head
 # loss), or an m_ref on a fraction loss, fixes it.
+# Every PressureBoundary fixes its Pt, so validate() treats all of them as one
+# node (#1003): a path of these elements from one boundary to another is such
+# a loop too and is refused, naming the two boundaries. In the GUI this is a
+# plenum with plain edges to two outlets: equal outlet Pt leaves the split
+# free (an outlet can even run backwards), unequal leaves no solution. Put a
+# flow-dependent loss on each outlet path, or merge the outlets into one
+# boundary. These elements couple the boundary's Pt, never its static P (only
+# a channel, crossflow segment or port discharge loses an exit head there),
+# so a single such link into one boundary is fine.
 # A momentum chamber discharging into a PressureBoundary (#637): static
 # coupling (the chamber's static P is the boundary's, its head lost) and,
 # choked, under-expanded at the sonic static pressure of its flux. Inflow and
