@@ -126,6 +126,17 @@ _STATE_EXCEPTIONS = (RuntimeError, ValueError, ArithmeticError)
 # undetermined state, so such a "root" is refused, never returned.
 _FUEL_MIN_OXIDIZER_FLOW = 1e-9
 
+# A flow component "carries flow" (#1004) when its largest element |m_dot| is
+# at least this fraction of the component's reference flow (the cold start's
+# _infer_reference_state m_dot). An unanchored fraction loss below
+# FLOW_REVERSAL_M_SCALE in such a component sits on its zero-flow blend and
+# is flagged; a whole component near zero flow (zero drive) is an answer.
+# Measured: on the stress random family (seeds 0:200, 152 networks with such
+# a loss) every component with a loss on its blend had a ratio of 0.23 or
+# more (converged: 2.1 or more); a blocked loss in series (the whole component
+# on the blend) 9e-5 to 7e-3, zero drive 0. 0.1 sits a decade from each.
+_FRACTION_UNANCHORED_FLOW_FACTOR = 0.1
+
 # A node's Q_withheld below this fraction of the heat given is the rounding
 # of m * (1/m), not heat withheld: reported as 0.0. The real fade below the
 # 1 mg/s uptake floor passes it within 4e-7 (relative) below the floor
@@ -933,6 +944,58 @@ class NetworkSolver:
         # the scale for the whole network.
         area = float(np.median(areas))
         return max(area * math.sqrt(2.0 * rho * dp), 1e-9)
+
+    def _fraction_unanchored(self, sol_dict: dict[str, Any]) -> dict[str, dict[str, float]]:
+        """Per unanchored fraction loss (``PressureLossElement.unanchored_fraction``,
+        #1004): its |m_dot|, its flow component's largest element |m_dot| and
+        reference flow (``_infer_reference_state``, per component as the cold
+        start makes it), and the flag. ``flag`` is 1 where |m_dot| is below
+        FLOW_REVERSAL_M_SCALE, on the blend of its forward and reverse forms,
+        while the component carries flow (its largest |m_dot| at least
+        _FRACTION_UNANCHORED_FLOW_FACTOR of its reference); 0 otherwise; NaN
+        where a flow is not finite. Reads the element results in ``sol_dict``
+        at whatever point they were evaluated (a failed solve: the best
+        iterate)."""
+        cand = [
+            eid
+            for eid, e in self.network.elements.items()
+            if isinstance(e, PressureLossElement) and e.unanchored_fraction
+        ]
+        if not cand:
+            return {}
+
+        def flow(eid: str) -> float:
+            v = sol_dict.get(f"{eid}.m_dot")
+            try:
+                return abs(float(v)) if v is not None else math.nan
+            except (TypeError, ValueError):
+                return math.nan
+
+        out: dict[str, dict[str, float]] = {}
+        comps = self._flow_components()
+        for node_ids, elem_ids in comps:
+            mine = [eid for eid in cand if eid in elem_ids]
+            if not mine:
+                continue
+            try:
+                if len(comps) <= 1:
+                    ref = float(self._infer_reference_state()["m_dot"])
+                else:
+                    with self._component_view(node_ids, elem_ids):
+                        ref = float(self._infer_reference_state()["m_dot"])
+            except Exception:  # noqa: BLE001 -- a diagnostic never breaks a solve
+                ref = math.nan
+            flows = [f for f in (flow(eid) for eid in elem_ids) if math.isfinite(f)]
+            m_max = max(flows) if flows else math.nan
+            carries = m_max >= _FRACTION_UNANCHORED_FLOW_FACTOR * ref
+            for eid in mine:
+                m = flow(eid)
+                if not (math.isfinite(m) and math.isfinite(m_max) and math.isfinite(ref)):
+                    flag = math.nan
+                else:
+                    flag = 1.0 if (m < FLOW_REVERSAL_M_SCALE and carries) else 0.0
+                out[eid] = {"m_dot": m, "m_max": m_max, "m_ref": ref, "flag": flag}
+        return out
 
     def _propagate_pressure_guess(self, ref: dict[str, Any]) -> dict[str, float]:
         """Estimate per-node pressures by walking the graph from boundaries.
@@ -7303,6 +7366,50 @@ class NetworkSolver:
             for eid, diag in (sol_dict.get("__element_diag__") or {}).items()
             if float(diag.get("wall_above_limit", 0.0)) == 1.0
         )
+        # Reported only (#1004): a fraction loss without m_ref holds dPt = xi
+        # Pt at every flow but zero, so where the network forces a smaller
+        # drop across it the only root is its zero-flow blend, and the solve
+        # converges there with the loss law not met. Flagged when its flow
+        # component carries flow; a whole component at ~zero flow (zero
+        # drive) is an answer. It does not demote the solve: the root is a
+        # root of the equations given. On a failed solve the same check at the
+        # best iterate, or such a loss among the worst rows, is named in the
+        # message.
+        _fraction_unanchored: list[str] = []
+        try:
+            _fu = self._fraction_unanchored(sol_dict)
+        except Exception:  # noqa: BLE001 -- a diagnostic never breaks a solve
+            _fu = {}
+        for eid, info in _fu.items():
+            diag = (sol_dict.get("__element_diag__") or {}).get(eid)
+            if diag is not None and "fraction_unanchored" in diag:
+                diag["fraction_unanchored"] = info["flag"]
+                sol_dict[f"{eid}.fraction_unanchored"] = info["flag"]
+            if info["flag"] == 1.0:
+                _fraction_unanchored.append(eid)
+        _fraction_unanchored.sort()
+        if not success and _fu:
+            _worst_rows = {n for n, _ in _worst}
+            _named = sorted(
+                {
+                    *_fraction_unanchored,
+                    *(
+                        eid
+                        for eid, info in _fu.items()
+                        if info["m_dot"] < FLOW_REVERSAL_M_SCALE and f"{eid}.m_dot" in _worst_rows
+                    ),
+                }
+            )
+            if _named:
+                message = (
+                    f"{message} PressureLossElement "
+                    + ", ".join(f"'{eid}'" for eid in _named)
+                    + ": a fraction loss without m_ref at ~zero flow (its forward/"
+                    "reverse blend) at this point: it holds dPt = xi Pt at every "
+                    "flow but zero, so a network that gives it a smaller drop has no "
+                    "root but zero flow through it. Set its m_ref (design flow), or "
+                    "use a head loss."
+                )
 
         # Incompressible validity (#588): each element on an incompressible
         # closure against one Mach limit. REPORTED only.
@@ -7337,6 +7444,7 @@ class NetworkSolver:
         sol_dict["__heat_undetermined__"] = list(_target_stagnant)
         sol_dict["__wall_undetermined__"] = _wall_undetermined
         sol_dict["__wall_above_limit__"] = _wall_above_limit
+        sol_dict["__fraction_unanchored__"] = _fraction_unanchored
         sol_dict["__supersonic_chambers__"] = list(_supersonic)
         sol_dict["__choked_bounded_junctions__"] = list(_choked_bounded)
         sol_dict["__outcome__"] = outcome

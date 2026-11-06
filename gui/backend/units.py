@@ -104,6 +104,7 @@ UNIT_MAP: dict[str, str] = {
     # --- Element diagnostics ---
     "xi": "-",
     "theta": "-",
+    "fraction_unanchored": "-",  # a fraction loss without m_ref on its zero-flow blend (#1004)
     "zeta": "-",
     "area_ratio": "-",  # Phase 2 name
     "is_correlation": "-",

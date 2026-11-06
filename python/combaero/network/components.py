@@ -12,7 +12,7 @@ from scipy.optimize import brentq as _brentq
 import combaero as cb
 from combaero import _solver_tools
 
-from .pressure_loss import PressureLossContext
+from .pressure_loss import ConstantFractionLoss, LinearThetaFractionLoss, PressureLossContext
 
 # Physics configuration types for network introspectability
 CompressibilityLiteral = Literal["incompressible", "compressible"]
@@ -9533,6 +9533,21 @@ class PressureLossElement(NetworkElement):
                         key = f"{src_node}.Y[{k}]"
                         row[key] = row.get(key, 0.0) + dres_dTu * d
 
+    @property
+    def unanchored_fraction(self) -> bool:
+        """A fraction loss with no design flow (#1004): ``ConstantFractionLoss``
+        or ``LinearThetaFractionLoss``, ``m_ref`` None and a nonzero loss. It
+        holds dPt = xi Pt at every flow but zero, so where the network gives
+        it a smaller drop its only root is the forward/reverse blend at
+        |m_dot| < FLOW_REVERSAL_M_SCALE, where the loss law is not met. The
+        solver's ``fraction_unanchored`` key flags it there."""
+        c = self.correlation
+        if isinstance(c, ConstantFractionLoss):
+            return c.m_ref is None and c.xi != 0.0
+        if isinstance(c, LinearThetaFractionLoss):
+            return c.m_ref is None and (c.k != 0.0 or c.xi0 != 0.0)
+        return False
+
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> dict[str, float | str]:
@@ -9577,6 +9592,11 @@ class PressureLossElement(NetworkElement):
             "theta": float(ctx.theta),
             "area": float(area or 0.0),
             "area_source": self._area_source,
+            # 1 where an unanchored fraction loss sits on its zero-flow blend
+            # in a component that carries flow (#1004). The element alone
+            # cannot tell (it needs the component's flow): NaN until the
+            # solver sets it; 0 for any other loss, which is anchored.
+            "fraction_unanchored": math.nan if self.unanchored_fraction else 0.0,
         }
 
         if self.has_convective_surface:
