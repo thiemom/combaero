@@ -105,12 +105,17 @@ double fanno_choked_mass_flux(double Pt, double Tt,
 // Below kFannoFlowDriveFloor of drive (Pt0 - P_target) the flux law, whose
 // slope is infinite at zero drive, is blended C1 into an odd cubic through
 // zero that matches its value and slope at the floor; at or below zero drive the flux is 0 (the caller reverses
-// the duct for reversed flow).
+// the duct for reversed flow). M_in and M_exit are the flow's at G there too
+// (#1017): M_in from the isentropic inlet at G, M_exit at the floor's
+// exit-to-inlet ratio. M_exit_root is the exit Mach of the root actually
+// solved -- the floor's below it, M_exit otherwise -- the warm start to pass
+// back as M_exit_guess.
 struct FannoChannelFlow {
   double G = 0.0;              // mass flux [kg/(m^2 s)], >= 0
   bool choked = false;         // exit at sonic, flux independent of P_target
   double M_in = 0.0;           // inlet Mach
   double M_exit = 0.0;         // exit Mach (1 when choked)
+  double M_exit_root = 0.0;    // exit Mach of the solved root (warm start)
   double dG_dPt0 = 0.0;        // [kg/(m^2 s Pa)]
   double dG_dTt0 = 0.0;        // [kg/(m^2 s K)]
   double dG_dP_target = 0.0;   // [kg/(m^2 s Pa)], 0 when choked

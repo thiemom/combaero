@@ -745,6 +745,26 @@ FannoChannelFlow raw_flow(const FlowProblem& pb) {
   return out;
 }
 
+// Below the drive floor the flux is the floor's scaled by h, but the end
+// states were the floor's: M_in and M_exit at G0, up to 80x the flow's own at
+// a sub-Pa drive (#1017), which the second-law heat band and the diagnostics
+// read. Re-evaluate them at the blended flux: M_in from the isentropic inlet
+// at G, M_exit at the floor's exit-to-inlet ratio (at low Mach M scales with
+// G at a fixed stagnation state; the ratio moves by ~drive / P). G and its
+// partials are untouched, so the residual and its Jacobian are too.
+void blend_end_states(FannoChannelFlow& out, const FannoChannelFlow& at, double Pt0, double Tt0,
+                      const std::vector<double>& X) {
+  out.M_exit_root = at.M_exit;
+  if (!(out.G > 0.0) || !(at.M_in > 0.0)) {
+    out.M_in = 0.0;
+    out.M_exit = 0.0;
+    return;
+  }
+  const double Mi = fanno_inlet_mach(Pt0, Tt0, out.G, X);
+  out.M_exit = std::min(1.0, at.M_exit * (Mi / at.M_in));
+  out.M_in = Mi;
+}
+
 }  // namespace
 
 FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<double>& X,
@@ -771,7 +791,9 @@ FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<do
   FlowProblem pb{Pt0, Tt0, P_target, L, D, roughness, f_multiplier, &X, &friction_model, exit_total,
                  M_exit_guess, &dirs, with_derivatives};
   if (drive >= kFannoFlowDriveFloor) {
-    return raw_flow(pb);
+    FannoChannelFlow raw = raw_flow(pb);
+    raw.M_exit_root = raw.M_exit;
+    return raw;
   }
   // Below the floor: G = G0 h(t), t = drive / floor, with G0 the flux at the
   // floor and h the odd cubic matching the raw law's value AND slope there:
@@ -789,6 +811,7 @@ FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<do
   const double dh = 0.5 * (3.0 - sigma) + 1.5 * (sigma - 1.0) * t * t;
   out = at;
   out.G = at.G * h;
+  blend_end_states(out, at, Pt0, Tt0, X);
   // d/dP_target through t only; d/dPt0 through t and through G0, whose own
   // target Pt0 - floor moves with Pt0. sigma is held fixed: its own
   // variation is second order within the floor.
@@ -1290,7 +1313,9 @@ FannoChannelFlow fanno_rayleigh_channel_flow(
   RayleighProblem pb{Pt0, Tt0, Tt_exit, P_target, L, D, roughness, f_multiplier, &X,
                      &friction_model, exit_total, G_guess, &dirs, with_derivatives};
   if (drive >= kFannoFlowDriveFloor) {
-    return rayleigh_raw_flow(pb);
+    FannoChannelFlow raw = rayleigh_raw_flow(pb);
+    raw.M_exit_root = raw.M_exit;
+    return raw;
   }
   // Below the floor: the same C1 odd-cubic blend as fanno_channel_flow.
   pb.P = Pt0 - kFannoFlowDriveFloor;
@@ -1303,6 +1328,7 @@ FannoChannelFlow fanno_rayleigh_channel_flow(
   const double dh = 0.5 * (3.0 - sigma) + 1.5 * (sigma - 1.0) * t * t;
   out = at;
   out.G = at.G * h;
+  blend_end_states(out, at, Pt0, Tt0, X);
   out.dG_dP_target = -at.G * dh / kFannoFlowDriveFloor;
   out.dG_dPt0 = at.G * dh / kFannoFlowDriveFloor + h * (at.dG_dPt0 + at.dG_dP_target);
   out.dG_dTt0 = h * at.dG_dTt0;

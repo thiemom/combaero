@@ -815,6 +815,7 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("choked", &combaero::FannoChannelFlow::choked)
       .def_readonly("M_in", &combaero::FannoChannelFlow::M_in)
       .def_readonly("M_exit", &combaero::FannoChannelFlow::M_exit)
+      .def_readonly("M_exit_root", &combaero::FannoChannelFlow::M_exit_root)
       .def_readonly("dG_dPt0", &combaero::FannoChannelFlow::dG_dPt0)
       .def_readonly("dG_dTt0", &combaero::FannoChannelFlow::dG_dTt0)
       .def_readonly("dG_dP_target", &combaero::FannoChannelFlow::dG_dP_target)
