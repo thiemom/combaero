@@ -3808,12 +3808,12 @@ const Inspector = () => {
 										{selectedNode.data.result?.fraction_unanchored === 1 && (
 											<div className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
 												This loss sits at ~zero flow (|ṁ| below 1e-4 kg/s, the
-												blend of its forward and reverse forms) while the rest
-												of its network flows: with no ṁ_ref it holds ΔPt = ξ·Pt
-												at every flow but zero, and the network gives it less.
-												The loss law is not met at this point. Set ṁ_ref, its
-												design flow: type it, or solve at a point where it flows
-												and use the button above.
+												blend of its forward and reverse forms) in a network
+												that is driven: with no ṁ_ref it holds ΔPt = ξ·Pt at
+												every flow but zero, and the network gives it less. The
+												loss law is not met at this point. Set ṁ_ref, its design
+												flow: type it, or solve at a point where it flows and
+												use the button above.
 											</div>
 										)}
 										<p className="text-[9px] text-gray-400 italic">

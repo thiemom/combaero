@@ -9593,8 +9593,8 @@ class PressureLossElement(NetworkElement):
             "area": float(area or 0.0),
             "area_source": self._area_source,
             # 1 where an unanchored fraction loss sits on its zero-flow blend
-            # in a component that carries flow (#1004). The element alone
-            # cannot tell (it needs the component's flow): NaN until the
+            # in a driven component, not a dead end (#1004). The element alone
+            # cannot tell (it needs the network's inputs and topology): NaN until the
             # solver sets it; 0 for any other loss, which is anchored.
             "fraction_unanchored": math.nan if self.unanchored_fraction else 0.0,
         }
