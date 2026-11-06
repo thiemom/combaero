@@ -132,7 +132,7 @@ class MultiPortChamberElement(MultiPortChamberBase):
     ``jacobian_method`` is RETIRED and selects nothing. It chose between a
     sympy derivation for the canonical 3-port separating T and an N+1-call
     finite-difference fallback for every other topology; both are gone. The
-    sympy derivation survives in ``_mpce_jacobian.py`` as an offline
+    sympy derivation survives in ``python/tests/_mpce_jacobian.py`` as an offline
     cross-check (``test_mpce_jacobian.py``), not as a runtime path. The
     attribute is kept so existing callers that set it do not break, and is
     documented here rather than removed silently -- a knob that quietly does

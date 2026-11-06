@@ -12,8 +12,8 @@ import math
 
 import numpy as np
 import pytest
+from _mpce_jacobian import dKQ_dmdot_separating_T
 
-from combaero.network._mpce_jacobian import dKQ_dmdot_separating_T
 from validation.junction.models.mynard2010 import junction_loss_coefficient
 
 
