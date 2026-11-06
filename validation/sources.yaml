@@ -824,6 +824,84 @@ documents:
   records: [validation/cooling/extractions/eriksen_1971_table2_h_over_h0.md, validation/cooling/data/eriksen1971/table2_ha_over_h0_long.csv]
   notes: 'Fetched 2026-11-03 at the user''s request (NTRS link). Table II transcribed 2026-11-03 (user sign-off;
     0 read disagreements; block B''s printed Re_D 0.44e5 is a misprint for 0.22e5, per Fig. 68 and the text).'
+- file: sources/heat_transfer/film/Ammari_1989_PhD_Nottingham_film_cooled_h_over_h0_density_acceleration.pdf
+  citation: Ammari, H. D. (1989). The heat transfer coefficient on film cooled surfaces. PhD thesis, University
+    of Nottingham, August 1989.
+  id: Ammari 1989 PhD (Nottingham)
+  topic: [film]
+  content: 'Scan with a text layer, 260 pp. (prose OCR usable, equations and figures from the page images).
+    Laterally averaged and local film heat transfer coefficient ratio h/h0 behind ONE ROW of round holes, P/D
+    3, injection 35 deg and 90 deg, flat plate, by mass transfer (swollen-polymer surface + holographic
+    interferometry, isothermal-wall analogue). M 0.5-2.0; density ratio 1.0 and 1.52 (foreign-gas injection);
+    acceleration parameter K = 0, 1.9e-6 and 5.0e-6 (35 deg only); Re_D 3.8e3, Tu 0.68 %, delta*/D 0.40,
+    u_inf 25 m/s (Table 6.2 lists the 7 test series). Section 8.5 correlations: 90 deg h/h0 = 1.0 + 0.555
+    exp[-0.14 (x/D) M^-0.5] (M 0.5-1.5, both DR, x/D < 25, +-5 %, Fig. 8.27); 35 deg h/h0 = 1.025 + 0.35
+    exp[-0.15 (x/D)(u_c/u_inf)^-4/3] (Forth & Jones scaling, +-7 % excluding u_c/u_inf = 2, Fig. 8.30);
+    with acceleration a factor [1 - 0.04 (K x 1e6)] (Fig. 8.32, large scatter). Data are FIGURES ONLY (Ch. 8;
+    no data tables). Ch. 9: PHOENICS CFD (not useful). Appendix D uncertainty.'
+  status: screened
+  verdict: 'Screened 2026-11-06. PLUGS A GAP: combaero has no film-side h for discrete-hole films --
+    FilmCoolingElement changes only T_aw and the wall keeps the duct h (the slot film got Seban 1960 in #962),
+    and EffusionPlateElement takes h_f/h0 as the user''s gas_augmentation (#476). This thesis gives a
+    closed-form h/h0(x/D, M or u_c/u_inf, K) for round-hole rows at 35 and 90 deg with DR to 1.52 --
+    IMPLEMENT-CANDIDATE for an opt-in h/h0 on FilmCoolingElement (and a sourced default for
+    gas_augmentation behind a row). Fidelity would be judged on its own Figs. 8.25-8.30 (digitising needed;
+    Fig. 8.29 is heavily overplotted near x/D < 10, so fidelity there is an upper bound). Cross-source
+    accuracy: Eriksen 1971 Table II (held, tabulated) -- BUT Fig. 8.29 plots Eriksen & Goldstein 1974 (ref.
+    22) and Goldstein & Yoshida (ref. 25) beside Ammari''s points, and whether they shaped the dotted mean
+    curve is not stated; treat Eriksen as possibly in-sample for the 35 deg fit. Limits: one row, P/D 3,
+    Tu 0.68 % (low), mass-transfer analogue, flat plate; effusion plates (P/D 5-8, many rows) are outside.'
+  read_for: ['film-side h/h0 behind round-hole rows (FilmCoolingElement has none)', '#476 gas_augmentation
+      default', 'density-ratio and acceleration effects on h/h0']
+  issues: [386, 476]
+  records: []
+  notes: 'Filename was 352949.pdf (probably its British Library EThOS number). Copyrighted thesis. Journal
+    version (as recalled, not held): Ammari, Hay & Lampard 1990, J. Turbomach. 112, 444-450. Figures worth
+    digitising if implemented: 8.25/8.27 (90 deg), 8.29/8.30 (35 deg), 8.31/8.32 (acceleration).'
+- file: sources/heat_transfer/film/Nickol_2013_MS_OSU_film_cooled_flat_plate_realistic_hole_pattern.pdf
+  citation: Nickol, J. B. (2013). Heat transfer measurements and comparisons for a film cooled flat plate with
+    realistic hole pattern in a medium duration blowdown facility. MS thesis, The Ohio State University
+    (adviser M. G. Dunn).
+  id: Nickol 2013 MS (OSU)
+  topic: [film]
+  content: 'Text PDF, 175 pp. (the PDF metadata title is a different, older working title). OSU Gas Turbine
+    Lab Small Calibration Facility, blowdown: aluminium flat plate with five rows of 30 deg round holes
+    adapted from an HP blade pressure side (Table 2.1: 16/15/32/31/16 holes, d 0.30-0.46 mm, pitch 2.9-5.6 D,
+    rows 3.9-53 D apart, 0.1 in plate), 17 surviving double-sided Kapton heat-flux gauges (Table 2.3
+    positions), M 0.3-1.5, Tu 2-3 %. Corrected Stanton number, heat-flux reduction (NCHFR, LCHFR) and an
+    adiabatic effectiveness inferred from the heated-plate method, all FIGURES ONLY (Ch. 6); a CFD
+    prediction (Ch. 7); comparison with flat-plate literature and rotating-rig data (Ch. 8). Most data are
+    from earlier runs by Haldeman and Davis.'
+  status: screened
+  verdict: 'Screened 2026-11-06. PLUGS NO GAP: no closure, figure-only data, and the author finds run-to-run
+    variation dominates the blowing-ratio effect on effectiveness (Section 6.3); a conducting aluminium
+    plate, engine-scale holes and only 17 gauges make it a poor accuracy set for the Sellers superposition of
+    FilmCoolingElement rows. Reference only (multi-row hole-pattern context). Not worth digitising.'
+  read_for: ['multi-row film effectiveness and h with a realistic hole pattern (#386 superposition)']
+  issues: [386]
+  records: []
+  notes: Copyrighted thesis (OSU ETD, openly downloadable). Candidate for deletion if the user prefers (no
+    value under the must-plug-a-gap rule).
+- file: sources/heat_transfer/film/Adeniji-Fashola_1989_NASA_CR-183652_wall_jet_inlet_Tu_CFD.pdf
+  citation: Adeniji-Fashola, A. A. (1989). Inlet turbulence intensity level and cross-stream distribution
+    effects on the heat transfer in plane wall jets. NASA CR-183652, Universities Space Research Association,
+    for NASA Marshall Space Flight Center, May 1989 (N89-24576).
+  id: NASA CR-183652 (NTRS 19890015205)
+  topic: [film]
+  content: 18 pp. scan. k-epsilon CFD (wall functions, elliptic 2-D) of a heated plane wall jet, varying the
+    inlet TKE level (0.5-5 % of the mean kinetic energy) and its cross-stream profile; compared with
+    Hishida, Umemura & Maeda (1986, 8th IHTC) Nu at slot Re 1700 and 3300 (Figs. 3-6). No measurements of
+    its own, no correlation.
+  status: screened
+  verdict: 'Screened 2026-11-06. NO VALUE: CFD sensitivity study; the only finding (inlet TKE changes the
+    predicted Nu within about 15 slot widths, over-predicting by up to 30 %) is qualitative and says nothing
+    about the #763 slot-film Tu closure. Hishida 1986 (wall-jet Nu, two-phase study) is not worth wanting
+    either: Seban 1960 and the Ballal-Lefebvre compilation already cover the wall-jet h.'
+  read_for: ['#763 slot-film turbulence intensity effect on h']
+  issues: [763]
+  records: []
+  notes: Public domain (NASA contractor report). Filename was the NTRS id. Candidate for deletion if the user
+    prefers.
 - file: sources/heat_transfer/film/Hassan_2013_PhD_Concordia_micro_tangential_jet_film.pdf
   citation: Hassan, O. (2013). Thermal and flow field investigations of a micro-tangential-jet film cooling
     scheme on gas turbine components. PhD thesis, Concordia University, Montreal (June 2013).
@@ -3111,6 +3189,80 @@ documents:
     replicate) and Fig. 13(f) F-3/F-4 (about 30 points each, 0.125 in) for the #807 crossflow set; for a
     louver/scoop closure Figs. 13(b) (B-1/B-2, B-8 via Fig. 7) and 13(c)/(d) plus Fig. 12 (zero-flow Phi vs h)
     and Fig. 9 (delta* vs Phi). Render at 130 dpi or more; several figures are rotated 90 deg in the scan.'
+- file: sources/combustor_network/kaddah_1964_Cranfield_DAE_thesis_vol1_liner_hole_Cd_deflection.pdf
+  citation: Kaddah, K. Sh. (1964). Discharge coefficient and jet deflection studies for combustor liner
+    air-entry holes. Thesis for the Diploma of Advanced Engineering, Department of Aircraft Propulsion, The
+    College of Aeronautics, Cranfield, June 1964 (supervisors A. H. Lefebvre and E. R. Norster). Volume 1
+    (text and tables).
+  id: Kaddah 1964 (Cranfield DAE thesis), Vol. 1
+  topic: [orifice, combustion]
+  content: 'Scan with a text layer, 119 pp.; the OCR is usable for the prose only -- read equations and tables
+    from the page images. Flush, square-edged holes in a 1/16 in (0.0625 in) aluminium plate in the floor of
+    a 1.25 in high x 8 in wide perspex duct, discharging into a plenum (bleed orifice) or to atmosphere; jets
+    with the duct flow parallel to the plate (supply-side crossflow). 20 configurations (Section 7.3): circular
+    C1-C5 (d 0.329-1.59 in, area ratio a* = hole/duct area 0.0595-0.595, d/t 5.25-25.4, i.e. t/d 0.04-0.19),
+    oval O1-O7 and rectangular R-slots (aspect ratio 1-8, a* 0.0595-0.604, slot major dimension up to 2.1 in
+    -- longer than the duct depth for the largest). Approach velocity V1 = 0 (no crossflow), 80 and 130 ft/s
+    (duct Mach about 0.07-0.12, incompressible), p1/pj up to 1.12, flow parameter K = (P1 - pj)/(P1 - p1)
+    about 1.5-170, bleed ratio alpha to about 0.4. TABLES 11-30 (PDF pp. 99-118, one per configuration)
+    TABULATE every measured point: p1/pj, alpha, mu = alpha/a*, L1, Lj, rho1, V1, rhoj, Vj, Lth, C, K, the
+    measured jet deflection angle phi (deg, from the plate) and the momentum loss factor delta -- about 15
+    points per configuration, about 300 in all; no digitising needed. C = Lj/Lth with Lth = rho_j Vj A_h and
+    Vj from (P1 - pj) (Appendix 2), i.e. Cd referred to the approach TOTAL pressure and the jet static, the
+    Phi convention of TN 3663. Section 6: two 1-D momentum analyses; Analysis I (Eqs. 8-13) gives C and phi
+    from K, alpha and a*; Analysis II adds an axial momentum loss factor delta (mean 0.8, Eqs. 28/29).
+    Tables 1-10 tabulate the theory. Appendix 4: a fit to Gandamihardja (1962) deflection angles. Vol. 2
+    (separate file) holds the figures, 125 + 26 appendix + 24 plates.'
+  status: screened
+  verdict: 'Screened 2026-11-06 (was wanted, #807). THE PRIMARY OF LEFEBVRE & BALLAL Eq. 4.15 / Fig. 4.2,
+    confirmed: the book''s (K - 1)/[4K^2 - K(2 - alpha)^2]^0.5 is Kaddah''s Analysis I Eq. 11; the book''s
+    leading 1.25 is not in Eq. 11 and is presumably the delta = 0.8 of Analysis II (1/0.8 = 1.25) -- check the
+    algebra of Eqs. 26-29 before implementing. The book calls it an MSc thesis; it is a DAE thesis. PLUGS A
+    GAP for #807: the shipped supply-crossflow Cd (McGreehan-Schotsch Eq. 17) is scored only on Rohde''s thick
+    hole (L/d 1.06); TN 3663 (registered) adds thin liner holes but only as rough figure reads. Kaddah gives
+    the thin-wall case (t/d 0.04-0.19) TABULATED, five hole sizes at fixed t, two crossflow velocities --
+    the cleanest cross-source ACCURACY set for Eq. 17 at liner geometry (Cranfield, not NACA Lewis). Caveat:
+    t/d and a* change together (C1-C5 vary d at fixed t), so a wall-thickness term cannot be separated from
+    the area-ratio (bleed) effect inside this set; large a* (0.25-0.6) and slots longer than the 1.25 in duct
+    depth are outside any liner annulus, so score the small-a* configurations first. FIDELITY set for a
+    Kaddah Cd(K, alpha) closure if one is implemented (his own Tables 11-30 vs his Eqs. 11/13 or the
+    book''s 4.15). #813: the measured deflection angle phi is the direct test of Report 1373 Eq. 9 (cos phi =
+    V_A/V_j, the jets keep the whole supply axial velocity). Indicative, read off Table 11 (C1; 10 crossflow points, not transcribed): at V1 130 ft/s, Vj
+    218-487 ft/s, Eq. 9 gives 53/64/70/72/75 deg vs measured 62/69/71/71/72; at 80 ft/s, Vj 135-468, Eq. 9
+    54/71/76/79/80 vs measured 66/70/72/73/75. So the jets are 9-12 deg STEEPER than Eq. 9 at the lowest K
+    (keep less axial velocity) and up to 7 deg SHALLOWER at high K (keep more): Eq. 9 is not a bound either
+    way, and #813''s from_crossflow mode should be scored against these tables, not assumed. Non-circular slots: oval and rectangular
+    data (Dittrich TN 3924 covers rectangular only; no oval data elsewhere in the register).'
+  read_for: ['#807 thin-wall liner-hole Cd under supply crossflow (cross-source accuracy for McGreehan-Schotsch
+      Eq. 17)', 'primary of Lefebvre & Ballal Eq. 4.15 / Fig. 4.2', '#813 jet deflection angle vs Report 1373
+      Eq. 9 (jets carrying V_A)']
+  issues: [807, 813, 793]
+  records: []
+  code: ['include/orifice.h: orifice::mcgreehan_schotsch::cd (Eq. 17, the closure Tables 11-15 would score)']
+  notes: 'Was on the wanted list as "Discharge coefficients and jet deflection angles for combustor liner air
+    admission ports, M.Sc. thesis" (as recalled); the printed title and degree differ. Copyrighted thesis
+    (Cranfield; scan supplied by the user). Transcription targets (tabulated, two-reader workflow, user
+    sign-off before scoring): Tables 11-15 circular C1-C5 first, then Tables 16-22 oval, 23-30 rectangular.
+    Vol. 2 figures only re-plot these tables, so nothing needs digitising. Rig and duct are Gandamihardja''s
+    (1962, ref. 7, Cranfield). Design drawings were a separate document (not held).'
+- file: sources/combustor_network/kaddah_1964_Cranfield_DAE_thesis_vol2_figures.pdf
+  citation: Kaddah, K. Sh. (1964). Discharge coefficient and jet deflection studies for combustor liner
+    air-entry holes. Thesis for the Diploma of Advanced Engineering, The College of Aeronautics, Cranfield,
+    June 1964. Volume 2 (figures and photographic plates).
+  id: Kaddah 1964 (Cranfield DAE thesis), Vol. 2
+  topic: [orifice, combustion]
+  content: 'Scan, 183 pp., hand-drawn graphs (no usable text layer): Figs. 1-125 (theory curves Figs. 12-25,
+    measured C and phi vs p1/pj and vs K per configuration Figs. 35-103, theory and previous-work comparisons
+    Figs. 104-120 including Dittrich & Graves, Fielding, Cox and Gandamihardja), 26 appendix figures (rig and
+    calibrations, Gandamihardja correlation, jet study) and 24 photographic plates of jet profiles.'
+  status: screened
+  verdict: 'Screened 2026-11-06 with Vol. 1. The measured points are tabulated in Vol. 1 Tables 11-30, so
+    nothing here needs digitising; use it only to check a transcription (Fig. 35-103 points per configuration)
+    and for the comparison plots against previous work (Figs. 104-111), which are other labs'' data.'
+  read_for: ['#807 (companion of Vol. 1)']
+  issues: [807]
+  records: []
+  notes: Copyrighted thesis (Cranfield; scan supplied by the user). 90 MB.
 - file: sources/lefebvre/Lefebvre_1985_AFWAL-TR-84-2104_fuel_properties_combustion.pdf
   citation: 'Lefebvre, A. H. (1985). Influence of fuel properties on gas turbine combustion performance.
     AFWAL-TR-84-2104, Purdue University (Thermal Science and Propulsion Center), final report, January 1985.
@@ -5498,16 +5650,6 @@ wanted:
     second independent liner flow split for #813 PR 2 and a #793 example, if the hole geometry is given (else
     Gouws 2007). Title as recalled, unverified.'
   where: ISABE 2005 proceedings.
-- citation: Kaddah, K. S. (1964). Discharge coefficients and jet deflection angles for combustor liner air
-    admission ports. M.Sc. thesis, College of Aeronautics, Cranfield.
-  checked: false
-  issues:
-  - 807
-  priority: later
-  question: 'The primary of Lefebvre & Ballal Eq. 4.15 / Fig. 4.2 (plain liner-hole Cd against the pressure-loss
-    parameter, with the jet angle): measured liner-hole Cd at combustor bleed ratios, the regime of #807. Title
-    as recalled, unverified.'
-  where: Cranfield University library.
 - citation: 'Rowbury, D. A., Oldfield, M. L. G., Lock, G. D. (2000). A method for correlating the influence of
     external crossflow on the discharge coefficients of film cooling holes. ASME Paper 2000-GT-0294 (also J.
     Turbomach. 123, 2001). Background: Rowbury (1998) DPhil thesis, Oxford.'
