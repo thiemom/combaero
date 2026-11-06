@@ -724,9 +724,6 @@ class NetworkSolver:
         # mass conserved), where every element offers a seed resistance
         # (``_seed_resistance``); other networks keep the propagated start.
         self.resistance_seed: bool = True
-        # The reference Tt of the flow component whose cold start is being
-        # estimated, set per thermal group by _build_x0 (#899); None outside.
-        self._ref_T_override: float | None = None
         # solve(stall_handover=False) turns this off for the duration of the
         # call, nested solves and the wall-free seed solver included (#864).
         self._stall_handover: bool = True
@@ -753,40 +750,6 @@ class NetworkSolver:
             ]
             comps.append((nodes, elems))
         return comps
-
-    def _thermal_group_T(self, comps: list[tuple[list[str], list[str]]]) -> dict[int, float]:
-        """Per flow component (by index in ``comps``): the mean boundary Tt
-        of its thermal group, the components joined by thermal walls (#899).
-        A component no wall touches is a group of its own. A wall endpoint
-        names an element or a node."""
-        comp_of: dict[str, int] = {}
-        for ci, (ns, es) in enumerate(comps):
-            for i in (*ns, *es):
-                comp_of[i] = ci
-        parent = list(range(len(comps)))
-
-        def find(i: int) -> int:
-            while parent[i] != i:
-                i = parent[i]
-            return i
-
-        if self.network.thermal_coupling_enabled:
-            for w in self.network.walls.values():
-                a, b = comp_of.get(w.element_a), comp_of.get(w.element_b)
-                if a is not None and b is not None:
-                    parent[find(a)] = find(b)
-        temps: dict[int, list[float]] = {}
-        for ci, (ns, _) in enumerate(comps):
-            for nid in ns:
-                n = self.network.nodes[nid]
-                if (
-                    isinstance(n, (PressureBoundary, MassFlowBoundary))
-                    and getattr(n, "Tt", None) is not None
-                ):
-                    temps.setdefault(find(ci), []).append(float(n.Tt))
-        return {
-            ci: float(np.mean(temps[find(ci)])) for ci in range(len(comps)) if find(ci) in temps
-        }
 
     @contextlib.contextmanager
     def _component_view(self, node_ids: list[str], elem_ids: list[str]) -> Any:
@@ -853,12 +816,6 @@ class NetworkSolver:
 
         ref_P = float(min(pressures)) if pressures else 101325.0
         ref_T = float(np.mean(temperatures)) if temperatures else 300.0
-        # The component's own boundary mean, before the thermal-group
-        # override below: the resistance-network seed runs at it (#990).
-        own_T = ref_T
-        # Per thermal group in a network of several flow components (#899).
-        if getattr(self, "_ref_T_override", None) is not None:
-            ref_T = float(self._ref_T_override)
         if compositions:
             ref_Y = [float(v) for v in np.mean(compositions, axis=0)]
         else:
@@ -870,7 +827,7 @@ class NetworkSolver:
         else:
             ref_mdot = self._bernoulli_reference_mdot(pressures, ref_P, ref_T, ref_Y)
 
-        return {"P": ref_P, "T": ref_T, "T_own": own_T, "Y": ref_Y, "m_dot": ref_mdot}
+        return {"P": ref_P, "T": ref_T, "Y": ref_Y, "m_dot": ref_mdot}
 
     def _bernoulli_reference_mdot(
         self,
@@ -1377,15 +1334,10 @@ class NetworkSolver:
             return None
         P_ref = float(np.mean(list(fixed.values())))
         X_ref = list(cb.mass_to_mole(ref["Y"]))
-        # The seed runs at the flow component's own boundary Tt ("T_own"), not
-        # its thermal group's mean (#990): the resistances (density) and the
-        # compressible kernels below. D-7156 run 19's Mach 0.7 coolant passage
-        # (297 K) seeded at the group's 446 K started its pressures 19% high
-        # (172.8 against a 145.2 kPa root) and its hot path 24% low on drop,
-        # and the cold solve took the warm-start retry; at its own Tt they
-        # start 0.6% and 1.3% off. Every other start estimate (node Tt, the
-        # reference m_dot, the propagated start) keeps the group's mean (#899).
-        T_seed = float(ref.get("T_own", ref["T"]))
+        # The flow component's own boundary Tt (#990): D-7156 run 19's Mach
+        # 0.7 coolant passage (297 K) seeded at a wall-joined mean of 446 K
+        # started its pressures 19% high and took the warm-start retry.
+        T_seed = float(ref["T"])
         rho = float(cb.density(T_seed, P_ref, X_ref))
         m_ref = max(float(ref["m_dot"]), SEED_MDOT_FLOOR)
         K_list = []
@@ -2005,14 +1957,7 @@ class NetworkSolver:
         # reference mixed them: a disconnected 358 K coolant duct beside 19
         # near-sonic 808 K gas paths pulled the reference to 583 K, every gas
         # path started 18% high (density), and the solve landed nine chambers
-        # on the supersonic root. The reference TEMPERATURE is per thermal
-        # group (components joined by walls): a stream heated
-        # through a wall ends between its own and its partner's boundary
-        # temperatures. Its own alone made the cold stream of a hot/cold pair
-        # too dense, its Bernoulli start 60% high, and its solve 4-7x slower
-        # (stress hotcold seeds 10, 18, 26). The resistance-network seed is the
-        # exception: it runs at the component's own Tt (#990, see
-        # _resistance_network_guess). A network of one component takes the
+        # on the supersonic root. A network of one component takes the
         # global path unchanged.
         comps = self._flow_components()
         ref_of: dict[str, dict[str, Any]] = {}
@@ -2020,14 +1965,9 @@ class NetworkSolver:
             ref, p_guess, mdot_guess, fuel_start, _tee_branch_guess = self._guess_start()
         else:
             p_guess, mdot_guess, fuel_start, _tee_branch_guess = {}, {}, {}, {}
-            group_T = self._thermal_group_T(comps)
-            for ci, (node_ids, elem_ids) in enumerate(comps):
-                self._ref_T_override = group_T.get(ci)
-                try:
-                    with self._component_view(node_ids, elem_ids):
-                        r, pg, mg, fs, tb = self._guess_start()
-                finally:
-                    self._ref_T_override = None
+            for node_ids, elem_ids in comps:
+                with self._component_view(node_ids, elem_ids):
+                    r, pg, mg, fs, tb = self._guess_start()
                 p_guess.update(pg)
                 mdot_guess.update(mg)
                 fuel_start.update(fs)
@@ -5804,16 +5744,11 @@ class NetworkSolver:
             else:
                 # Per flow component, as _build_x0's reference state (#899).
                 self._init_overrides = {}
-                group_T = self._thermal_group_T(comps)
-                for ci, (node_ids, elem_ids) in enumerate(comps):
-                    self._ref_T_override = group_T.get(ci)
-                    try:
-                        with self._component_view(node_ids, elem_ids):
-                            self._init_overrides.update(
-                                self._propagate_analytical_pt_prop(self._infer_reference_state())
-                            )
-                    finally:
-                        self._ref_T_override = None
+                for node_ids, elem_ids in comps:
+                    with self._component_view(node_ids, elem_ids):
+                        self._init_overrides.update(
+                            self._propagate_analytical_pt_prop(self._infer_reference_state())
+                        )
         else:
             self._init_overrides = {}
 
