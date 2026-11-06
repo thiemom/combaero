@@ -65,5 +65,8 @@ def test_branching_tee_into_a_heated_node() -> None:
             tee_type="branching",
         )
     )
-    net.add_element(ChannelElement("c", "s", "pb_out", length=0.5, diameter=0.1128))
+    # The straight pipe is F_C's own: an explicit F_C that contradicts the
+    # pipe at its arm is refused (#1023); 0.1128 m was F_C to 3 digits.
+    D_C = math.sqrt(4.0 * 0.01 / math.pi)
+    net.add_element(ChannelElement("c", "s", "pb_out", length=0.5, diameter=D_C))
     assert _max_rel_jacobian_error(net) < 1e-3

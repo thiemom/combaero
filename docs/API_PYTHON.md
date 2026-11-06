@@ -1718,6 +1718,13 @@ wall = WallNode("wall")
 junction = PlenumNode("junction")
 combustor = CombustorNode("combustor", method="complete")  # or "equilibrium"
 momentum = MomentumChamberNode("momentum", area=0.01, regime="compressible")
+# A chamber narrower than an adjoining pipe (#1023) is a contraction or
+# expansion with no loss: FlowNetwork.validate warns (UserWarning naming the
+# chamber, the pipe and both areas; momentum.pipe_area_warnings(net) returns the
+# messages, and the GUI's resolve preview shows them), suggesting an explicit
+# AreaChangeElement. Never for the DEFAULT_CHAMBER_AREA placeholder, a merge
+# chamber's area inherited from an orifice main inlet, or a pipe at the GUI's
+# default diameter; equal is to NEIGHBOUR_AREA_RTOL on the equivalent diameter.
 combustor.add_energy_boundary(EnergyBoundary("energy", Q=50000))  # heat addition [W]
 combustor.add_energy_boundary(EnergyBoundary("loss", fraction=-0.05))  # -5% of the SENSIBLE enthalpy
 junction.add_energy_boundary(EnergyBoundary("heater", Tt_target=650.0))  # set outlet Tt [K]: Q solved
@@ -2066,6 +2073,9 @@ tee_branch = TeeJunctionElement(
 )
 # Solved unknowns: tee.m_dot_com (total), tee.m_dot_branch (branch arm)
 # Straight flow is implicit: m_dot_straight = m_dot_com - m_dot_branch
+# A given F_C (common and straight arm) or F_branch that contradicts the single
+# pipe at its arm is refused at resolve_topology (#1023, as AreaChangeElement's
+# faces). A branch wider than the main (psi < 1) is accepted.
 
 # Momentum-CV junction (PDF spec, supersedes K-closure for n>3 manifolds and
 # high-Mach / ejector behaviour; see sources/junction/momentum cv implementation guide.pdf).
@@ -2221,7 +2231,9 @@ ejector = EjectorElement(
     throat_area=3.14e-5,      # primary nozzle throat area A_t [m^2]
     nozzle_exit_area=1.0e-4,  # primary nozzle exit area A_p1 [m^2], must exceed throat_area
     mixing_area=8.0e-4,       # mixing section A_3 [m^2], > nozzle_exit_area; None = inherit
-                              # from the outlet pipe (else DEFAULT_EJECTOR_MIXING_AREA)
+                              # from the outlet pipe (else DEFAULT_EJECTOR_MIXING_AREA);
+                              # a given one larger than the single outlet pipe is
+                              # refused (#1023), a wider pipe (a diffuser exit) is not
     recovery_efficiency=1.0,  # in (0, 1]: multiplies the lossless mixed stagnation P; not fitted
     regime="compressible",    # default DEFAULT_REGIME ("compressible" since #585), see below
     anchor_closure="huang1999",  # the (P_c*, P_b0) pair (default): Huang's printed P_c*
@@ -2301,7 +2313,8 @@ is a sudden or conical expansion or contraction from face `F0` to `F1` (#731).
   - Each direction is fed from its own upstream node (reversed flow reads the `to_node`). The two are blended C1 through zero drive.
   - Below a branch's drive floor (zeta times 2 Pa of head) the flow is a C1 odd blend with a finite slope at zero.
   - Every partial is analytic, composition included (`cb.area_change_element_flow`).
-- **Equal areas are refused** (no area change, no loss to set the flow): use a `LosslessConnectionElement`.
+- **Equal faces are no area change** (#1023, until 0.10.0 refused): F0 == F1 to `NEIGHBOUR_AREA_RTOL` (1e-6, #788's bore-pipe band) on the equivalent diameter `sqrt(F0 / F1)` is a pass-through, as a bore equal to its pipe is. Zero loss, the row is `Pt_in - Pt_out = 0` with Jacobian +1/-1 (row kind "p"), and the resolve preview reports `pass_through = 1`; diagnostics report `dPt_loss = zeta = 0` and the duct's own Mach as `mach_loss_ref`. Two in parallel are a flow-independent loop (refused at validate, as two lossless connections are).
+- **An explicit face against its pipe** (#1023): a given `F0` (`F1`) is compared with the single `ChannelElement` at the `from_node` (`to_node`), and one that differs by more than `NEIGHBOUR_AREA_RTOL` on the equivalent diameter is refused at `resolve_topology` (`ValueError` naming the element, the pipe and both areas). Equal is consistent; an inherited face is the pipe's by construction. Not compared: a node that joins more than one pipe, a pipe at the GUI's `DEFAULT_CHANNEL_DIAMETER`, and a face whose node is a `MomentumChamberNode` or `CombustorNode` with its own (user) area or Dh -- the face meets that chamber, and the chamber against the pipe is the chamber's warning (see `MomentumChamberNode`).
 - **Diagnostics** (upwind node's state):
   - `dPt_loss`: the closure's stagnation loss (formerly `dP_static`);
   - `zeta`: on the small section's static head;

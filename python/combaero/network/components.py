@@ -2606,6 +2606,15 @@ ORIFICE_BORE_PIPE_RTOL = 1e-6
 #: start guess is unchanged. Never a result.
 _ORIFICE_SEED_CD = 0.6
 
+#: Relative tolerance on "an element's area equals its neighbour's" (#1023):
+#: #788's bore-pipe band, compared on the equivalent diameter
+#: sqrt(A / A_neighbour). Equal within it is a pass-through (an area change
+#: with F0 == F1) or a consistent face (an explicit F0, F1, F_C or F_branch
+#: against the pipe it is attached to); outside it an explicit face is
+#: refused, as is an ejector mixing area above its outlet pipe, and a
+#: momentum chamber below an adjoining pipe is warned about.
+NEIGHBOUR_AREA_RTOL = ORIFICE_BORE_PIPE_RTOL
+
 #: Mass flow [kg/s] over which a directional loss blends its forward and
 #: reverse forms, logistic in m_dot / scale (C++ ``sigmoid`` in
 #: area_change.cpp). Outside a few scales either form holds alone.
@@ -2842,6 +2851,75 @@ def _unresolved_area_error(
         f"A default would fabricate a geometry that does not exist and the "
         f"solver would stall on it."
     )
+
+
+def _attached_pipe(
+    graph: "FlowNetwork", node_id: str, exclude: "NetworkElement"
+) -> "tuple[ChannelElement, float] | None":
+    """The pipe an element's face at ``node_id`` is attached to, with its area
+    (#1023), or None.
+
+    The single ChannelElement at the node other than ``exclude``, in either
+    direction, whose diameter states the geometry: never the GUI's
+    DEFAULT_CHANNEL_DIAMETER placeholder. With no channel, or more than one
+    (a node that joins pipes of their own sizes), the face has no one pipe
+    to agree with.
+    """
+    pipes = [
+        e
+        for e in graph.get_upstream_elements(node_id) + graph.get_downstream_elements(node_id)
+        if e is not exclude and isinstance(e, ChannelElement)
+    ]
+    if len(pipes) != 1:
+        return None
+    pipe = pipes[0]
+    if (
+        not (pipe.diameter and pipe.diameter > 0.0)
+        or getattr(pipe, "_area_source", "") == "default"
+    ):
+        return None
+    return pipe, math.pi * (pipe.diameter / 2.0) ** 2
+
+
+def _chamber_states_own_area(node: "NetworkNode | None") -> bool:
+    """A momentum chamber or combustor at a face whose area is the user's own
+    (an area or a Dh): the face then meets that chamber, not the pipe beyond
+    it, and a chamber against its pipe is MomentumChamberNode's warning
+    (#1023)."""
+    return isinstance(node, (MomentumChamberNode, CombustorNode)) and node._area_source in (
+        "user",
+        "derived from Dh",
+    )
+
+
+def _check_face_against_pipe(
+    element: "NetworkElement",
+    graph: "FlowNetwork",
+    name: str,
+    area: float,
+    node_ids: "list[str]",
+) -> None:
+    """Refuse an explicit face area ``name`` of ``element`` that contradicts
+    the pipe attached at one of ``node_ids`` (#1023): their equivalent
+    diameters differ by more than NEIGHBOUR_AREA_RTOL. Equal is consistent.
+    A node whose chamber states its own area is skipped
+    (_chamber_states_own_area)."""
+    for node_id in dict.fromkeys(node_ids):
+        if _chamber_states_own_area(graph.nodes.get(node_id)):
+            continue
+        hit = _attached_pipe(graph, node_id, element)
+        if hit is None:
+            continue
+        pipe, A_pipe = hit
+        if abs(math.sqrt(area / A_pipe) - 1.0) <= NEIGHBOUR_AREA_RTOL:
+            continue
+        raise ValueError(
+            f"{type(element).__name__} '{element.id}': {name} = {area:.6g} m^2 contradicts "
+            f"the channel '{pipe.id}' it is attached to at '{node_id}' "
+            f"(D = {pipe.diameter:.6g} m, A = {A_pipe:.6g} m^2). The face is that pipe's "
+            f"own: leave {name} unset to inherit it, or make the two equal. A change of "
+            "area between them is an AreaChangeElement of its own."
+        )
 
 
 class NetworkNode(ABC):
@@ -3791,6 +3869,63 @@ class MomentumChamberNode(NetworkNode):
                 "A merge chamber is a constant-area control volume; leave the "
                 "area unset to inherit it."
             )
+
+    def _area_is_a_statement(self, graph: "FlowNetwork") -> bool:
+        """Whether the resolved area states the geometry (#1023, #1016's
+        rule): a user's area or Dh, or one inherited from a channel or another
+        area-bearing neighbour. Not the DEFAULT_CHAMBER_AREA placeholder of a
+        chamber nothing sizes, nor a merge chamber's area inherited from an
+        orifice main inlet (a bore, never an area a neighbour measures
+        against)."""
+        source = self._area_source
+        if source in ("", "default") or not (self.area and self.area > 0.0):
+            return False
+        if self._auto_area and self.main_inlet is not None:
+            main = graph.elements.get(self.main_inlet)
+            if isinstance(main, OrificeElement) and source == f"inherited from {self.main_inlet}":
+                return False
+        return True
+
+    def pipe_area_warnings(self, graph: "FlowNetwork") -> list[str]:
+        """One message per adjoining pipe wider than this chamber (#1023).
+
+        The chamber's closure carries the flow through its own area with no
+        loss, so a pipe wider than it is a contraction into the chamber (or an
+        expansion out of it) that costs nothing. Someone may mean that, so it
+        is a warning, not a refusal; FlowNetwork.validate issues it and the
+        GUI's resolve preview shows it. Compared on the equivalent diameter to
+        NEIGHBOUR_AREA_RTOL, only where the area is a statement
+        (_area_is_a_statement) and against a pipe whose diameter is not the
+        GUI's default."""
+        if not self._area_is_a_statement(graph):
+            return []
+        provenance = "" if self._area_source == "user" else f", {self._area_source}"
+        out: list[str] = []
+        seen: set[str] = set()
+        for e in graph.get_upstream_elements(self.id) + graph.get_downstream_elements(self.id):
+            if e.id in seen or not isinstance(e, ChannelElement):
+                continue
+            seen.add(e.id)
+            if not (e.diameter and e.diameter > 0.0) or getattr(e, "_area_source", "") == "default":
+                continue
+            A_pipe = math.pi * (e.diameter / 2.0) ** 2
+            if math.sqrt(self.area / A_pipe) >= 1.0 - NEIGHBOUR_AREA_RTOL:
+                continue
+            into = e.to_node == self.id
+            out.append(
+                f"MomentumChamberNode '{self.id}': area {self.area:.6g} m^2{provenance} is "
+                f"smaller than the adjoining pipe '{e.id}' (D = {e.diameter:.6g} m, "
+                f"A = {A_pipe:.6g} m^2): the flow "
+                + (
+                    "contracts from the pipe into the chamber"
+                    if into
+                    else "expands from the chamber into the pipe"
+                )
+                + " with no loss. If that area change is real, model it explicitly "
+                "with an AreaChangeElement between them; otherwise make the chamber "
+                "at least the pipe's area."
+            )
+        return out
 
 
 class PressureBoundary(NetworkNode):
@@ -11688,10 +11823,14 @@ class AreaChangeElement(NetworkElement):
     rises monotonically with it and saturates at the sonic flow, so it exists for
     every state. Each direction is fed from its own upstream node, and the two
     are blended C1 through zero drive (``area_change_element_flow``).
+
+    Equal faces (#1023), F0 == F1 to NEIGHBOUR_AREA_RTOL on the equivalent
+    diameter, are no area change: a pass-through, as a bore equal to its pipe
+    is no orifice (#788). Zero loss, the row Pt_in - Pt_out with the constant
+    Jacobian of a lossless connection. An explicit F0 or F1 that contradicts
+    the pipe attached at its face is refused (_check_face_against_pipe).
     """
 
-    #: RESIDUAL-ROW-SCALING: m_dot - m_calc, in kg/s (#731; it was a Pa row).
-    residual_scale_kind = "mdot"
     #: Incompressible validity (#588): the closure's own Mach -- the small
     #: section's for an expansion, the vena contracta's for a contraction.
     validity_mach_keys = ("mach_loss_ref",)
@@ -11722,10 +11861,30 @@ class AreaChangeElement(NetworkElement):
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
 
+    @property
+    def _pass_through(self) -> bool:
+        """Equal faces, F0 == F1 to NEIGHBOUR_AREA_RTOL on the equivalent
+        diameter: no area change (#1023). Follows F0/F1 wherever they were
+        set or resolved."""
+        f0, f1 = self.F0, self.F1
+        if not (f0 and f1 and f0 > 0.0 and f1 > 0.0):
+            return False
+        return abs(math.sqrt(f0 / f1) - 1.0) <= NEIGHBOUR_AREA_RTOL
+
+    @property
+    def residual_scale_kind(self) -> str:
+        """RESIDUAL-ROW-SCALING: m_dot - m_calc, in kg/s (#731; it was a Pa
+        row); a total-pressure equality, Pa, where the faces are equal and
+        there is no area change (#1023). Must change with the residual."""
+        return "p" if self._pass_through else "mdot"
+
     def _seed_resistance(self, rho: float, P_ref: float, m_ref: float) -> float | None:
-        """Start guess: a Borda-Carnot head at the smaller area."""
+        """Start guess: a Borda-Carnot head at the smaller area; none for
+        equal faces (no area change, #1023)."""
         if not self.F0 or not self.F1:
             return None
+        if self._pass_through:
+            return 0.0
         a, b = sorted((self.F0, self.F1))
         return (1.0 - a / b) ** 2 / (2.0 * rho * a * a)
 
@@ -11733,6 +11892,12 @@ class AreaChangeElement(NetworkElement):
         return 1
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
+        # An explicit face against the pipe at it (#1023): before inference,
+        # so an inherited face (equal by construction) is never compared.
+        if self._F0_source == "user" and self.F0:
+            _check_face_against_pipe(self, graph, "F0", float(self.F0), [self.from_node])
+        if self._F1_source == "user" and self.F1:
+            _check_face_against_pipe(self, graph, "F1", float(self.F1), [self.to_node])
         # F0/F1 ARE the physics here: their ratio is the area change the
         # element exists to model. A defaulted value invents a contraction or
         # expansion the network does not contain, so an unresolvable area is
@@ -11755,11 +11920,7 @@ class AreaChangeElement(NetworkElement):
             raise ValueError(
                 f"AreaChangeElement '{self.id}' has invalid Downstream Area F1={self.F1}. Must be > 0."
             )
-        if self.F0 == self.F1:
-            raise ValueError(
-                f"AreaChangeElement '{self.id}' has F0 == F1 = {self.F0}: no area change, and no "
-                "loss to set the flow. Use a LosslessConnectionElement."
-            )
+        # F0 == F1 is no area change: a pass-through (#1023), no longer refused.
         if self.D_h is not None and self.D_h < 0:
             raise ValueError(
                 f"AreaChangeElement '{self.id}' has invalid Hydraulic Diameter D_h={self.D_h}. Must be >= 0."
@@ -11795,6 +11956,13 @@ class AreaChangeElement(NetworkElement):
     def residuals(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> tuple[list[float], LazyJacobian]:
+        if self._pass_through:
+            # Equal faces (#1023): no area change. Zero loss, the flow passes
+            # unchanged; its rate is the network's. Exact and linear, so the
+            # Jacobian is the constant +-1 of a lossless connection.
+            return [state_in.Pt - state_out.Pt], LazyJacobian(
+                lambda: {0: {f"{self.from_node}.Pt": 1.0, f"{self.to_node}.Pt": -1.0}}
+            )
         # The loss couples stagnation to stagnation, as ChannelElement does
         # (#175, #541): for a plenum or boundary downstream Pt == P.
         m_calc = float(self._flow(state_in, state_out, derivatives=False).m_dot)
@@ -11826,6 +11994,8 @@ class AreaChangeElement(NetworkElement):
         m_dot = float(state_in.m_dot)
         # The upwind node feeds the closure, and the face it enters by.
         up, F_in, F_out = (state_in, f0, f1) if m_dot >= 0.0 else (state_out, f1, f0)
+        if self._pass_through:
+            return self._pass_through_diagnostics(state_in, state_out, f_small)
         try:
             cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
             loss = cb.area_change_loss(
@@ -11871,6 +12041,41 @@ class AreaChangeElement(NetworkElement):
             "Re_small": float(loss.Re),
             "expansion": float(loss.expansion),
             "choked": float(loss.choked),
+            "F0": f0,
+            "F1": f1,
+            "F0_source": self._F0_source,
+            "F1_source": self._F1_source,
+        }
+
+    def _pass_through_diagnostics(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState, area: float
+    ) -> dict[str, float | str]:
+        """Equal faces (#1023): no closure runs. Zero loss and zeta, no
+        choke; the Mach and Re the validity check and the report read are the
+        duct's own, at the face area, on the inlet state."""
+        m_dot = float(state_in.m_dot)
+        f0, f1 = float(self.F0), float(self.F1)
+        try:
+            cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
+        except Exception:
+            return {"dPt_loss": 0.0, "area_ratio": f1 / f0}
+        Dh = self.D_h or math.sqrt(4.0 * area / math.pi)
+        ref = _element_reference_block(
+            cs_in, m_dot=m_dot, area=area, Dh=Dh, location="small_section"
+        )
+        a = cs_in.thermo.a
+        mach = ref["velocity"] / a if a > 0 else 0.0
+        return {
+            "m_dot": m_dot,
+            **_element_pressure_block(state_in, state_out, mach_in=mach, mach_out=mach),
+            **ref,
+            "dPt_loss": 0.0,
+            "area_ratio": f1 / f0,
+            "zeta": 0.0,
+            "mach_loss_ref": float(mach),
+            "Re_small": float(ref.get("Re", 0.0)),
+            "expansion": 0.0,
+            "choked": 0.0,
             "F0": f0,
             "F1": f1,
             "F0_source": self._F0_source,
@@ -11933,6 +12138,9 @@ class TeeJunctionElement(NetworkElement):
         self._F_branch: float | None = (
             F_branch  # resolved branch area; psi derived from F_C/_F_branch
         )
+        #: Whether F_branch was given (#1023): only a given one is compared
+        #: with the branch pipe.
+        self._F_branch_user = F_branch is not None
         self.psi = psi
         self.tee_type = tee_type
         self.blend_k = blend_k
@@ -11970,6 +12178,17 @@ class TeeJunctionElement(NetworkElement):
         return 2
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
+        # Step 0 (#1023): an explicit F_C or F_branch against the pipe
+        # attached at its arm. F_C is both the common and the straight arm's
+        # area (Bassett: F_straight = F_C).
+        if self._area_source == "user" and self.F_C:
+            _check_face_against_pipe(
+                self, graph, "F_C", float(self.F_C), [self.common_node, self.straight_node]
+            )
+        if self._F_branch_user and self._F_branch:
+            _check_face_against_pipe(
+                self, graph, "F_branch", float(self._F_branch), [self.branch_node]
+            )
         # Step 1: resolve F_C from common or straight arm channels.
         # Branch arm is only used as last resort (back-calculate F_C = F_branch * psi).
         if self.F_C is None:

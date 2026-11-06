@@ -62,6 +62,10 @@ class ItemResolution:
     #: When unresolved, the refusal message (which field to set, and where it
     #: searched). Empty when resolved.
     reason: str = ""
+    #: A warning the solve will issue about this item's geometry, which does
+    #: not stop it (#1023: a momentum chamber narrower than an adjoining
+    #: pipe). Empty when there is none.
+    warning: str = ""
 
 
 def _s(obj: Any, name: str) -> str:
@@ -98,9 +102,17 @@ def _extract(item: Any) -> dict[str, FieldResolution]:
             "Dh": FieldResolution(_f(item, "Dh"), _s(item, "_Dh_source")),
         }
     if isinstance(item, AreaChangeElement):
+        # Equal faces are no area change (#1023): pass_through = 1, zero
+        # loss. An explicit face contradicting its pipe is refused, so it
+        # arrives here as unresolved.
+        pass_through = bool(item._pass_through)
         return {
             "F0": FieldResolution(_f(item, "F0"), _s(item, "_F0_source")),
             "F1": FieldResolution(_f(item, "F1"), _s(item, "_F1_source")),
+            "pass_through": FieldResolution(
+                1.0 if pass_through else 0.0,
+                "F0 = F1: no area change" if pass_through else "",
+            ),
         }
     if isinstance(item, TeeJunctionElement):
         return {"F_C": FieldResolution(_f(item, "F_C"), _s(item, "_area_source"))}
@@ -216,8 +228,15 @@ def resolve_preview(net: FlowNetwork) -> dict[str, ItemResolution]:
     for item_id, item in {**net.nodes, **net.elements}.items():
         reason = refusals.get(item_id, "")
         fields = _extract(item)
+        # The warning FlowNetwork.validate issues (#1023), from the same
+        # method, on the resolved geometry.
+        warning = (
+            " ".join(item.pipe_area_warnings(net)) if isinstance(item, MomentumChamberNode) else ""
+        )
         if reason:
-            report[item_id] = ItemResolution(status="unresolved", fields=fields, reason=reason)
+            report[item_id] = ItemResolution(
+                status="unresolved", fields=fields, reason=reason, warning=warning
+            )
         else:
-            report[item_id] = ItemResolution(status="resolved", fields=fields)
+            report[item_id] = ItemResolution(status="resolved", fields=fields, warning=warning)
     return report
