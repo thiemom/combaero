@@ -66,6 +66,10 @@ class ItemResolution:
     #: not stop it (#1023: a momentum chamber narrower than an adjoining
     #: pipe). Empty when there is none.
     warning: str = ""
+    #: A resolved geometry the solver will refuse at validate() (#1024):
+    #: overlapping holes, a zero-area duct or node, a Dh no section of its
+    #: area has. Empty when there is nothing to refuse.
+    refusal: str = ""
 
 
 def _s(obj: Any, name: str) -> str:
@@ -233,10 +237,30 @@ def resolve_preview(net: FlowNetwork) -> dict[str, ItemResolution]:
         warning = (
             " ".join(item.pipe_area_warnings(net)) if isinstance(item, MomentumChamberNode) else ""
         )
+        if isinstance(item, OrificeElement) and item.closed:
+            # A zero bore (#1024): closed, a wall in the flow path, no flow.
+            fields["closed"] = FieldResolution(1.0, "zero area: closed, no flow")
         if reason:
             report[item_id] = ItemResolution(
                 status="unresolved", fields=fields, reason=reason, warning=warning
             )
         else:
-            report[item_id] = ItemResolution(status="resolved", fields=fields, warning=warning)
+            report[item_id] = ItemResolution(
+                status="resolved",
+                fields=fields,
+                warning=warning,
+                refusal=_geometry_refusal(item),
+            )
     return report
+
+
+def _geometry_refusal(item: Any) -> str:
+    """The element's or node's own geometry refusal (#1024), the message its
+    validate() raises, or "": checked on the resolved values, before Solve."""
+    check = getattr(item, "_geometry_error", None)
+    if not callable(check):
+        return ""
+    try:
+        return str(check() or "")
+    except (ValueError, TypeError, ArithmeticError):
+        return ""

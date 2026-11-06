@@ -341,6 +341,32 @@ const Inspector = () => {
 					</div>
 				</h2>
 
+				{(() => {
+					// #1024: the solver's own geometry verdict from the resolve pass.
+					// A geometry it refuses at Solve (overlapping holes, a zero-area
+					// duct or node, a Dh no section of its area has), and a closed
+					// restriction (zero bore: a wall, no flow).
+					const item = previewItems?.[selectedNode.id];
+					const refusal = item?.refusal;
+					const closed = item?.fields?.closed?.value === 1;
+					if (!refusal && !closed) return null;
+					return (
+						<div className="mb-2 flex flex-col gap-1 text-[10px]">
+							{refusal && (
+								<p className="rounded border border-amber-200 bg-amber-50 p-2 text-amber-800">
+									The solver refuses this geometry: {refusal}
+								</p>
+							)}
+							{closed && (
+								<p className="rounded border border-stone-200 bg-stone-50 p-2 text-stone-600">
+									Closed: zero area, a wall in the flow path. No flow passes;
+									the pressures either side are independent.
+								</p>
+							)}
+						</div>
+					);
+				})()}
+
 				<div className="flex flex-col gap-2 mb-4">
 					<label
 						htmlFor={`node_label_${selectedNode.id}`}

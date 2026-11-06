@@ -687,7 +687,7 @@ def test_a_bad_thermal_wall_value_names_the_edge() -> None:
     _assert_readable_error(_post("/solve", graph), "'w1'", "orientation")
 
 
-@pytest.mark.parametrize(("L", "D"), [(-1.0, 0.05), (0.5, 0.0), (0.5, -0.05)])
+@pytest.mark.parametrize(("L", "D"), [(-1.0, 0.05)])
 def test_non_positive_geometry_is_a_failed_solve_that_names_the_element(
     L: float, D: float, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -704,6 +704,19 @@ def test_non_positive_geometry_is_a_failed_solve_that_names_the_element(
     body = r.json()
     assert body["success"] is False
     assert "'ch' [Channel]" in body["message"] and "positive" in body["message"], body["message"]
+
+
+@pytest.mark.parametrize("D", [0.0, -0.05])
+def test_a_duct_without_area_is_refused_before_the_solve_naming_it(D: float) -> None:
+    """A channel of zero or negative diameter is no geometry: refused at
+    validate() (#1024), a 400 naming the element, where it used to fail
+    mid-solve in the Fanno kernel."""
+    graph = _pipe()
+    graph["nodes"][1]["data"].update({"L": 0.5, "D": D})
+    r = _post("/solve", graph)
+    assert r.status_code == 400, r.text[:300]
+    detail = r.json()["detail"]
+    assert "'ch' [Channel]" in detail and "positive" in detail, detail
 
 
 def test_nan_geometry_in_a_preview_is_not_a_bare_500() -> None:

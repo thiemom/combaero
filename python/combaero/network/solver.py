@@ -34,6 +34,7 @@ from .components import (
     PressureLossElement,
     TurbomachineElement,
     WallNode,
+    _is_closed_restriction,
     film_discharge_node,
     film_on_wall_side,
     film_sources,
@@ -949,12 +950,13 @@ class NetworkSolver:
         """True when the element's flow is zero by mass balance, from the
         graph alone (#1004): the part of the network on one side of it,
         without it, reaches no node that passes flow -- no PressureBoundary,
-        no fuel controller, no MassFlowBoundary feeding a nonzero m_dot."""
+        no fuel controller, no MassFlowBoundary feeding a nonzero m_dot. A
+        closed restriction (#1024) passes none: the search stops at it."""
         net = self.network
         el = net.elements[eid]
         touching: dict[str, list[str]] = {}
         for oid, other in net.elements.items():
-            if oid == eid:
+            if oid == eid or _is_closed_restriction(other):
                 continue
             for n in (*other.all_source_nodes(), *other.all_sink_nodes()):
                 touching.setdefault(n, []).append(oid)
@@ -1224,7 +1226,10 @@ class NetworkSolver:
                 # Dead-end channels (to_node is a WallNode) carry zero flow.
                 # Start Newton at m_dot=0 so the mass-balance constraint is
                 # trivially satisfied from the first iteration.
-                if isinstance(self.network.nodes.get(elem.to_node), WallNode):
+                # So does a closed restriction (#1024), whatever lies beyond.
+                if isinstance(
+                    self.network.nodes.get(elem.to_node), WallNode
+                ) or _is_closed_restriction(elem):
                     elem_share = 0.0
 
                 # Only apply the Mach cap when the flow is estimated (pressure-
@@ -1474,8 +1479,13 @@ class NetworkSolver:
         if not fixed:
             return None
         walls = {nid for nid, n in net.nodes.items() if isinstance(n, WallNode)}
+        # A closed restriction (#1024) is a wall in the path: no resistance to
+        # fit, no flow; it is seeded at zero below.
+        shut = [e.id for e in net.elements.values() if _is_closed_restriction(e)]
         els = [
-            e for e in net.elements.values() if e.from_node not in walls and e.to_node not in walls
+            e
+            for e in net.elements.values()
+            if e.from_node not in walls and e.to_node not in walls and e.id not in shut
         ]
         # A compressor or turbine (#893) is a pressure ratio, not a resistance:
         # with one end at a fixed pressure it fixes the other (in a chain, in
@@ -1728,6 +1738,7 @@ class NetworkSolver:
         p_floor = 0.5 * min(fixed.values())
         p_map = {nid: max(float(p[idx[nid]]), p_floor) for nid in free}
         m_map = {e.id: float(mi) for e, mi in zip(els, m, strict=True)}
+        m_map.update(dict.fromkeys(shut, 0.0))
         for nid, P in fixed.items():
             if nid not in boundary:
                 p_map[nid] = P  # set by a machine's pressure ratio

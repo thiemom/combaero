@@ -395,7 +395,8 @@ class OrificeData(BaseModel):
             import math
 
             area_val = data.pop("area")
-            if area_val > 0:
+            # 0 is a closed restriction (#1024), as a 0 diameter is.
+            if area_val is not None and area_val >= 0:
                 data["diameter"] = math.sqrt(4.0 * area_val / math.pi)
         return data
 
@@ -590,7 +591,7 @@ class TurbomachineData(BaseModel):
     Pt_out / Pt_in = pressure_ratio (compressor) or its inverse (turbine)."""
 
     model_config = ConfigDict(extra="ignore")
-    pressure_ratio: float = Field(4.0, ge=1.0)
+    pressure_ratio: float = Field(4.0, ge=1.0, allow_inf_nan=False)  # finite (#1024)
     efficiency_type: Literal["polytropic", "isentropic"] = "polytropic"
     efficiency: float = Field(0.88, gt=0.0, le=1.0)
     initial_guess: dict[str, float] = Field(default_factory=dict)

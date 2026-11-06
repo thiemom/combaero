@@ -1771,6 +1771,8 @@ fluid. Three modes:
   products'. It is not a fraction of absolute enthalpy, which includes
   formation enthalpy (#481). The heat it applied is reported as
   `{node}.Q_fraction` [W].
+  It must be above -1, per boundary and summed over a node (#1024): at -1
+  it removes all the sensible enthalpy.
 - **`Q`** is spread over the node's real inflow. Only a near-stagnant node
   (below `cb.MIXER_HEAT_MDOT_FLOOR` = 1 mg/s) takes up less, fading C1 to none
   at zero flow (`cb.mixer_heat_per_unit_flow(m)` returns the enthalpy rise per
@@ -1797,6 +1799,7 @@ fluid. Three modes:
   - **Orifices:** the kernel is evaluated from the node the flow comes from: its stagnation state, its density, and the velocity of approach of the pipe on its side (`beta`, or `beta_reverse` from the to-node's pipe).
     - The direction comes from the pressures, blended through equal Pt over `ORIFICE_REVERSAL_P_SCALE` (0.1 Pa).
     - An orifice into a dead end (no flow boundary beyond its to-node) is never reversed: every root has zero flow there.
+    - **A zero bore is a closed restriction** (#1024). `OrificeElement(diameter=0)` or `area=0`, `EffectiveAreaConnectionElement(effective_area=0)` and `DiameterDischargeCoefficientConnectionElement(diameter=0)` are walls (`element.closed` is True). The row is `m_dot = 0` with the constant Jacobian 1 (row kind "mdot"), and no kernel is evaluated. The diagnostics are `closed = 1`, the pressures either side, and zero flow, area and velocity. The resolve preview reports `closed = 1`, and the start guess seeds the flow at zero. A part of the network that only closed elements join to the rest solves when it holds a `PressureBoundary` of its own. A part they cut off from every `PressureBoundary` is refused at `FlowNetwork.validate()`, naming the closed elements, because nothing sets the pressure of the gas trapped there. The #1004 dead-end test and an orifice's own dead-end test do not search past a closed element. A negative or non-finite bore, area or effective area is refused at construction.
     - **With a pipe upstream (E applied) the orifice drives from that pipe's static state** (#651), the node's (Pt, Tt) at the pipe's mass flux, not from the node's own static pressure: a `PlenumNode` (P = Pt) and a `MomentumChamberNode` then give the same flow. Reported as `P_approach`. The row then solves its own consistency, m* = m_calc(m*, x).
     - **Between pipes the orifice charges its permanent loss** (#645). With a pipe on the side the flow comes from (beta) and a wider one on the side it goes to, a metering or `fixed` orifice's drop is the nodes' stagnation difference, ISO 5167-2's k(beta, C) times the tapping differential, and the kernel expands to the implied tap pressure. Into a node with no pipe beyond it, the jet's head is lost and the drop is the tapping differential. The row's Cd is at D-D/2 taps; `OrificeElement(tap=...)` only picks the `dP_tap` it reports.
     - **The bore against its pipe** (#788, 0.8.0). The pipes that set beta (the single upstream channel forward, the single to-side channel in reverse) are compared with the bore to `ORIFICE_BORE_PIPE_RTOL` (1e-6 relative). Equal on either side is **no orifice**: zero loss, the row is `Pt_in - Pt_out = 0` with Jacobian +1/-1 (row kind "p"), `beta = 1`, and the resolve preview reports `pass_through = 1`; this is how an orifice is switched off without editing the network. A bore larger than either pipe is refused (`ValueError`). Until 0.8.0 a bore at or above the pipe silently became a wall hole (beta = 0, and only in that direction); that fallback is gone. Write a lumped Cd*A restriction as `OrificeElement(..., in_pipe=False)` (GUI: untick "In a pipe"): no pipe diameter, beta = 0 both ways, no recovery. Its metering Cd (Reader-Harris/Gallagher) is then evaluated as for a plenum-fed orifice, at D = 1 m; the old fallback used D = 10 d.
@@ -1824,6 +1827,26 @@ fluid. Three modes:
   - Both agree with the compressible forms to O(Ma^2): 0.25% of the head at Ma 0.2, the gap quartering as Ma halves.
   - A junction's reference head (`MultiPortChamberElement`'s constant K) follows its port chamber's regime.
   - A script that validates the compressible closure must ask for it: `MomentumChamberNode(..., regime="compressible")`.
+
+#### Geometry the network refuses (#1024)
+
+Each refusal names the element or node, the input and the limit, and raises `ValueError` at `FlowNetwork.validate()` unless noted. Every check is a method `_geometry_error()` on its class, which returns the message or "". The GUI's resolve preview reports that message as the item's `refusal` before Solve.
+
+| what | refused |
+|---|---|
+| `ChannelElement` | a diameter (given or inherited) that is not positive and finite; a given `Dh` that is not positive and finite |
+| `MomentumChamberNode`, `CombustorNode` | a given area or `Dh` that is not positive and finite; a given `Dh` above `2 sqrt(A/pi)` |
+| `EffusionPlateElement` | `pitch_y <= d`; `pitch_x <= d / sin(angle_deg)`, the hole's footprint on the surface (rows taken inline: the panel gives no arrangement) |
+| `FilmCoolingElement` | `lateral_pitch <= d`; with `n_rows > 1`, `row_pitch <= d / sin(angle_deg)` (rows taken inline) |
+| `ImpingementPlateElement` | `pi/4 / (xn_d yn_d) >= 1`; `yn_d <= 1`; `xn_d <= 1` inline; staggered (`pattern="staggered"`, the next row half a spanwise pitch over) `min(sqrt(xn_d^2 + (yn_d/2)^2), 2 xn_d) <= 1` |
+| `CompressorElement`, `TurbineElement` | a non-finite `pressure_ratio` (at construction) |
+| `CombustorNode` | a `method` other than `"complete"` / `"equilibrium"` (at construction and at `validate()`) |
+| `EnergyBoundary` | `fraction <= -1`, per boundary (at construction) and summed over a node's boundaries |
+
+- **Holes must leave material between them.** Equal pitches are refused too, because touching holes leave no plate. If a valid staggered film or effusion design is refused, it gets its own issue.
+- **The isoperimetric bound** (chambers and combustors). `Dh = 4A/P`, and no closed section of area `A` has a shorter perimeter than the circle, so `Dh <= 2 sqrt(A/pi)`. The tolerance is `ISOPERIMETRIC_DH_RTOL` (1e-3 relative), which absorbs an area typed to three significant figures. A `ChannelElement` is not bounded: a channel that stands for a share of a wider duct wets only its part of the wall, and keeps the duct's Dh, as the C3X vane example's hole segments do.
+- **A fraction of -1 removes all the sensible enthalpy.** The node then lands on the 298.15 K reference whatever it is fed. On a combustor the report divided by zero. Below -1 the node goes below the reference temperature, and from a hot inflow below 0 K. To set an outlet temperature, use `Tt_target`.
+- **To shut a path**, use a closed restriction (above), not a zero-area duct.
 
 #### Merge chamber: main inlet plus side streams (#471)
 
