@@ -12,7 +12,7 @@ import {
 } from "reactflow";
 import { create } from "zustand";
 import { exportResults, isBackendReachable, resolvePreview } from "../api";
-import { discoverFields } from "../utils/diagnostics";
+import { discoverFields, REFUSED_ROOT_KEY } from "../utils/diagnostics";
 import { repairEdgeHandles } from "../utils/edgeHandles";
 import { type ExampleInfo, parseExampleInfo } from "../utils/exampleInfo";
 import { HEAT_SOURCE_HANDLE, heatSourceEdgeProps } from "../utils/heatSource";
@@ -437,7 +437,13 @@ const useStore = create<RFState>((set, get) => ({
 		// has no result for loses its old one: after a failed request (no
 		// results at all) or for an item the solve did not cover, a kept result
 		// would read as current in the probe, the telemetry and the cards.
+		// A refused root (converged, outcome "inconsistent") is told from a
+		// solve that did not converge on each result, so the telemetry and the
+		// probes keep the difference after the status banner is dismissed.
+		const refused = results.success === false && results.converged === true;
 		const withResult = <T extends Node | Edge>(item: T, result: any): T => {
+			if (result && refused && result.success === false)
+				result = { ...result, [REFUSED_ROOT_KEY]: true };
 			if (result) return { ...item, data: { ...item.data, result } };
 			if (!item.data?.result) return item;
 			const { result: _old, ...rest } = item.data;

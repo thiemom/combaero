@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 import type { Edge, Node } from "reactflow";
 import { beforeEach, describe, expect, it } from "vitest";
+import { unacceptedResult } from "../utils/diagnostics";
 import { PROBE_LINK_HANDLE, probeLinkId } from "../utils/probeLink";
 import useStore, { PROBE_HANDLE } from "./useStore";
 
@@ -84,6 +85,35 @@ describe("results after a solve", () => {
 			Q: 1,
 			success: false,
 		});
+	});
+
+	it("a refused root stays told from a failed solve after dismiss", () => {
+		const failed = { m_dot: 0.1, success: false };
+		useStore.getState().setSolveResults(
+			solved([], {
+				success: false,
+				converged: true,
+				outcome: "inconsistent",
+				element_results: { a: failed },
+				edge_results: { w: { Q: 1 } },
+			}),
+		);
+		useStore.getState().setSolveResults(null); // the banner dismissed
+		const { nodes, edges } = useStore.getState();
+		expect(unacceptedResult(nodes[0].data.result)).toBe("refused");
+		expect(unacceptedResult(edges[0].data.result)).toBe("refused");
+		// A solve that did not converge is not stamped.
+		useStore.getState().setSolveResults(
+			solved([], {
+				success: false,
+				converged: false,
+				element_results: { a: failed },
+			}),
+		);
+		useStore.getState().setSolveResults(null);
+		expect(unacceptedResult(useStore.getState().nodes[0].data.result)).toBe(
+			"not_converged",
+		);
 	});
 
 	it("a field the user unchecked stays unchecked at the next solve", () => {

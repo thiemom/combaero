@@ -305,3 +305,63 @@ def test_a_closer_retry_is_returned(monkeypatch):
 
     assert calls["n"] == 2
     assert sol["marker"] == "retry"
+
+
+def _refused_primary_then_no_seed(monkeypatch, converged: bool) -> dict:
+    """The primary attempt is refused (converged, outcome INCONSISTENT) or
+    fails outright, and neither incompressible proxy gives a seed."""
+    solver = NetworkSolver(_retryable_network())
+    msg = "Converged, but refused" if converged else "did not converge"
+
+    def fake_impl(*args, **kwargs):
+        return {
+            "__success__": False,
+            "__converged__": converged,
+            "__message__": msg,
+            "__final_norm__": 0.0 if converged else 1.0,
+        }
+
+    monkeypatch.setattr(solver, "_solve_impl", fake_impl)
+    monkeypatch.setattr(solver, "_outlet_ref_incompressible_seed", lambda **kw: None)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return solver.solve(timeout=20.0)
+
+
+def test_a_refused_root_does_not_say_the_retry_was_skipped(monkeypatch):
+    """A converged-but-refused primary (the no-cooling-path refusal, #998)
+    read "Converged, but ... [auto-retry skipped: neither ... proxy solve
+    converged]": a contradiction. The skipped note is for a failed solve."""
+    sol = _refused_primary_then_no_seed(monkeypatch, converged=True)
+    assert sol["__message__"] == "Converged, but refused"
+
+
+def test_a_failed_solve_still_says_the_retry_was_skipped(monkeypatch):
+    """The other side: where the note is informative it stays."""
+    sol = _refused_primary_then_no_seed(monkeypatch, converged=False)
+    assert "auto-retry skipped" in sol["__message__"]
+
+
+def test_a_refused_root_kept_over_a_worse_retry_is_not_called_failed(monkeypatch):
+    solver = NetworkSolver(_retryable_network())
+    calls = {"n": 0}
+
+    def fake_impl(*args, **kwargs):
+        calls["n"] += 1
+        first = calls["n"] == 1
+        return {
+            "__success__": False,
+            "__converged__": first,
+            "__message__": "Converged, but refused" if first else "retry",
+            "__final_norm__": 0.0 if first else 1.0,
+        }
+
+    monkeypatch.setattr(solver, "_solve_impl", fake_impl)
+    monkeypatch.setattr(solver, "_outlet_ref_incompressible_seed", lambda **kw: np.zeros(3))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        sol = solver.solve(timeout=20.0)
+    assert calls["n"] == 2
+    assert sol["__message__"].startswith("Converged, but refused")
+    assert "also failed" not in sol["__message__"]
+    assert "no admissible root either" in sol["__message__"]

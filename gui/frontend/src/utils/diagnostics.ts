@@ -90,6 +90,40 @@ export function isConvergedResult(result: unknown): boolean {
 }
 
 /**
+ * Why a stored result is not an accepted solution, or null when it is one.
+ * "refused": the root finder converged and the solve then refused the root
+ * (outcome "inconsistent": a second-law violation, an effusion plate with no
+ * cooling path, ...); "not_converged": it never got there. Read from the
+ * solve response's `converged` (the per-item results carry `success` only).
+ */
+export type UnacceptedResult = "refused" | "not_converged";
+
+/** Stamped on each result of a refused solve by the store (setSolveResults):
+ *  the status banner, and with it the response, can be dismissed. */
+export const REFUSED_ROOT_KEY = "refused_root";
+
+export function unacceptedResult(
+	result: unknown,
+	solve?: { converged?: boolean; outcome?: string } | null,
+): UnacceptedResult | null {
+	if (!result || isConvergedResult(result)) return null;
+	const stamped =
+		(result as Record<string, unknown>)[REFUSED_ROOT_KEY] === true;
+	return stamped ||
+		solve?.converged === true ||
+		solve?.outcome === "inconsistent"
+		? "refused"
+		: "not_converged";
+}
+
+/** The note under a result that is not an accepted solution. */
+export function unacceptedNote(kind: UnacceptedResult): string {
+	return kind === "refused"
+		? "The last solve converged, but its root was refused (see the solver message): these values are that root, not an accepted solution."
+		: "The last solve did not converge: these are its last iterate, not a solution.";
+}
+
+/**
  * Discover all finite scalar diagnostic fields present in a solve result.
  *
  * Returns fields sorted alphabetically. Fields that appear only as

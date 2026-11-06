@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { isConvergedResult, probeKeyOptions, resolveKey } from "./diagnostics";
+import {
+	isConvergedResult,
+	probeKeyOptions,
+	REFUSED_ROOT_KEY,
+	resolveKey,
+	unacceptedNote,
+	unacceptedResult,
+} from "./diagnostics";
 import { PORT_ARMS, portArms, withPortArm } from "./portArms";
 import { expectedResultKeys } from "./quantities";
 
@@ -54,6 +61,50 @@ describe("isConvergedResult", () => {
 		expect(isConvergedResult({ success: true })).toBe(true);
 		expect(isConvergedResult({ Q: 1 })).toBe(true);
 		expect(isConvergedResult(undefined)).toBe(false);
+	});
+});
+
+describe("unacceptedResult", () => {
+	const failed = { success: false, m_dot: 0.1 };
+
+	it("is null for an accepted result or none", () => {
+		expect(unacceptedResult({ success: true }, { converged: true })).toBe(null);
+		expect(unacceptedResult(undefined, { converged: false })).toBe(null);
+	});
+
+	it("tells a refused root from a solve that did not converge", () => {
+		// The effusion no-cooling-path refusal (#998): converged, outcome
+		// inconsistent. It read "did not converge" under "Converged, but ...".
+		expect(
+			unacceptedResult(failed, { converged: true, outcome: "inconsistent" }),
+		).toBe("refused");
+		expect(unacceptedResult(failed, { outcome: "inconsistent" })).toBe(
+			"refused",
+		);
+		expect(
+			unacceptedResult(failed, { converged: false, outcome: "no_progress" }),
+		).toBe("not_converged");
+		// A response from before the fields existed reads as before.
+		expect(unacceptedResult(failed, { success: false } as object)).toBe(
+			"not_converged",
+		);
+		expect(unacceptedResult(failed, null)).toBe("not_converged");
+	});
+
+	it("keeps the difference once the banner (the response) is dismissed", () => {
+		// setSolveResults(null) on dismiss: the stored result carries it.
+		expect(
+			unacceptedResult({ ...failed, [REFUSED_ROOT_KEY]: true }, null),
+		).toBe("refused");
+		expect(unacceptedResult({ ...failed, [REFUSED_ROOT_KEY]: true })).toBe(
+			"refused",
+		);
+	});
+
+	it("words the two apart", () => {
+		expect(unacceptedNote("refused")).toMatch(/converged, but/);
+		expect(unacceptedNote("refused")).not.toMatch(/did not converge/);
+		expect(unacceptedNote("not_converged")).toMatch(/did not converge/);
 	});
 });
 

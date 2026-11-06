@@ -3,6 +3,8 @@ import { nodeTypes } from "../components/flowTypes";
 import {
 	expectedResultKeys,
 	formatGeneric,
+	formatMassFlow,
+	formatSignificant,
 	QUANTITY_CATALOGUE,
 	quantityMeta,
 	resultKinds,
@@ -167,5 +169,73 @@ describe("direct result reads in the components", () => {
 			}
 		}
 		expect(unknown).toEqual([]);
+	});
+});
+
+describe("formatMassFlow", () => {
+	it("keeps four decimals for an ordinary flow", () => {
+		expect(formatMassFlow(0.2284676518958348)).toBe("0.2285");
+		expect(formatMassFlow(12.5)).toBe("12.5000");
+		expect(formatMassFlow(0.001)).toBe("0.0010");
+		expect(formatMassFlow(-0.05)).toBe("-0.0500");
+		expect(formatMassFlow(0)).toBe("0.0000");
+	});
+
+	it("goes exponential below 1e-3 kg/s instead of rounding to a flow", () => {
+		// A blocked fraction loss (#1006): 5.5e-5 kg/s read as "0.0001".
+		expect(formatMassFlow(5.5e-5)).toBe("5.50e-5");
+		expect(formatMassFlow(-5.5e-5)).toBe("-5.50e-5");
+		expect(formatMassFlow(4e-6)).toBe("4.00e-6");
+		expect(formatMassFlow(9.99e-4)).toBe("9.99e-4");
+	});
+
+	it("shows float residue as zero, not as a flow", () => {
+		// An unfed effusion plate's card read "-4.51e-27 kg/s".
+		expect(formatMassFlow(-4.51e-27)).toBe("0.0000");
+		expect(formatMassFlow(9e-13)).toBe("0.0000");
+		expect(formatMassFlow(-0)).toBe("0.0000");
+		expect(formatMassFlow(2e-12)).toBe("2.00e-12");
+		expect(formatMassFlow(5.53e-5)).toBe("5.53e-5");
+	});
+
+	it("is the format of every kg/s catalogue entry", () => {
+		const massFlows = Object.entries(QUANTITY_CATALOGUE).filter(
+			([, cat]) => cat.unit === "kg/s",
+		);
+		expect(massFlows.length).toBeGreaterThan(5);
+		for (const [k, cat] of massFlows) {
+			expect(cat.format(5.5e-5), k).toBe("5.50e-5");
+			expect(cat.format(0.25), k).toBe("0.2500");
+		}
+	});
+});
+
+describe("plate-limit and fraction-loss flags have labels", () => {
+	it("shows a name, not the raw key", () => {
+		expect(quantityMeta("T_wall_limit").label).toBe("T wall limit");
+		expect(quantityMeta("T_wall_limit").unit).toBe("K");
+		expect(quantityMeta("T_wall_limit").format(1574.15)).toBe("1574");
+		for (const k of [
+			"wall_above_limit",
+			"no_cooling_path",
+			"fraction_unanchored",
+		]) {
+			const meta = quantityMeta(k);
+			expect(meta.catalogued, k).toBe(true);
+			expect(meta.label, k).not.toBe(k);
+			expect(meta.format(1), k).toBe("yes");
+			expect(meta.format(0), k).toBe("no");
+		}
+	});
+});
+
+describe("formatSignificant", () => {
+	it("shows a solved m_ref at 6 significant figures", () => {
+		// The "Use the solved flow as m_ref" button stores |m_dot| exactly.
+		expect(formatSignificant(0.2284676518958348)).toBe("0.228468");
+		expect(formatSignificant(0.25)).toBe("0.25");
+		expect(formatSignificant(1234567.8)).toBe("1234570");
+		expect(formatSignificant(5.5e-5)).toBe("0.000055");
+		expect(formatSignificant(0.2284676518958348, 4)).toBe("0.2285");
 	});
 });
