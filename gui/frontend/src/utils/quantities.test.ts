@@ -189,6 +189,15 @@ describe("formatMassFlow", () => {
 		expect(formatMassFlow(9.99e-4)).toBe("9.99e-4");
 	});
 
+	it("shows float residue as zero, not as a flow", () => {
+		// An unfed effusion plate's card read "-4.51e-27 kg/s".
+		expect(formatMassFlow(-4.51e-27)).toBe("0.0000");
+		expect(formatMassFlow(9e-13)).toBe("0.0000");
+		expect(formatMassFlow(-0)).toBe("0.0000");
+		expect(formatMassFlow(2e-12)).toBe("2.00e-12");
+		expect(formatMassFlow(5.53e-5)).toBe("5.53e-5");
+	});
+
 	it("is the format of every kg/s catalogue entry", () => {
 		const massFlows = Object.entries(QUANTITY_CATALOGUE).filter(
 			([, cat]) => cat.unit === "kg/s",

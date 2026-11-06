@@ -4,12 +4,22 @@ import resultKeysJson from "./resultKeys.generated.json";
  * Quantity catalogue: mapping result keys to labels, units, and formatting logic.
  */
 /**
+ * [kg/s] below this a mass flow is float residue, shown as "0.0000" (an unfed
+ * effusion plate solves to ~1e-27). Eight decades under the zero-flow blend
+ * scale FLOW_REVERSAL_M_SCALE (1e-4) and the smallest real flow worth reading
+ * (a blocked fraction loss, 5.5e-5); still far above any solver residue.
+ */
+export const MASS_FLOW_RESIDUE = 1e-12;
+
+/**
  * A mass flow [kg/s]: four decimals, or exponential below 1e-3 kg/s, where
  * four decimals round a blocked branch's 5.5e-5 up to "0.0001" (or a trace
  * flow to "0.0000") and read as a flow it does not carry.
  */
 export function formatMassFlow(v: number): string {
-	if (v !== 0 && Math.abs(v) < 1e-3) return v.toExponential(2);
+	const a = Math.abs(v);
+	if (a < MASS_FLOW_RESIDUE) return "0.0000";
+	if (a < 1e-3) return v.toExponential(2);
 	return v.toFixed(4);
 }
 
