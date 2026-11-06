@@ -29,7 +29,6 @@ dependencies = [
     # dependency-floors job tests them: scripts/dependency_floors.py.
     "numpy>=1.26",
     "scipy>=1.15",
-    "sympy>=1.14.0",
 ]
 
 [project.urls]
@@ -53,6 +52,9 @@ dev = [
     "pytest-cov",
     "setuptools-scm>=10.0.5",
     "pytest-xdist>=3.6",
+    # The MPCE sympy cross-check (python/tests/_mpce_jacobian.py) and the
+    # derivation scripts (scripts/derive_*_jacobian.py); no runtime use.
+    "sympy>=1.14.0",
 ]
 
 [tool.scikit-build]
