@@ -853,7 +853,7 @@ documents:
     Tu 0.68 % (low), mass-transfer analogue, flat plate; effusion plates (P/D 5-8, many rows) are outside.'
   read_for: ['film-side h/h0 behind round-hole rows (FilmCoolingElement has none)', '#476 gas_augmentation
       default', 'density-ratio and acceleration effects on h/h0']
-  issues: [386, 476]
+  issues: [386, 476, 1015]
   records: []
   notes: 'Filename was 352949.pdf (probably its British Library EThOS number). Copyrighted thesis. Journal
     version (as recalled, not held): Ammari, Hay & Lampard 1990, J. Turbomach. 112, 444-450. Figures worth
@@ -3192,7 +3192,7 @@ documents:
   read_for: ['#807 thin-wall liner-hole Cd under supply crossflow (cross-source accuracy for McGreehan-Schotsch
       Eq. 17)', 'primary of Lefebvre & Ballal Eq. 4.15 / Fig. 4.2', '#813 jet deflection angle vs Report 1373
       Eq. 9 (jets carrying V_A)']
-  issues: [807, 813, 793]
+  issues: [807, 813, 793, 1014]
   records: []
   code: ['include/orifice.h: orifice::mcgreehan_schotsch::cd (Eq. 17, the closure Tables 11-15 would score)']
   notes: 'Was on the wanted list as "Discharge coefficients and jet deflection angles for combustor liner air
@@ -3216,7 +3216,7 @@ documents:
     nothing here needs digitising; use it only to check a transcription (Fig. 35-103 points per configuration)
     and for the comparison plots against previous work (Figs. 104-111), which are other labs'' data.'
   read_for: ['#807 (companion of Vol. 1)']
-  issues: [807]
+  issues: [807, 1014]
   records: []
   notes: Copyrighted thesis (Cranfield; scan supplied by the user). 90 MB.
 - file: sources/lefebvre/Lefebvre_1985_AFWAL-TR-84-2104_fuel_properties_combustion.pdf
