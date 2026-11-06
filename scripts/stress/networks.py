@@ -73,7 +73,8 @@ from combaero.network import (
 )
 from combaero.network.components import ORIFICE_BORE_PIPE_RTOL
 from combaero.network.ejector_element import EjectorElement
-from combaero.network.pressure_loss import ConstantFractionLoss
+from combaero.network.graph import _flow_independent_dpt
+from combaero.network.pressure_loss import ConstantFractionLoss, ConstantHeadLoss
 
 Builder = Callable[[int], tuple[FlowNetwork, list[str]]]
 
@@ -202,16 +203,21 @@ class _Layered:
             )
         else:
             e = LosslessConnectionElement(eid, a, b)
-        if isinstance(e, LosslessConnectionElement) and _closes_a_lossless_loop(self.net, a, b):
-            # A loop of lossless joints leaves its circulation undetermined and
-            # the network refuses it (#988): a 1 % fraction loss instead, with
-            # no draw, so no seed changes (random 5, 14 and 47 of 0:200).
+        if _flow_independent_dpt(e) is not None and _closes_a_flow_independent_loop(self.net, a, b):
+            # A loop of elements whose Pt relation ignores their flow (lossless
+            # joints, fraction losses without m_ref) has no root or an
+            # undetermined split, and the network refuses it (#988 and its
+            # follow-up): a head loss instead, which scales with the flow at
+            # every flow (a fraction loss with m_ref is flat above it). No
+            # draw, so no other seed changes (of 0:200, random 5, 14, 19, 34,
+            # 45, 47, 48, 81, 88, 95, 99, 113, 156 and 192 change).
             both_theta = getattr(na, "has_theta", False) and getattr(nb, "has_theta", False)
             e = PressureLossElement(
                 eid,
                 a,
                 b,
-                correlation=ConstantFractionLoss(xi=0.01),
+                correlation=ConstantHeadLoss(zeta=_LOOP_BREAK_ZETA, area=_LOOP_BREAK_AREA),
+                area=_LOOP_BREAK_AREA,
                 theta_source=a if both_theta else None,
             )
         self.net.add_element(e)
@@ -323,11 +329,19 @@ class _Layered:
         return net
 
 
-def _closes_a_lossless_loop(net: FlowNetwork, a: str, b: str) -> bool:
-    """Whether a and b are already joined by lossless joints alone (#988)."""
+#: The head loss that replaces an element closing a flow-independent loop:
+#: zeta 10 keeps it below M ~0.2 at a 20 % drop; the area is a mid-size duct.
+_LOOP_BREAK_ZETA = 10.0
+_LOOP_BREAK_AREA = 4e-3
+
+
+def _closes_a_flow_independent_loop(net: FlowNetwork, a: str, b: str) -> bool:
+    """Whether a and b are already joined by elements whose Pt relation does
+    not depend on their flow alone (``_flow_independent_dpt``: lossless
+    joints, fraction losses without m_ref; #988)."""
     adj: dict[str, list[str]] = {}
     for e in net.elements.values():
-        if isinstance(e, LosslessConnectionElement):
+        if _flow_independent_dpt(e) is not None:
             adj.setdefault(e.from_node, []).append(e.to_node)
             adj.setdefault(e.to_node, []).append(e.from_node)
     seen, stack = {a}, [a]

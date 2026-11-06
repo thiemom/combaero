@@ -1959,8 +1959,15 @@ effective_area = EffectiveAreaConnectionElement("ea", "node3", "node4", diameter
 lossless = LosslessConnectionElement("lossless", "node4", "node5")
 # validate() refuses a closed loop of lossless connections only -- two in
 # parallel between the same nodes, or a ring (#988): Pt is equal all round
-# it, so its circulation is not determined. Any loss element in the loop
-# fixes it. In the GUI a plain (untyped) edge is a lossless connection.
+# it, so its circulation is not determined. In the GUI a plain (untyped)
+# edge is a lossless connection. The same refusal covers any closed loop made
+# only of elements whose Pt relation does not depend on their own flow:
+# lossless connections, free vortices, a splitter's reference outlet,
+# fixed-ratio compressors/turbines, and fraction losses (ConstantFractionLoss,
+# LinearThetaFractionLoss) WITHOUT m_ref. Round such a loop the Pt ratios
+# either fail to close (no solution) or close exactly (the split is not
+# determined). A flow-dependent loss on one path (orifice, channel, head
+# loss), or an m_ref on a fraction loss, fixes it.
 # A momentum chamber discharging into a PressureBoundary (#637): static
 # coupling (the chamber's static P is the boundary's, its head lost) and,
 # choked, under-expanded at the sonic static pressure of its flux. Inflow and
