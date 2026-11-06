@@ -708,6 +708,27 @@ def _find_junction_port(
     )
 
 
+def _wetted_area_from_wall(
+    net: FlowNetwork, side: str, side_area: float | None, contact_area: float | None
+) -> None:
+    """Give a walled combustor, momentum chamber or discrete loss its wetted area.
+
+    The GUI has no wetted-area field on these components. Their surface used
+    to be the flow area (passed here when typed, written at resolve when
+    inherited); a wetted area is not a flow area, and neither the library nor
+    the GUI derives one from the other any more (#1022). A wall drawn to the
+    component names the area that exchanges heat -- its side's face, else the
+    wall's area, which the coupling uses either way -- so that is the
+    surface's area. An unwalled one has no convective surface.
+    """
+    obj = net.nodes.get(side) or net.elements.get(side)
+    if not isinstance(obj, CombustorNode | MomentumChamberNode | PressureLossElement):
+        return
+    area = side_area if side_area is not None else contact_area
+    if obj.surface.area == 0.0 and area:
+        obj.surface.area = float(area)
+
+
 def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     checked = _checked_edges(schema)  # refuses an edge to a missing node first
     heat_links = _heat_source_links(schema)
@@ -776,7 +797,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 area=data.area,
                 Dh=data.Dh,
                 surface=ConvectiveSurface(
-                    area=data.area or 0.0,
+                    # No wetted-area field: a wall drawn to it gives one (#1022).
+                    area=0.0,
                     model=map_surface_model(data.surface),
                     Nu_multiplier=data.Nu_multiplier
                     * (schema.solver_settings.Nu_multiplier or 1.0),
@@ -795,7 +817,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 area=data.area,
                 Dh=data.Dh,
                 surface=ConvectiveSurface(
-                    area=data.area or 0.0,
+                    # No wetted-area field: a wall drawn to it gives one (#1022).
+                    area=0.0,
                     model=map_surface_model(data.surface),
                     Nu_multiplier=data.Nu_multiplier
                     * (schema.solver_settings.Nu_multiplier or 1.0),
@@ -1594,7 +1617,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             )
             theta_source = data.theta_source if data.theta_source not in (None, "none") else None
             surface = ConvectiveSurface(
-                area=area if area and area > 0 else 0.0,
+                # No wetted-area field: a wall drawn to it gives one (#1022).
+                area=0.0,
                 model=map_surface_model(data.surface),
                 Nu_multiplier=data.Nu_multiplier,
                 f_multiplier=data.f_multiplier,
@@ -1742,6 +1766,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     array_is_side_a=array_is_a,
                 )
                 continue
+            _wetted_area_from_wall(net, edge.source, data.area_a, data.area)
+            _wetted_area_from_wall(net, edge.target, data.area_b, data.area)
             net.add_wall(
                 ThermalWall(
                     id=wall_id,

@@ -667,7 +667,6 @@ class EjectorElement(MultiPortChamberBase):
         source = f"EjectorElement '{self.id}' (A_3)"
         node.area = float(self.mixing_area)
         node.Dh = 2.0 * math.sqrt(node.area / math.pi)
-        node.surface.area = node.area
         node._area_source = source
         node._Dh_source = source
 

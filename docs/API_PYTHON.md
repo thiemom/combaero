@@ -2332,6 +2332,15 @@ and the solver either stalls on it or converges to a confidently wrong answer.
 The second group defaults because the area is only a dynamic-head reference and
 a network can legitimately never read it.
 
+**An inferred flow area never becomes a wetted area** (#1022). A
+`MomentumChamberNode`, `CombustorNode` or `PressureLossElement` keeps the
+`surface=ConvectiveSurface(area=...)` you gave it, whatever its flow area
+resolves to; with no surface given, `surface.area` stays 0 (no convective
+surface), and a `ThermalWall` on it is refused by name. Give the wetted area
+explicitly to wall such a component. The GUI, which has no wetted-area field
+on these components, takes it from the wall drawn to them (that side's area,
+else the wall's area).
+
 ```python
 # Unresolvable -> a named error saying which parameter clears it
 AreaChangeElement("expansion", "plenum_a", "plenum_b")

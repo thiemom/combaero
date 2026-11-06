@@ -3378,7 +3378,24 @@ class MomentumChamberNode(NetworkNode):
         """Compute heat transfer coefficient for the momentum chamber."""
         if self.surface.area == 0.0:
             return None
+        return self._surface_htc_and_T(state, self.surface)
 
+    def _gas_side_htc_and_T(self, state: NetworkMixtureState):
+        """The chamber's coefficient as another component's gas side.
+
+        An effusion plate on this chamber owns the wall and its area; it reads
+        only h (per unit area) and T_aw from the chamber's surface model, so
+        the chamber needs no wetted area of its own. Its ``surface.area`` is 0
+        unless given (#1022), and the surface's zero-area gate would then hide
+        the coefficient; a unit-area copy of the surface evaluates it.
+        """
+        surface = self.surface
+        if surface.area == 0.0:
+            surface = copy.copy(surface)
+            surface.area = 1.0
+        return self._surface_htc_and_T(state, surface)
+
+    def _surface_htc_and_T(self, state: NetworkMixtureState, surface: ConvectiveSurface):
         T_hot = self.t_hot if self.t_hot is not None else math.nan
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
         # The correlation takes the BULK STATIC state; state.Tt is the
@@ -3398,7 +3415,7 @@ class MomentumChamberNode(NetworkNode):
         diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
         length = self.length if self.length is not None else diameter
 
-        r = self.surface.htc_and_T(
+        r = surface.htc_and_T(
             T=T_static,
             P=state.P,
             X=state.X,
@@ -3722,7 +3739,6 @@ class MomentumChamberNode(NetworkNode):
             if self._auto_area and self._main_inlet_area:
                 self.area = self._main_inlet_area
                 self.Dh = getattr(main, "Dh", None) or 2.0 * math.sqrt(self.area / math.pi)
-                self.surface.area = self.area
                 self._area_source = f"inherited from {self.main_inlet}"
                 self._Dh_source = self._area_source
                 return
@@ -3736,7 +3752,6 @@ class MomentumChamberNode(NetworkNode):
         # Derive cross-section area from Dh when area was not user-specified
         if self._auto_area and self.Dh is not None:
             self.area = math.pi * (self.Dh / 2.0) ** 2
-            self.surface.area = self.area
             self._area_source = "derived from Dh" if self._Dh_source == "user" else self._Dh_source
         elif self._auto_area:
             # No channel to inherit from: widen the search to any area-bearing
@@ -3746,7 +3761,6 @@ class MomentumChamberNode(NetworkNode):
                 self.area = area
                 self.Dh = 2.0 * math.sqrt(area / math.pi)
                 self._Dh_source = source
-                self.surface.area = area
                 self._area_source = source
             else:
                 # Unlike AreaChangeElement, this area is a dynamic-head
@@ -3755,7 +3769,6 @@ class MomentumChamberNode(NetworkNode):
                 # default stands. It is recorded, not silent: anything that
                 # consumes it reports the provenance in diagnostics.
                 self.area = DEFAULT_CHAMBER_AREA
-                self.surface.area = self.area
                 self._area_source = "default"
 
     def validate(self) -> None:
@@ -4388,7 +4401,6 @@ class CombustorNode(NetworkNode):
         # Derive cross-section area from Dh when area was not user-specified
         if self._auto_area and self.Dh is not None:
             self.area = math.pi * (self.Dh / 2.0) ** 2
-            self.surface.area = self.area
             self._area_source = "derived from Dh" if self._Dh_source == "user" else self._Dh_source
         elif self._auto_area:
             # No channel to inherit from: widen the search to any area-bearing
@@ -4398,7 +4410,6 @@ class CombustorNode(NetworkNode):
                 self.area = area
                 self.Dh = 2.0 * math.sqrt(area / math.pi)
                 self._Dh_source = source
-                self.surface.area = area
                 self._area_source = source
             else:
                 # Unlike AreaChangeElement, this area is a dynamic-head
@@ -4407,7 +4418,6 @@ class CombustorNode(NetworkNode):
                 # default stands. It is recorded, not silent: anything that
                 # consumes it reports the provenance in diagnostics.
                 self.area = DEFAULT_CHAMBER_AREA
-                self.surface.area = self.area
                 self._area_source = "default"
 
 
@@ -6083,7 +6093,7 @@ def _chamber_gas_side(node: Any, state: "NetworkMixtureState") -> dict[str, Any]
     # would make a stagnant chamber an adiabatic gas side.
     if not abs(float(getattr(node, "_total_m_dot", 0.0))) >= cb.MIXER_HEAT_MDOT_FLOOR:
         return None
-    gas = node.htc_and_T(state)
+    gas = node._gas_side_htc_and_T(state)
     if gas is None:
         return None
     # The chamber's static density (#578), from its closure on state.Tt.
@@ -9242,11 +9252,11 @@ class PressureLossElement(NetworkElement):
                         UserWarning,
                         stacklevel=2,
                     )
-            # Propagate updated area into head-loss correlations and convective surface.
+            # Propagate updated area into head-loss correlations. The convective
+            # surface is left as given: a wetted area is not a flow area, and
+            # an unset surface (0) means no convective surface (#1022).
             if hasattr(self.correlation, "area"):
                 self.correlation.area = self.area
-            if self.surface.area == 0.0:
-                self.surface.area = self.area
 
         # 1. Explicit override wins.
         if self.theta_source is not None:
@@ -11935,7 +11945,6 @@ class TeeJunctionElement(NetworkElement):
                 if isinstance(_node, MomentumChamberNode) and _node._auto_area and _node.Dh is None:
                     _node.Dh = D_main
                     _node.area = self.F_C
-                    _node.surface.area = _node.area
         if self._F_branch is not None and self._F_branch > 0:
             D_branch = math.sqrt(4.0 * self._F_branch / math.pi)
             _bra_node = graph.nodes.get(self.branch_node)
@@ -11946,7 +11955,6 @@ class TeeJunctionElement(NetworkElement):
             ):
                 _bra_node.Dh = D_branch
                 _bra_node.area = self._F_branch
-                _bra_node.surface.area = _bra_node.area
 
     def validate(self) -> None:
         if self.tee_type not in ("merging", "branching"):
@@ -12548,14 +12556,14 @@ class MultiPortChamberBase(NetworkElement):
             #    so it would otherwise keep MomentumChamberNode's 0.1 m^2
             #    fallback and its Pt = P + 0.5*rho*v^2 closure would see a
             #    near-zero face velocity. Mirrors the MCN auto path (Dh ->
-            #    area, surface.area) exactly so a later node-resolve pass is
-            #    idempotent and collector ports match what inlet ports
-            #    already get from upstream-channel Dh inheritance.
+            #    area; the wetted surface is never written, #1022) exactly
+            #    so a later node-resolve pass is idempotent and collector
+            #    ports match what inlet ports already get from
+            #    upstream-channel Dh inheritance.
             if port_node._auto_area and port_node.Dh is None:
                 area_i = float(self.port_areas[i])
                 port_node.Dh = 2.0 * math.sqrt(area_i / math.pi)
                 port_node.area = area_i
-                port_node.surface.area = area_i
 
     def diagnostics(
         self,
