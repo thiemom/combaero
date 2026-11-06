@@ -510,6 +510,17 @@ def _palette_network(kind: str) -> dict:
             _node("out", pb, lo),
         ]
         edges = [_edge("e1", "x", "c1"), _edge("e2", "c1", "out")]
+    elif kind in ("discrete_loss", "vortex"):
+        # Their Pt relation is fixed at any flow (a fraction loss without
+        # m_ref, a free vortex): alone between two boundaries nothing sets
+        # the flow, and validate() refuses it (#1003). A channel sets it.
+        nodes = [
+            _node("in", pb, hi),
+            _node("x", kind, data),
+            _node("c1", "channel", {"L": 0.5, "D": 0.05}),
+            _node("out", pb, lo),
+        ]
+        edges = [_edge("e1", "in", "x"), _edge("e2", "x", "c1"), _edge("e3", "c1", "out")]
     else:  # a two-port element between two boundaries
         nodes = [_node("in", pb, hi), _node("x", kind, data), _node("out", pb, lo)]
         edges = [_edge("e1", "in", "x"), _edge("e2", "x", "out")]

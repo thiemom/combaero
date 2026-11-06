@@ -176,13 +176,28 @@ class FlowNetwork:
                         queue.append(nb)
         return visited
 
-    def _flow_independent_loop(self) -> list[str] | None:
-        """The element ids of one closed loop made only of elements whose
-        total-pressure relation does not depend on their own flow
-        (``_flow_independent_dpt``; #988 for lossless connections), or None.
+    def _flow_independent_loop(self) -> tuple[list[str], tuple[str, str] | None] | None:
+        """One closed loop made only of elements whose total-pressure relation
+        does not depend on their own flow (``_flow_independent_dpt``; #988 for
+        lossless connections), or None.
+
+        Every ``PressureBoundary`` fixes its Pt, so all of them count as one
+        shared node (#1003): a path of such elements from one boundary to
+        another closes a loop through the fixed pressures. Returns the loop's
+        element ids and, for such a path, the two boundaries it joins (the
+        ids then run in order from the first to the second); for a loop among
+        the network's own nodes, or through a single boundary, None.
+
         Union-find over the nodes: such an edge whose ends are already joined
         by such edges closes a loop, and the tree path between its ends
         completes it."""
+        from .components import PressureBoundary
+
+        shared = "<pressure boundaries>"
+
+        def key(n: str) -> str:
+            return shared if isinstance(self.nodes.get(n), PressureBoundary) else n
+
         parent: dict[str, str] = {}
 
         def root(n: str) -> str:
@@ -196,7 +211,7 @@ class FlowNetwork:
         for eid, elem in self.elements.items():
             if _flow_independent_dpt(elem) is None:
                 continue
-            a, b = elem.from_node, elem.to_node
+            a, b = key(elem.from_node), key(elem.to_node)
             ra, rb = root(a), root(b)
             if ra != rb:
                 parent[ra] = rb
@@ -204,8 +219,8 @@ class FlowNetwork:
                 tree.setdefault(b, []).append((a, eid))
                 continue
             # a and b are already joined: the tree path from a to b plus eid.
-            # (a == b cannot occur: add_element refuses an element whose ends
-            # are one node.)
+            # a == b only for an element between two boundaries (add_element
+            # refuses an element whose ends are one node).
             came: dict[str, tuple[str, str]] = {a: (a, "")}
             queue = deque([a])
             while queue:
@@ -216,11 +231,37 @@ class FlowNetwork:
                     if nb not in came:
                         came[nb] = (n, via)
                         queue.append(nb)
-            path, n = [], b
+            nodes, edges, n = [b], [], b
             while n != a:
                 n, via = came[n]
-                path.append(via)
-            return [*reversed(path), eid]
+                nodes.append(n)
+                edges.append(via)
+            nodes.reverse()
+            edges.reverse()
+            # edges[i] joins nodes[i] and nodes[i + 1]; eid closes nodes[-1]
+            # back to nodes[0].
+            loop = [*edges, eid]
+            if shared not in nodes:
+                return loop, None
+            i = nodes.index(shared)
+            path = loop[i:] + loop[:i]
+            first, last = self.elements[path[0]], self.elements[path[-1]]
+            if len(path) == 1:
+                ends = (first.from_node, first.to_node)
+            else:
+                ends = (
+                    next(m for m in (first.from_node, first.to_node) if key(m) == shared),
+                    next(m for m in (last.from_node, last.to_node) if key(m) == shared),
+                )
+            if ends[0] == ends[1]:
+                # Out of and back into one boundary: a loop of its own.
+                return loop, None
+            order = list(self.nodes)
+            if order.index(ends[0]) > order.index(ends[1]):
+                # Name the boundaries in the order they were added.
+                path.reverse()
+                ends = (ends[1], ends[0])
+            return path, ends
         return None
 
     def validate(self) -> None:
@@ -232,7 +273,9 @@ class FlowNetwork:
         - No closed loop made only of lossless connections (#988), or more
           generally of elements whose Pt relation does not depend on their
           own flow (``_flow_independent_dpt``): no solution, or an
-          undetermined split.
+          undetermined split. Every PressureBoundary counts as one shared
+          node, so a path of such elements between two boundaries is one
+          such loop (#1003).
         - No isolated subgraphs (all nodes reachable from first node).
         - Every interior node must be connected to at least one element.
         """
@@ -270,9 +313,28 @@ class FlowNetwork:
         # fixed, so either it is not 1 and there is no root, or it is and the
         # circulation is free. A fraction loss's only "root" at a mismatch is
         # its zero-flow blend, where the forward and reverse forms cancel.
-        loop = self._flow_independent_loop()
-        if loop is not None:
+        found = self._flow_independent_loop()
+        if found is not None:
+            loop, ends = found
             members = [self.elements[eid] for eid in loop]
+            if ends is not None:
+                # A path between two boundaries closes the loop through their
+                # fixed Pt (#1003): the GUI's plain edges to two outlets.
+                described = ", ".join(
+                    f"{e.id!r} ({e.from_node} -> {e.to_node}, {_flow_independent_dpt(e)})"
+                    for e in members
+                )
+                raise ValueError(
+                    f"FlowNetwork validation failed: the elements {described} join the "
+                    f"pressure boundaries {ends[0]!r} and {ends[1]!r} by a path on which "
+                    "every total-pressure relation is fixed independently of the flow. Each "
+                    "boundary fixes its Pt, so the pressure ratio along the path is fixed at "
+                    "both ends: unless it matches the boundaries' Pt ratio exactly there is no "
+                    "solution, and if it does the flow along the path is not determined (an "
+                    "outlet split can take any value, one outlet can even run backwards). Put "
+                    "a flow-dependent loss (a duct, an orifice, a head loss) on each outlet "
+                    "path, or merge the boundaries into one."
+                )
             if all(isinstance(e, LosslessConnectionElement) for e in members):
                 described = ", ".join(f"{e.id!r} ({e.from_node} -> {e.to_node})" for e in members)
                 raise ValueError(
