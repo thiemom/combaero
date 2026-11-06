@@ -75,17 +75,31 @@ def _b541(
 
 
 def _solved(mc: float, law: str) -> tuple[NetworkSolver, dict, ImpingementArray]:
-    """Table 4.1 at the strongest crossflow (mc/mj 0.99) starts from the
-    default law's root, as a user scoring D.1 like for like would. Cold, it
-    still fails the primary solve (|F| 4.5e-1) and the outlet-referenced
-    retry (1.7e-2); the solver's constant-Cd retry then reaches the same
-    root (max relative difference 7e-8 over all 45 unknowns), but in 16.9 s
-    against 2.7 s warm (measured after #1005). Every other case solves cold
-    on the primary path."""
-    if law == "florschuetz_metzger_su_1982" and mc >= 0.99:
-        _, res, _ = _b541(mc, "rogers_hersh_1976")
-        return _b541(mc, law, np.array(res["__x_solution__"], dtype=float))
+    """Every case cold. Until #1021 Table 4.1 at mc/mj 0.99 started from the
+    default law's root here: cold, it failed the primary solve (|F| 4.5e-1)
+    and the outlet-referenced retry (1.7e-2) before the constant-Cd retry
+    reached the root, 16.9-25 s in all. The solver now runs that stage first
+    for Table 4.1 plates."""
     return _b541(mc, law)
+
+
+def test_table_4_1_solves_cold_from_the_constant_cd_stage() -> None:
+    """#1021: CR-3630 B(5,4,1) at mc/mj 0.99 under Table 4.1. The cold x0
+    seeds the stagnant rows backwards (p1-p3 at -60x, -21x, -7x the root) in
+    a basin too narrow for the primary attempt; the constant-Cd root is a
+    start inside it. The solver runs that stage FIRST and lands on the root
+    a warm start from the default law's root finds (measured 7e-8 relative,
+    5.5 s against 25.5 s through the retries on main 4843598f)."""
+    _, cold, _ = _b541(0.99, "florschuetz_metzger_su_1982")
+    assert "run first for the Table 4.1 Cd" in cold["__message__"]
+    _, rh, _ = _b541(0.99, "rogers_hersh_1976")
+    _, warm, _ = _b541(
+        0.99, "florschuetz_metzger_su_1982", np.array(rh["__x_solution__"], dtype=float)
+    )
+    x, w = np.array(cold["__x_solution__"]), np.array(warm["__x_solution__"])
+    assert np.max(np.abs(x - w) / np.maximum(np.abs(w), 1e-12)) < 1e-6
+    # The default law keeps its cold path: no constant-Cd stage.
+    assert "constant-Cd" not in rh["__message__"]
 
 
 def _jets(res: dict, arr: ImpingementArray) -> list[float]:
