@@ -107,9 +107,10 @@ def test_an_incompressible_chamber_is_judged_at_its_own_mach(regime: str, report
     net.add_node(MassFlowBoundary("inlet", m_dot=0.5, Tt=T_IN))
     net.add_node(MomentumChamberNode("ch", area=2e-3, regime=regime))
     net.add_node(PressureBoundary("outlet", Pt=P_OUT, Tt=T_IN))
-    net.add_element(OrificeElement("o1", "inlet", "ch", Cd=0.6, diameter=0.06, correlation="fixed"))
+    # Bores inside the chamber's 2e-3 m^2 (#1016): a wider one is refused.
+    net.add_element(OrificeElement("o1", "inlet", "ch", Cd=0.6, diameter=0.05, correlation="fixed"))
     net.add_element(
-        OrificeElement("o2", "ch", "outlet", Cd=0.6, diameter=0.06, correlation="fixed")
+        OrificeElement("o2", "ch", "outlet", Cd=0.6, diameter=0.05, correlation="fixed")
     )
     r = NetworkSolver(net).solve()
     assert r["__success__"], r["__message__"]

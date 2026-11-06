@@ -328,6 +328,7 @@ class _Layered:
                 )
             )
             self.tags.append("thermal_wall")
+        _fit_orifices_into_their_chambers(net)
         _lump_orifices_at_or_above_their_pipe(net)
         return net
 
@@ -365,6 +366,35 @@ def _closes_a_flow_independent_loop(net: FlowNetwork, a: str, b: str) -> bool:
                 seen.add(nb)
                 stack.append(nb)
     return False
+
+
+#: Cd A over the chamber area a bore drawn at or above its momentum chamber is
+#: shrunk to (#1016): the ratio the issue's experiment used, so the bore's
+#: own area is 0.56-0.91 of the chamber's at the family's Cd 0.55-0.9.
+_BORE_CHAMBER_CDA_RATIO = 0.5
+
+
+def _fit_orifices_into_their_chambers(net: FlowNetwork) -> None:
+    """Fit the draws' bores into the momentum chambers they adjoin (#1016).
+    The family draws bore and chamber area independently, so a bore can be
+    wider than the chamber it opens into or draws from: a geometry the
+    network now refuses (equal is no orifice). Shrink such a bore to Cd A =
+    _BORE_CHAMBER_CDA_RATIO times the smaller adjoining chamber area, with no
+    random draw, so every other seed draws the network it drew before. Runs
+    before _lump_orifices_at_or_above_their_pipe, which then sees the fitted
+    bore."""
+    for e in net.elements.values():
+        if type(e) is not OrificeElement or e.diameter is None:
+            continue
+        areas = [
+            n.area
+            for n in (net.nodes[e.from_node], net.nodes[e.to_node])
+            if isinstance(n, MomentumChamberNode) and n.area
+        ]
+        if not areas or math.sqrt(e.area / min(areas)) < 1.0 - ORIFICE_BORE_PIPE_RTOL:
+            continue
+        e.area = _BORE_CHAMBER_CDA_RATIO * min(areas) / e.Cd
+        e.diameter = math.sqrt(4.0 * e.area / math.pi)
 
 
 def _lump_orifices_at_or_above_their_pipe(net: FlowNetwork) -> None:

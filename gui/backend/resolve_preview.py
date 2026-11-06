@@ -129,17 +129,15 @@ def _extract(item: Any) -> dict[str, FieldResolution]:
         # factor. beta = 0 means no correction: no single upstream channel, or
         # in_pipe=False (a lumped Cd*A restriction). A bore equal to the pipe
         # is no orifice (pass_through = 1, beta = 1, zero loss); a larger one
-        # is refused, so it arrives here as unresolved (#788). Reversed flow
+        # is refused, so it arrives here as unresolved (#788). The same for a
+        # bore against an adjacent momentum chamber's area (#1016); the
+        # field's source says which. Reversed flow
         # approaches through the to-node's single pipe (#554). E comes from the
         # C++ factor the kernels use, never re-derived in the frontend.
         beta = _f(item, "beta") or 0.0
         beta_rev = _f(item, "beta_reverse") or 0.0
-        pass_through = bool(getattr(item, "_pass_through", False))
         return {
-            "pass_through": FieldResolution(
-                1.0 if pass_through else 0.0,
-                "bore = pipe D: no orifice" if pass_through else "",
-            ),
+            **_pass_through_field(item),
             "diameter": FieldResolution(_f(item, "diameter"), _s(item, "_area_source")),
             "pipe_diameter": FieldResolution(
                 _f(item, "upstream_diameter"), _s(item, "_upstream_source")
@@ -162,7 +160,24 @@ def _extract(item: Any) -> dict[str, FieldResolution]:
                 else "selected at build",
             ),
         }
+    if isinstance(item, OrificeElement):
+        # The plates (effusion, film, slot, impingement) take their geometry
+        # from construction; only the verdict against an adjacent momentum
+        # chamber is resolved (#1016). A wider one is refused: unresolved.
+        return _pass_through_field(item)
     return {}
+
+
+def _pass_through_field(item: Any) -> dict[str, FieldResolution]:
+    """1 when the orifice is no orifice (#788 bore = pipe, #1016 bore area =
+    an adjacent momentum chamber's), with the element's own reason."""
+    pass_through = bool(getattr(item, "_pass_through", False))
+    return {
+        "pass_through": FieldResolution(
+            1.0 if pass_through else 0.0,
+            _s(item, "_pass_through_reason") if pass_through else "",
+        )
+    }
 
 
 def _f(obj: Any, name: str) -> float | None:

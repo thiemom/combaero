@@ -285,16 +285,16 @@ def test_the_network_jacobian_at_a_choked_bounded_root_matches_central_differenc
 
 
 def _lossless_fed_chamber() -> FlowNetwork:
-    """A chamber too small for the flow a wide orifice draws through it, fed
-    by a lossless connection: nothing chokes upstream of it."""
+    """A chamber too small for the flow a wide duct draws through it, fed
+    by a lossless connection: nothing chokes upstream of it. (A wide ORIFICE
+    there, the fixture before #1016, is now refused at resolve: its bore
+    was 3.5x the chamber's area.)"""
     n = FlowNetwork()
     n.add_node(PressureBoundary("in", Pt=10.0e5, Tt=300.0, Y=Y_AIR))
     n.add_node(MomentumChamberNode("mc", area=2.0e-4))
     n.add_node(PressureBoundary("out", Pt=1.0e5, Tt=300.0, Y=Y_AIR))
     n.add_element(LosslessConnectionElement("ll", "in", "mc"))
-    n.add_element(
-        OrificeElement("o", "mc", "out", Cd=0.6, diameter=0.03, correlation="fixed", in_pipe=False)
-    )
+    n.add_element(ChannelElement("o", "mc", "out", length=0.05, diameter=0.03))
     return n
 
 
@@ -307,8 +307,12 @@ def test_a_bounded_chamber_fed_by_a_lossless_connection_is_refused() -> None:
 
 
 def test_a_junction_narrower_than_its_choked_channel_is_refused() -> None:
-    """The chamber is the throat: it would choke before the channel."""
-    _, r = _solve(_net(0.15, in_pipe=False, junction_area=0.6 * np.pi * 0.05**2))
+    """The chamber is the throat: it would choke before the channel. The
+    outlet is no restriction: a bore equal to the junction's area is no
+    orifice (#1016; the fixture's 0.15 m bore, 3.75x the junction's area,
+    is now refused at resolve)."""
+    A_jct = 0.6 * np.pi * 0.05**2
+    _, r = _solve(_net(np.sqrt(4.0 * A_jct / np.pi), in_pipe=False, junction_area=A_jct))
     assert not r["__success__"]
     assert r["__choked_bounded_junctions__"] == []
     assert JCT in r["__supersonic_chambers__"]

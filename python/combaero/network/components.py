@@ -2595,7 +2595,10 @@ DEFAULT_ORIFICE_BORE = 0.08
 #: flow passes unchanged (beta = 1). A bore larger than the pipe by more than
 #: this is refused. Wide enough to absorb a diameter round-tripped through an
 #: area or a unit conversion; at beta = 1 - 1e-6 an in-pipe orifice's
-#: permanent loss is nil anyway, so nothing physical hides inside it.
+#: permanent loss is nil anyway, so nothing physical hides inside it. The
+#: same tolerance compares the geometric bore (a plate's total hole area)
+#: with a momentum chamber it opens into or draws from (#1016), on the
+#: equivalent diameter sqrt(A_bore / A_chamber).
 ORIFICE_BORE_PIPE_RTOL = 1e-6
 
 #: The Cd an orifice-family start guess assumes when a correlation computes
@@ -4605,6 +4608,13 @@ class OrificeElement(NetworkElement):
         lumped Cd*A restriction. Write a lumped restriction this way; a bore
         at or above the pipe is no longer read as one.
 
+    The bore against a momentum chamber on its flow path (#1016), the same
+    rule with areas (_bore_against_chambers): the bore's own area, never Cd
+    A, larger than the chamber it opens into or draws from is refused,
+    equal is no orifice, smaller is unchanged. Only an area that states the
+    geometry is compared (_chamber_area_statement): never the default
+    placeholder. The plate subclasses check their total hole area.
+
     ``compressible_model`` (#854) picks how the compressible regime expands
     the flow; the incompressible regime ignores it (each reduces to Cd E A
     sqrt(2 rho dP) there). An explicit choice always wins. Left at None it
@@ -4700,8 +4710,10 @@ class OrificeElement(NetworkElement):
         self._compressible_model_explicit = compressible_model is not None
         self.compressible_model = compressible_model or "nozzle"
         self.Cv = float(Cv)
-        # bore == pipe: no orifice, set in resolve_topology (#788).
+        # bore == pipe (#788) or bore area == an adjacent momentum chamber's
+        # (#1016): no orifice, set in resolve_topology, with the reason.
         self._pass_through = False
+        self._pass_through_reason = ""
         if tap not in _TAPS:
             raise ValueError(f"OrificeElement {id!r}: tap {tap!r} is not one of {sorted(_TAPS)}.")
         # The taps whose differential diagnostics() reports as dP_tap. Never
@@ -4860,6 +4872,93 @@ class OrificeElement(NetworkElement):
         pipe and there is no orifice (#788). Must change with the residual."""
         return "p" if self._pass_through else "mdot"
 
+    def _chamber_area_statement(
+        self, graph: "FlowNetwork", node_id: str
+    ) -> "tuple[float, str] | None":
+        """The area of the momentum chamber at ``node_id`` when it is a
+        statement about the geometry, with its provenance; None otherwise
+        (#1016).
+
+        A user's area, a user's Dh, or one inherited from a channel or another
+        area-bearing neighbour is a statement. The DEFAULT_CHAMBER_AREA
+        placeholder is not: a chamber nothing sizes says nothing about the
+        bore. Nor is an area inherited from an orifice (a merge chamber's
+        main inlet): a bore is never the area a neighbour measures against,
+        and against itself it would read as equal. And a chamber that took
+        its area from a channel is that pipe's end: the bore against the pipe
+        is #788's rule, whose waiver is in_pipe=False (a lumped Cd*A
+        restriction, no pipe diameter), so such an area is not checked then.
+        """
+        node = graph.nodes.get(node_id)
+        if not isinstance(node, MomentumChamberNode):
+            return None
+        source = node._area_source
+        if source in ("", "default") or not (node.area and node.area > 0.0):
+            return None
+        if not self.in_pipe and source.startswith("channel '"):
+            return None
+        if node._auto_area and node.main_inlet is not None:
+            main = graph.elements.get(node.main_inlet)
+            if isinstance(main, OrificeElement) and source == f"inherited from {node.main_inlet}":
+                return None
+        return float(node.area), source
+
+    def _bore_against_chambers(self, graph: "FlowNetwork") -> str:
+        """The geometric bore against a momentum chamber on either side of the
+        flow path (#1016), #788's rule with areas: the bore's own area (a
+        plate's total hole area, never Cd A) larger than the chamber's is
+        refused, equal (to ORIFICE_BORE_PIPE_RTOL on the equivalent diameter,
+        sqrt(A_bore / A_chamber)) is no orifice. Returns the
+        pass-through's reason, or "" when the bore is smaller (or no chamber's
+        area is a statement, see _chamber_area_statement)."""
+        bore = float(self.area or 0.0)
+        if not bore > 0.0:
+            return ""
+        what = "bore" if type(self) is OrificeElement else "total hole area"
+        reason = ""
+        for node_id in dict.fromkeys((self.from_node, self.to_node)):
+            stated = self._chamber_area_statement(graph, node_id)
+            if stated is None:
+                continue
+            A, source = stated
+            # Compared as equivalent diameters, sqrt(A), so the band is
+            # #788's exactly where the chamber is a pipe's end.
+            d_ratio = math.sqrt(bore / A)
+            if d_ratio > 1.0 + ORIFICE_BORE_PIPE_RTOL:
+                side = "opens into" if node_id == self.to_node else "draws from"
+                provenance = "" if source == "user" else f", {source}"
+                raise ValueError(
+                    f"{type(self).__name__} {self.id!r}: {what} {bore:.6g} m^2 is larger "
+                    f"than the momentum chamber it {side} ({node_id!r}, A = {A:.6g} m^2"
+                    f"{provenance}). There is no such geometry: the jet would be wider "
+                    "than the chamber. A bore area equal to the chamber's is no "
+                    "orifice (zero loss); otherwise make the chamber at least the "
+                    "bore's area or the bore smaller."
+                )
+            if abs(d_ratio - 1.0) <= ORIFICE_BORE_PIPE_RTOL:
+                reason = f"{what} = chamber '{node_id}' area: no orifice"
+        return reason
+
+    def _resolve_plate_against_chambers(self, graph: "FlowNetwork") -> None:
+        """The plates' (effusion, film, slot, impingement) check against an
+        adjacent momentum chamber (#1016): their resolve_topology skips the
+        pipe discovery, so this is the whole of #788's rule for them."""
+        self._pass_through = False
+        self._pass_through_reason = ""
+        reason = self._bore_against_chambers(graph)
+        if reason:
+            self._set_pass_through(reason)
+
+    def _set_pass_through(self, reason: str) -> None:
+        """No orifice (#788, #1016): beta = 1, no recovery, no pipe Cd."""
+        self._pass_through = True
+        self._pass_through_reason = reason
+        self.beta = 1.0
+        self._recovery_fwd = False
+        self._recovery_rev = False
+        self._pipe_cd_ratio_fwd = 1.0
+        self._pipe_cd_ratio_rev = 1.0
+
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         self._to_node_obj = graph.nodes.get(self.to_node)
         self._to_side_closed = self._side_is_closed(graph, self.to_node)
@@ -4898,6 +4997,7 @@ class OrificeElement(NetworkElement):
         self.beta = 0.0
         self._orifice_geom = None
         self._pass_through = False
+        self._pass_through_reason = ""
 
         # Reversed flow approaches from the to-node's side (#554): the single
         # pipe there, declared either way, sets the velocity of approach.
@@ -4936,6 +5036,7 @@ class OrificeElement(NetworkElement):
             pipes.append((self.upstream_diameter, self._upstream_source))
         if len(to_pipes) == 1 and to_pipes[0].diameter and to_pipes[0].diameter > 0:
             pipes.append((to_pipes[0].diameter, f"channel '{to_pipes[0].id}'"))
+        pass_through = ""
         for D, source in pipes:
             if d_bore > D * (1.0 + ORIFICE_BORE_PIPE_RTOL):
                 raise ValueError(
@@ -4946,14 +5047,14 @@ class OrificeElement(NetworkElement):
                     "beta = 0)."
                 )
             if abs(d_bore - D) <= ORIFICE_BORE_PIPE_RTOL * D:
-                self._pass_through = True
-        if self._pass_through:
+                pass_through = "bore = pipe D: no orifice"
+        # The bore's area against a momentum chamber on its flow path (#1016),
+        # in_pipe or not: a hole in a wall cannot be wider than the chamber
+        # behind it either.
+        pass_through = self._bore_against_chambers(graph) or pass_through
+        if pass_through:
             # beta = 1: no restriction, and no orifice physics to set up.
-            self.beta = 1.0
-            self._recovery_fwd = False
-            self._recovery_rev = False
-            self._pipe_cd_ratio_fwd = 1.0
-            self._pipe_cd_ratio_rev = 1.0
+            self._set_pass_through(pass_through)
             return
 
         if len(to_pipes) == 1 and to_pipes[0].diameter:
@@ -6404,6 +6505,7 @@ class EffusionPlateElement(OrificeElement):
             for eid in self.crossflow_segments:
                 if eid is not None:
                     self._xf_elems.append((graph.elements[eid], eid))
+        self._resolve_plate_against_chambers(graph)
 
     def network_flow_inputs(self) -> list[tuple[str, str]]:
         """The backside segments' flows at this panel's supply station."""
@@ -7060,6 +7162,7 @@ class FilmCoolingElement(OrificeElement):
         self._orifice_geom.t = self.hole_length
         self._orifice_geom.r = self.edge_radius
         self.beta = 0.0
+        self._resolve_plate_against_chambers(graph)
 
     def validate(self) -> None:
         super().validate()
@@ -7255,6 +7358,7 @@ class SlotFilmElement(OrificeElement):
         self._orifice_geom.t = self.lip_thickness
         self._orifice_geom.r = self.edge_radius
         self.beta = 0.0
+        self._resolve_plate_against_chambers(graph)
 
     def validate(self) -> None:
         super().validate()
@@ -7808,8 +7912,12 @@ class ImpingementPlateElement(OrificeElement):
         The user's rig-matching knob. 1.0 unless they set it.
     """
 
-    #: RESIDUAL-ROW-SCALING: its residual is the orifice's, m - m_calc, kg/s.
-    residual_scale_kind = "mdot"
+    @property
+    def residual_scale_kind(self) -> str:
+        """RESIDUAL-ROW-SCALING: its residual is the orifice's, m - m_calc,
+        kg/s; Pt_in - Pt_out, Pa, where the holes' total area equals an
+        adjacent momentum chamber's and there is no plate (#1016)."""
+        return "p" if self._pass_through else "mdot"
 
     # htc_and_T's dh_dmdot comes from C++ in the signed jet flow (#481).
     _htc_dmdot_is_signed = True
@@ -7950,6 +8058,7 @@ class ImpingementPlateElement(OrificeElement):
         self._bypass_segment = seg.id if seg is not None else None
         self._bypass_node = seg.from_node if seg is not None else None
         self._bypass_outlet = seg.to_node if seg is not None else None
+        self._resolve_plate_against_chambers(graph)
 
     def _find_bypass(self, graph: "FlowNetwork") -> "ImpingementCrossflowElement | None":
         """The bypass_inlet segment up the crossflow chain, if any."""
