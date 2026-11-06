@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-06
+
+### Added
+
+- **A fraction loss without `m_ref` on its zero-flow blend is flagged (#1004).** `ConstantFractionLoss` and `LinearThetaFractionLoss` without `m_ref` hold dPt = xi Pt at every flow but zero. Where the network gives one a smaller drop, its only root is the forward/reverse blend at |m_dot| < `FLOW_REVERSAL_M_SCALE`, and the solve converged there reporting success with nothing to say the loss law is not met.
+  - **Now:** every `PressureLossElement` reports `fraction_unanchored`: 1 for such a loss on its blend when its flow component is driven and the loss is not a dead end, 0 otherwise, NaN where its flow is not finite. `__fraction_unanchored__` lists them. Reported only, never a demotion.
+  - **Driven, from the inputs only:** pressure boundaries whose Pt differ by more than 1e-9 of the largest, a `MassFlowBoundary` feeding a nonzero flow, a `FuelBoundary` whose target is above the coldest other boundary Tt, or a compressor or turbine at a pressure ratio other than 1. **Dead end, from the topology:** one side of the loss reaches no pressure boundary, fuel controller or nonzero feed without it. Checked once per solve, after every retry has restored the boundaries.
+  - **A failed solve** names the losses flagged at the best iterate in `__message__`.
+  - **GUI:** the discrete loss's Inspector has a "Use the solved flow as ṁ_ref" button. It is enabled after a converged solve in which the loss carries flow. At ṁ = ṁ_ref the loss is exactly ξ, so the solved point is unchanged. A flagged loss shows a note pointing at the button. Nothing changes by default: ṁ_ref stays unset and the palette is unchanged.
+
+### Changed
+
+- `FlowNetwork.validate()` now refuses a path between two `PressureBoundary`s made only of elements whose total-pressure relation does not depend on their own flow -- the edge set of the closed-loop check (lossless connections, free vortices, a splitter's reference outlet, fixed-ratio compressors/turbines, fraction losses without `m_ref`) (#1003). Each boundary fixes its Pt, so such a path's pressure ratio is fixed at both ends: in the GUI, a plenum with plain edges to two outlets at equal Pt "converged" with success at arbitrary splits, some with an outlet flowing backwards, and at Pt 0.1 % apart it had no root and failed at about 6e11 kg/s through the pair. The message names the two boundaries and each element on the path, and says how to fix it: put a flow-dependent loss (a duct, an orifice, a head loss) on each outlet path, or merge the outlets into one boundary. A single such link into one boundary is unaffected.
+
+- **An effusion plate with no coolant flow is flagged, never silent (#998).** Since #995 its wall keys were NaN on a plenum or a stagnant chamber and the solve still reported success; in hot gas the adiabatic wall T came with no warning that it melts the plate.
+  - **No cooling path refused.** No coolant through the holes and no gas flow on the other side (a plenum, or a chamber with none): the wall T is undetermined, so `no_cooling_path` is 1 and a converged solve is demoted to INCONSISTENT with `EffusionPlateElement 'id': no cooling path: wall T undetermined (heats until failure)` in `__message__`, the plates in `__wall_undetermined__`, as a `Tt_target` with no through-flow is (#792).
+  - **Temperature limit.** `EffusionPlateElement(material=...)` / `EffusionLiner(material=...)` name the plate's alloy for its limit only: `T_wall_limit` is the hot end of its #882 envelope (`cb.GENERIC_METAL_SOLIDUS`, 1533.15 K, without one, now exposed), and `wall_above_limit` flags a face above it (NaN when the wall T is undefined), listed in `__wall_above_limit__`. The conduction stays `wall_conductivity`. The GUI plate and liner take the material and show both notes.
+  - **No flow below the floor.** The plate counts as having no coolant, and its gas-side chamber as having no gas flow, below `cb.MIXER_HEAT_MDOT_FLOOR` (1 mg/s), not only at exactly 0: a zero-flow root ends at ~1e-31 kg/s through the holes, where the coefficient put the cold face at 5.7e11 K, and ~1e-13 kg/s in the chamber, which made a stagnant liner an adiabatic 1500 K wall.
+  - Not modelled, by decision: radiation, backside convection without hole through-flow, conduction to the mounts. The code comment at `wall_heat_transfer` says how each could be; #898's wall-to-wall conduction is the path for a locally starved plate.
+
+- `FlowNetwork.validate()` refuses a closed loop made only of `LosslessConnectionElement`s -- two in parallel between the same nodes, or a ring of them -- and names its elements (#988). Total pressure is equal all round such a loop, so any circulating flow is a root: the solve returned an arbitrary one, start- and release-dependent (stress random 5: 159 kg/s circulating while the network carried 8.7 kg/s), and a heated element on the loop got an arbitrary heat transfer. In the GUI this is two plain edges drawn back and forth between the same nodes, or a ring of plain edges; the solve now says so. A loop with any loss element in it is determined and unaffected. Remove one of the connections, or give one path a loss element.
+
+- **The cold start no longer shares a temperature across wall-joined flow components (#899).** Each flow component's reference state now comes from its own boundaries alone, its reference Tt included; before, components joined by thermal walls started at their thermal group's mean Tt. Since #990 moved the resistance seed to each component's own Tt, the group mean reached only the propagated start and the reference m_dot.
+  - Networks of one flow component, or of components no wall joins, start bit-identically.
+  - Wall-joined networks start slightly differently (stress: hot/cold pairs by at most 1e-13, impingement median 1e-7, pin fins by up to 46 % on the propagated start) and converge to the same roots (564/564 stress seeds, all 62 NASA TN D-7156 runs, C3X), at the same wall-clock time within 1 %.
+
+- `FlowNetwork.validate()` now refuses any closed loop made only of elements whose total-pressure relation does not depend on their own flow, not just a loop of lossless connections (#988): `LosslessConnectionElement`, `VortexElement` (a free vortex conserves Pt), a flow splitter's reference outlet, `CompressorElement`/`TurbineElement` at their fixed pressure ratio, and a `PressureLossElement` with `ConstantFractionLoss` or `LinearThetaFractionLoss` and no `m_ref`. Round such a loop the pressure ratios either fail to close, so there is no solution (a fraction loss in parallel with a lossless link "converged" only by sitting in its zero-flow blend, or failed with a circulation of thousands of kg/s), or close exactly, so the split between the paths is not determined. The message names each element and why, and says how to fix it: put a flow-dependent loss (orifice, channel, head loss) on one path, or give the fraction losses an `m_ref`. A fraction loss with `m_ref` fades to zero at zero flow and is not affected. A loop made only of lossless connections keeps its #988 message.
+
+- A result's keys no longer depend on the operating point: a value that is undefined at a point is reported as NaN (Python) / `null` (GUI `/solve`) instead of the key being left out. This covers the second-law band (`sigma_norm`, `sigma_norm_low`, `sigma_norm_high`, now NaN on a `not_checked` verdict, e.g. at zero flow), a channel's `Re_surface` / `f_surface` / `surface_extrapolated` and a discrete loss's `Nu` / `St` / `htc` / `T_aw` / `f` without flow, the ejector's `P_c_star` / `P_b0` / `entrainment_ratio_critical` unchoked and `head_ratio_N` / `efficiency` without a drive, the tees' `port_i_K`, `port_i_flow_fraction`, `K_straight` / `K_branch` / `K11` / `K12` and `mass_flow_ratio` in every flow pattern (ideal momentum, Mynard, constant K), and the effusion plate's coolant- and gas-side keys without coolant flow. Code that tested `key in result` to detect a regime should test `math.isnan(result[key])`.
+- `jet_flow_nonuniformity` (impingement array) and `bleed_nonuniformity` (effusion liner) are NaN when no row flows or one runs backwards (they were inf); inf remains for a starved row beside a flowing one.
+- `scripts/gui_result_keys.py` counts a key whose value is `null` as present: the generated list is the result schema, not the values one solve produced.
+
+### Fixed
+
+- **An orifice in a pipe solves at zero flow (#997).** With an approach pipe (beta > 0), the Jobson model (the default for a sharp-edged bore, and the Lichtarowicz, IdelchikThick and McGreehanSchotsch correlations) failed at equal boundary pressures with `chamber_static_state: no convergence ... (last step [K] = nan)`.
+  - **Cause:** two roundings. `duct_static_state` (the approach pipe's static state) came back one ulp above its own total pressure at zero flux. The Jobson momentum balance wrote the jet's `1 - (p/p0)^((n-1)/n)` as a difference near 1, which rounded to zero a few ulp below `p0`. At zero flow the kernel then divided a positive drive by a zero jet velocity, and the infinite flow it returned reached the next static-state solve as a NaN.
+  - **Now:** the static pressure is solved relative to `Pt`, so it equals `Pt` to the bit at zero flux and never exceeds it. The jet term is evaluated as `-expm1(((n-1)/n) log1p((p - p0)/p0))`, so the flow follows `m ~ sqrt(dp)` down to a one-ulp drive. Solves away from zero flow change only at the rounding level.
+
+- **The cold start's resistance seed runs at each stream's own temperature (#990).** In a network of flow components joined by thermal walls, the resistance-network seed now uses the component's own mean boundary Tt, for both its density and its compressible kernels. Before, it used the thermal group's mean (#899). Every other start estimate still uses the group's mean.
+  - **Before:** NASA TN D-7156 run 19 seeded its Mach 0.7, 297 K coolant passage at the group's 446 K. Its pressures started 19 % high (172.8 against a 145.2 kPa root) and the default cold solve needed the warm-start retry.
+  - **Now:** all 62 D-7156 runs converge cold, and run 19 takes about a third of the time. Only networks of several flow components joined by walls start differently, and their solved roots are unchanged.
+
+- **The cold start seeds a fraction pressure loss from its own law (#989).** In the resistance-network seed, a `PressureLossElement` with a `ConstantFractionLoss` (or a `LinearThetaFractionLoss` with no theta source) now takes at most its own drop, xi Pt_up. Once its reference-flow resistance would take more, it enters as the pressure ratio Pt_dn = Pt_up (1 - xi) and leaves its flow to the rest of the network. Below a design flow `m_ref` it enters as the dynamic head the loss fades with.
+  - **Before:** on stress random draw 3832186739 the seed sent 0.56 kg/s through a 1 % fraction loss that carries 117 kg/s at the root, and the cold solve failed.
+  - **Now:** that draw starts within 1.5x of its root flows and converges cold. Only networks with a fraction loss start differently, and their solved roots are unchanged.
+
+- GUI: a fraction loss's ṁ_ref set from the solved flow is shown at 6 significant figures; the stored value stays exact, so the solved point does not move (#1006).
+- GUI: element cards show a mass flow below 1e-3 kg/s in exponential notation, so a blocked fraction loss at 5.5e-5 kg/s no longer reads "0.0001 kg/s".
+- A converged solve whose root is refused (outcome inconsistent, e.g. an effusion plate with no cooling path) no longer gets "[... auto-retry skipped: neither ... proxy solve converged]" appended to its message, and the GUI's Live Telemetry and probes say the root was refused instead of "did not converge". `/solve` now returns `converged`, `consistent` and `outcome`.
+- GUI: `T_wall_limit`, `wall_above_limit`, `no_cooling_path` and `fraction_unanchored` have readable labels in Live Telemetry and Display Fields.
+
+- A node with an energy boundary now always reports `{node}.Q_withheld`, 0.0 when nothing is withheld. Before, the key appeared only when the value was nonzero, and `m * (1/m)` rounding to `1 - 1 ulp` (about one flow in eight, e.g. 0.09 or 0.36 kg/s) reported ~1e-11 W of "withheld" heat on a flowing node. Which keys a result has, and the GUI's result-key list, therefore depended on the last bit of a solved flow and differed between platforms. The rounding remainder (below 1e-12 of the heat given) is now reported as 0.0; heat withheld by a stagnant node is unchanged.
+- `{node}.Q_fraction` is likewise always reported on a node with an energy boundary: 0.0 when there is no fraction boundary or no flow for it to be a fraction of (it was absent).
+
+- An `EffusionPlateElement` on a gas-side chamber with no coolant flow reports the adiabatic limit (q = 0, both faces at the gas side's adiabatic wall temperature, no film) instead of dropping its wall keys; on a plenum, or on a chamber with no gas flow, the wall temperatures are NaN. A chamber with no gas flow no longer switches the plate to the plenum key set.
+- The GUI's flow splitter always reports `valve_dPt_max` and `fraction_error_max`, NaN (null) when no outlet row carries one (no flow to split); `fraction_error_max` was absent at zero flow on Linux.
+
 ## [0.9.0] - 2026-11-04
 
 ### Highlights
@@ -6539,7 +6596,8 @@ continuation retries; geometry inheritance and autosave in the GUI.
 - State property units mismatch in example runner
 - Solver stability under degenerate initial conditions
 
-[Unreleased]: https://github.com/thirox-lab/combaero/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/thirox-lab/combaero/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/thirox-lab/combaero/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/thirox-lab/combaero/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/thirox-lab/combaero/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/thirox-lab/combaero/compare/v0.7.0...v0.7.1
