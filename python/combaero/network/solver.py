@@ -126,6 +126,14 @@ _STATE_EXCEPTIONS = (RuntimeError, ValueError, ArithmeticError)
 # undetermined state, so such a "root" is refused, never returned.
 _FUEL_MIN_OXIDIZER_FLOW = 1e-9
 
+# Two PressureBoundary total pressures closer than this, relative to the
+# larger, drive no flow (#1004, the fraction-loss check's "driven" rule). The
+# values are the user's inputs, so equal ones are equal floats; the tolerance
+# only absorbs a unit round trip in the GUI (bar or psi to Pa: ~1e-16
+# relative) and is far below any drive a network means: 1e-9 of 1 bar is
+# 1e-4 Pa.
+_FRACTION_DRIVE_PT_RTOL = 1e-9
+
 # A node's Q_withheld below this fraction of the heat given is the rounding
 # of m * (1/m), not heat withheld: reported as 0.0. The real fade below the
 # 1 mg/s uptake floor passes it within 4e-7 (relative) below the floor
@@ -933,6 +941,164 @@ class NetworkSolver:
         # the scale for the whole network.
         area = float(np.median(areas))
         return max(area * math.sqrt(2.0 * rho * dp), 1e-9)
+
+    def _component_drive(self, node_ids: list[str], elem_ids: list[str]) -> str:
+        """Why a flow component is driven, from its INPUTS only (#1004), or ""
+        when nothing drives it. Never reads an iterate.
+
+        - (a) its PressureBoundary Pt differ by more than
+          _FRACTION_DRIVE_PT_RTOL of the largest;
+        - (b) a MassFlowBoundary (not a fuel controller) feeds a nonzero m_dot;
+        - (c) a FuelBoundary's target asks for fuel: Tt_target above the
+          coldest other boundary Tt in the component (the fuel flow itself is
+          an unknown, so its target is read; which boundary feeds the
+          combustor is not known before the solve, so the coldest);
+        - (d) a compressor or turbine at a pressure ratio other than 1 sets a
+          Pt ratio whatever its flow.
+
+        Nothing else raises Pt from its own inputs: a free vortex conserves
+        it (#661), junctions, ejectors and tees redistribute what the
+        boundaries supply, a splitter valve or metered outlet only divides a
+        flow, heat release lowers Pt and there is no gravity term."""
+        net = self.network
+        pts: list[float] = []
+        temps: list[float] = []
+        fuels: list[FuelBoundary] = []
+        for nid in node_ids:
+            n = net.nodes[nid]
+            if isinstance(n, PressureBoundary):
+                pts.append(float(n.Pt))
+                if getattr(n, "Tt", None) is not None:
+                    temps.append(float(n.Tt))
+            elif isinstance(n, FuelBoundary):
+                fuels.append(n)
+            elif isinstance(n, MassFlowBoundary):
+                if getattr(n, "Tt", None) is not None:
+                    temps.append(float(n.Tt))
+                if float(n.m_dot) != 0.0:
+                    return f"MassFlowBoundary '{nid}' feeds {float(n.m_dot):g} kg/s"
+        if len(pts) >= 2 and max(pts) - min(pts) > _FRACTION_DRIVE_PT_RTOL * max(map(abs, pts)):
+            return f"pressure boundaries at {min(pts):g} to {max(pts):g} Pa"
+        for f in fuels:
+            if temps and float(f.Tt_target) > min(temps):
+                return f"FuelBoundary '{f.id}' targets Tt {float(f.Tt_target):g} K"
+        for eid in elem_ids:
+            e = net.elements[eid]
+            if isinstance(e, TurbomachineElement) and float(e.pressure_ratio) != 1.0:
+                return f"{type(e).__name__} '{eid}' at pressure ratio {float(e.pressure_ratio):g}"
+        return ""
+
+    def _dead_end(self, eid: str) -> bool:
+        """True when the element's flow is zero by mass balance, from the
+        graph alone (#1004): the part of the network on one side of it,
+        without it, reaches no node that passes flow -- no PressureBoundary,
+        no fuel controller, no MassFlowBoundary feeding a nonzero m_dot."""
+        net = self.network
+        el = net.elements[eid]
+        touching: dict[str, list[str]] = {}
+        for oid, other in net.elements.items():
+            if oid == eid:
+                continue
+            for n in (*other.all_source_nodes(), *other.all_sink_nodes()):
+                touching.setdefault(n, []).append(oid)
+
+        def opens(nid: str) -> bool:
+            n = net.nodes[nid]
+            if isinstance(n, (PressureBoundary, FuelBoundary)):
+                return True
+            return isinstance(n, MassFlowBoundary) and float(n.m_dot) != 0.0
+
+        for start in (el.from_node, el.to_node):
+            seen: set[str] = set()
+            queue = [start]
+            found = False
+            while queue and not found:
+                nid = queue.pop()
+                if nid in seen:
+                    continue
+                seen.add(nid)
+                if opens(nid):
+                    found = True
+                    break
+                for oid in touching.get(nid, []):
+                    other = net.elements[oid]
+                    queue.extend(
+                        n
+                        for n in (*other.all_source_nodes(), *other.all_sink_nodes())
+                        if n not in seen
+                    )
+            if not found:
+                return True
+        return False
+
+    def _fraction_unanchored(self, sol: dict[str, Any]) -> dict[str, dict[str, Any]]:
+        """Per unanchored fraction loss (``PressureLossElement.unanchored_fraction``,
+        #1004): its |m_dot| in ``sol``, its component's drive
+        (``_component_drive``), whether it is a dead end (``_dead_end``) and
+        the flag: 1 where |m_dot| is below FLOW_REVERSAL_M_SCALE, on the blend
+        of its forward and reverse forms, in a driven component and not in a
+        dead end; 0 otherwise; NaN where its flow is not finite. Only the
+        flow is read from the result; the rest is inputs and topology."""
+        cand = [
+            eid
+            for eid, e in self.network.elements.items()
+            if isinstance(e, PressureLossElement) and e.unanchored_fraction
+        ]
+        if not cand:
+            return {}
+        out: dict[str, dict[str, Any]] = {}
+        for node_ids, elem_ids in self._flow_components():
+            mine = [eid for eid in cand if eid in elem_ids]
+            if not mine:
+                continue
+            drive = self._component_drive(node_ids, elem_ids)
+            for eid in mine:
+                v = sol.get(f"{eid}.m_dot")
+                try:
+                    m = abs(float(v)) if v is not None else math.nan
+                except (TypeError, ValueError):
+                    m = math.nan
+                dead = self._dead_end(eid)
+                if not math.isfinite(m):
+                    flag = math.nan
+                else:
+                    flag = 1.0 if (m < FLOW_REVERSAL_M_SCALE and drive and not dead) else 0.0
+                out[eid] = {"m_dot": m, "drive": drive, "dead_end": dead, "flag": flag}
+        return out
+
+    def _mark_fraction_unanchored(self, sol: dict[str, Any]) -> dict[str, Any]:
+        """The #1004 check on a top-level solve's result, once, after every
+        retry, homotopy and boundary ramp has restored the user's boundaries:
+        sets ``fraction_unanchored`` on each PressureLossElement's result and
+        ``__fraction_unanchored__``, and on a failed solve names the flagged
+        losses (at the best iterate) in ``__message__``. Reported only: it
+        never demotes a solve."""
+        try:
+            fu = self._fraction_unanchored(sol)
+        except Exception:  # noqa: BLE001 -- a diagnostic never breaks a solve
+            fu = {}
+        diags = sol.get("__element_diag__") or {}
+        flagged: list[str] = []
+        for eid, info in fu.items():
+            diag = diags.get(eid)
+            if diag is not None and "fraction_unanchored" in diag:
+                diag["fraction_unanchored"] = info["flag"]
+                sol[f"{eid}.fraction_unanchored"] = info["flag"]
+            if info["flag"] == 1.0:
+                flagged.append(eid)
+        flagged.sort()
+        sol["__fraction_unanchored__"] = flagged
+        if flagged and not sol.get("__success__", False):
+            sol["__message__"] = (
+                f"{sol.get('__message__', '')} PressureLossElement "
+                + ", ".join(f"'{eid}'" for eid in flagged)
+                + ": a fraction loss without m_ref at ~zero flow (its forward/"
+                "reverse blend) at this point in a driven network: it holds dPt = "
+                "xi Pt at every flow but zero, so a network that gives it a smaller "
+                "drop has no root but zero flow through it. Set its m_ref (design "
+                "flow), or use a head loss."
+            ).strip()
+        return sol
 
     def _propagate_pressure_guess(self, ref: dict[str, Any]) -> dict[str, float]:
         """Estimate per-node pressures by walking the graph from boundaries.
@@ -4621,7 +4787,50 @@ class NetworkSolver:
         retry. False turns every stall handover off for this call, its
         retries and nested solves included: each cold rung then runs to its
         own share of the budget (#864).
+
+        The fraction-loss check (#1004, ``fraction_unanchored``,
+        ``__fraction_unanchored__``) runs once on the result of the outermost
+        call, after every retry has restored the boundaries.
         """
+        depth = getattr(self, "_solve_depth", 0)
+        self._solve_depth = depth + 1
+        try:
+            sol = self._solve_entry(
+                method=method,
+                timeout=timeout,
+                options=options,
+                use_jac=use_jac,
+                x0=x0,
+                init_strategy=init_strategy,
+                lambda_steps=lambda_steps,
+                auto_retry=auto_retry,
+                stall_handover=stall_handover,
+            )
+        finally:
+            self._solve_depth = depth
+        if depth == 0:
+            sol = self._mark_fraction_unanchored(sol)
+        return sol
+
+    def _solve_entry(
+        self,
+        method: str = "hybr",
+        timeout: float | None = None,
+        options: dict[str, Any] | None = None,
+        use_jac: bool = True,
+        x0: np.ndarray | None = None,
+        init_strategy: Literal[
+            "default",
+            "outletref_warmstart",
+            "homotopy",
+            "analytical_pt_prop",
+        ] = "default",
+        lambda_steps: list[float] | None = None,
+        auto_retry: bool = True,
+        stall_handover: bool = True,
+    ) -> dict[str, float]:
+        """``solve`` without the outermost-call checks; recursive calls go
+        through ``solve``."""
         if not getattr(self, "_in_reference_swap", False):
             # Flow splitters whose reference the solve finds (#903): an outer
             # loop around this whole solve, see solve_with_reference_swaps.

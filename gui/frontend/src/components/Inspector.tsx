@@ -8,6 +8,7 @@ import {
 	resolveField,
 } from "../utils/diagnostics";
 import { defaultFilmSide } from "../utils/filmLink";
+import { solvedFlowAsMref } from "../utils/fractionLoss";
 import {
 	formatHeat,
 	formatKelvin,
@@ -3775,6 +3776,46 @@ const Inspector = () => {
 											placeholder="none: constant at every flow"
 											className="p-2 border rounded"
 										/>
+										{/* Opt-in (#1004): copy the last converged flow. At
+										    ṁ = ṁ_ref the loss is exactly ξ, so the point stays. */}
+										{(() => {
+											const solved = solvedFlowAsMref(selectedNode.data);
+											return (
+												<button
+													type="button"
+													disabled={solved === null}
+													onClick={() => {
+														if (solved !== null) {
+															updateNodeData(selectedNode.id, {
+																m_ref: solved,
+															});
+														}
+													}}
+													title={
+														solved === null
+															? "Needs a converged solve in which this loss carries flow (and is not below a set ṁ_ref)."
+															: "At ṁ = ṁ_ref the loss is exactly the fraction: the solved point is unchanged, and below it the loss now fades with the flow."
+													}
+													className="self-start px-2 py-0.5 border rounded bg-white text-[10px] hover:bg-stone-50 disabled:opacity-50 disabled:hover:bg-white"
+												>
+													Use the solved flow as ṁ_ref
+													{solved !== null
+														? ` (${solved.toPrecision(4)} kg/s)`
+														: ""}
+												</button>
+											);
+										})()}
+										{selectedNode.data.result?.fraction_unanchored === 1 && (
+											<div className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+												This loss sits at ~zero flow (|ṁ| below 1e-4 kg/s, the
+												blend of its forward and reverse forms) in a network
+												that is driven: with no ṁ_ref it holds ΔPt = ξ·Pt at
+												every flow but zero, and the network gives it less. The
+												loss law is not met at this point. Set ṁ_ref, its design
+												flow: type it, or solve at a point where it flows and
+												use the button above.
+											</div>
+										)}
 										<p className="text-[9px] text-gray-400 italic">
 											At and above ṁ_ref the loss is exactly the fraction; below
 											it the loss scales with the dynamic head and vanishes at
