@@ -358,6 +358,9 @@ async def solve(schema: NetworkGraphSchema):
         gui_ids = {n.id for n in schema.nodes}
         return SolveResponse(
             success=result.get("__success__", False),
+            converged=bool(result.get("__converged__", False)),
+            consistent=result.get("__consistent__"),
+            outcome=str(result.get("__outcome__", "")),
             message=humanize(result.get("__message__", "Solve completed"), schema),
             final_norm=result.get("__final_norm__"),
             node_results=node_results,

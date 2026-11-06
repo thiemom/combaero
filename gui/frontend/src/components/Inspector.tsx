@@ -3,9 +3,10 @@ import React from "react";
 import useStore from "../store/useStore";
 import { isCardKind } from "../utils/cardRows";
 import {
-	isConvergedResult,
 	probeKeyOptions,
 	resolveField,
+	unacceptedNote,
+	unacceptedResult,
 } from "../utils/diagnostics";
 import { defaultFilmSide } from "../utils/filmLink";
 import { solvedFlowAsMref } from "../utils/fractionLoss";
@@ -23,6 +24,7 @@ import { junctionGuessKey } from "../utils/legacyKeys";
 import { nodeTypeLabel } from "../utils/nodeUtils";
 import { withPortArm } from "../utils/portArms";
 import {
+	formatSignificant,
 	QUANTITY_CATALOGUE,
 	quantityMeta,
 	THERMAL_WALL_KIND,
@@ -256,12 +258,16 @@ const Inspector = () => {
 							see values.
 						</p>
 					)}
-					{result && !isConvergedResult(result) && (
-						<p className="text-[10px] text-red-500">
-							The last solve did not converge: the values are its last iterate,
-							not a solution.
-						</p>
-					)}
+					{(() => {
+						const why = unacceptedResult(result, solveResults);
+						return (
+							why && (
+								<p className="text-[10px] text-red-500">
+									{unacceptedNote(why)}
+								</p>
+							)
+						);
+					})()}
 				</div>
 			</aside>
 		);
@@ -3773,6 +3779,7 @@ const Inspector = () => {
 												updateNodeData(selectedNode.id, { m_ref: null })
 											}
 											min={0}
+											format={formatSignificant}
 											placeholder="none: constant at every flow"
 											className="p-2 border rounded"
 										/>
@@ -4159,12 +4166,19 @@ const Inspector = () => {
 								<CardRowsReset kind={selectedNode.type} />
 							)}
 						</div>
-						{!isConvergedResult(selectedNode.data.result) && (
-							<p className="text-[10px] text-red-500 mb-2">
-								The last solve did not converge: these are its last iterate, not
-								a solution.
-							</p>
-						)}
+						{(() => {
+							const why = unacceptedResult(
+								selectedNode.data.result,
+								solveResults,
+							);
+							return (
+								why && (
+									<p className="text-[10px] text-red-500 mb-2">
+										{unacceptedNote(why)}
+									</p>
+								)
+							);
+						})()}
 
 						{displaySettings.length === 0 ? (
 							<p className="text-[10px] text-stone-400 italic text-center py-2">

@@ -1,7 +1,11 @@
 import { memo, useMemo } from "react";
 import { Handle, Position } from "reactflow";
 import useStore from "../../store/useStore";
-import { isConvergedResult, resolveKey } from "../../utils/diagnostics";
+import {
+	resolveKey,
+	unacceptedNote,
+	unacceptedResult,
+} from "../../utils/diagnostics";
 import { nodeTypeLabel } from "../../utils/nodeUtils";
 import { withPortArm } from "../../utils/portArms";
 import {
@@ -50,7 +54,7 @@ function ProbeSlot({
 }
 
 function ProbeNode({ data, selected }: { data: any; selected?: boolean }) {
-	const { nodes, edges } = useStore();
+	const { nodes, edges, solveResults } = useStore();
 
 	const targetElement = useMemo(
 		() =>
@@ -69,9 +73,11 @@ function ProbeNode({ data, selected }: { data: any; selected?: boolean }) {
 			(data.target_id ? "Unknown target" : "No target");
 	const hasTarget = !!data.target_id;
 	const missing = hasTarget && !targetElement;
-	// The backend returns the last iterate of a solve that did not converge
-	// (success: false): shown, but flagged so it does not read as an answer.
-	const notConverged = !!result && !isConvergedResult(result);
+	// The backend returns the last iterate of a solve that did not converge,
+	// or the refused root of one that did (success: false): shown, but flagged
+	// so it does not read as an answer.
+	const unaccepted = unacceptedResult(result, solveResults);
+	const notConverged = unaccepted !== null;
 
 	return (
 		<div
@@ -107,9 +113,9 @@ function ProbeNode({ data, selected }: { data: any; selected?: boolean }) {
 				{notConverged && (
 					<span
 						className="text-[8px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-500"
-						title="The last solve did not converge: these are its last iterate, not a solution."
+						title={unacceptedNote(unaccepted)}
 					>
-						not converged
+						{unaccepted === "refused" ? "refused" : "not converged"}
 					</span>
 				)}
 			</div>

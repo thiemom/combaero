@@ -31,6 +31,11 @@ export interface WorstResidual {
 
 export interface SolveResponse {
 	success: boolean;
+	/** The root finder got there (true on a refused root too). */
+	converged?: boolean;
+	consistent?: boolean | null;
+	/** NetworkSolver's SolveOutcome: "converged", "inconsistent", ... */
+	outcome?: string;
 	message: string;
 	final_norm?: number;
 	node_results: Record<string, NodeResult>;

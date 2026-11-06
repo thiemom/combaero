@@ -20,6 +20,14 @@ interface NumericInputProps {
 	disabled?: boolean;
 	// Shown but not editable (an inherited value locked until the user opts out).
 	readOnly?: boolean;
+	/**
+	 * Display-only format (e.g. a value copied from a solve, shown at 6
+	 * significant figures). The stored value stays exact: leaving the field
+	 * without typing in it never commits the rounded display, and what the
+	 * user types replaces it as usual. Without it the field shows
+	 * `value.toString()`.
+	 */
+	format?: (v: number) => string;
 }
 
 const NumericInput: React.FC<NumericInputProps> = ({
@@ -33,17 +41,25 @@ const NumericInput: React.FC<NumericInputProps> = ({
 	max,
 	disabled,
 	readOnly,
+	format,
 }) => {
 	const [localValue, setLocalValue] = useState(
-		value !== undefined && value !== null ? value.toString() : "",
+		value !== undefined && value !== null ? (format ?? String)(value) : "",
 	);
 	const [isFocused, setIsFocused] = useState(false);
+	// Typed in since focus: only then may a formatted display be committed.
+	const [dirty, setDirty] = useState(false);
 
 	// Update local state if the external value changes, but ONLY when not focused
 	useEffect(() => {
 		if (isFocused) return;
 		if (value === undefined || value === null) {
 			setLocalValue("");
+			return;
+		}
+		if (format) {
+			const shown = format(value);
+			if (localValue !== shown) setLocalValue(shown);
 			return;
 		}
 		const safeValue = value;
@@ -54,10 +70,11 @@ const NumericInput: React.FC<NumericInputProps> = ({
 		) {
 			setLocalValue(safeValue.toString());
 		}
-	}, [value, isFocused, localValue]);
+	}, [value, isFocused, localValue, format]);
 
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const raw = e.target.value;
+		setDirty(true);
 		// Allow typing decimal points; only allow negative sign if no min constraint
 		if (
 			raw === "" ||
@@ -85,9 +102,14 @@ const NumericInput: React.FC<NumericInputProps> = ({
 			onClear();
 			return;
 		}
+		if (format && !dirty) {
+			// Clicked in and out: the display is rounded, the value is not.
+			setLocalValue(value != null ? format(value) : "");
+			return;
+		}
 		const parsed = Number.parseFloat(localValue);
 		if (Number.isNaN(parsed)) {
-			setLocalValue(value != null ? value.toString() : "");
+			setLocalValue(value != null ? (format ?? String)(value) : "");
 		} else {
 			const clamped =
 				min !== undefined && parsed < min
@@ -101,8 +123,13 @@ const NumericInput: React.FC<NumericInputProps> = ({
 			if (value == null || Math.abs(clamped - value) > 1e-10) {
 				onChange(clamped);
 			}
-			setLocalValue(clamped.toString());
+			setLocalValue((format ?? String)(clamped));
 		}
+	};
+
+	const handleFocus = () => {
+		setIsFocused(true);
+		setDirty(false);
 	};
 
 	return (
@@ -111,7 +138,7 @@ const NumericInput: React.FC<NumericInputProps> = ({
 			type="text"
 			value={localValue}
 			onChange={handleChange}
-			onFocus={() => setIsFocused(true)}
+			onFocus={handleFocus}
 			onBlur={handleBlur}
 			className={className}
 			placeholder={placeholder}

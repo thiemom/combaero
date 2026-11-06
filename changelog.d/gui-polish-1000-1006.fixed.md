@@ -1,0 +1,4 @@
+- GUI: a fraction loss's ṁ_ref set from the solved flow is shown at 6 significant figures; the stored value stays exact, so the solved point does not move (#1006).
+- GUI: element cards show a mass flow below 1e-3 kg/s in exponential notation, so a blocked fraction loss at 5.5e-5 kg/s no longer reads "0.0001 kg/s".
+- A converged solve whose root is refused (outcome inconsistent, e.g. an effusion plate with no cooling path) no longer gets "[... auto-retry skipped: neither ... proxy solve converged]" appended to its message, and the GUI's Live Telemetry and probes say the root was refused instead of "did not converge". `/solve` now returns `converged`, `consistent` and `outcome`.
+- GUI: `T_wall_limit`, `wall_above_limit`, `no_cooling_path` and `fraction_unanchored` have readable labels in Live Telemetry and Display Fields.

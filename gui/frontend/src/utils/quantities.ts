@@ -3,6 +3,16 @@ import resultKeysJson from "./resultKeys.generated.json";
 /**
  * Quantity catalogue: mapping result keys to labels, units, and formatting logic.
  */
+/**
+ * A mass flow [kg/s]: four decimals, or exponential below 1e-3 kg/s, where
+ * four decimals round a blocked branch's 5.5e-5 up to "0.0001" (or a trace
+ * flow to "0.0000") and read as a flow it does not carry.
+ */
+export function formatMassFlow(v: number): string {
+	if (v !== 0 && Math.abs(v) < 1e-3) return v.toExponential(2);
+	return v.toFixed(4);
+}
+
 export const QUANTITY_CATALOGUE: Record<
 	string,
 	{
@@ -14,7 +24,7 @@ export const QUANTITY_CATALOGUE: Record<
 	}
 > = {
 	// Scalar results (accessed via result.*)
-	m_dot: { label: "ṁ", unit: "kg/s", format: (v) => v.toFixed(4) },
+	m_dot: { label: "ṁ", unit: "kg/s", format: formatMassFlow },
 	mach: { label: "Ma", unit: "—", format: (v) => v.toFixed(4) },
 	mach_in: { label: "Ma in", unit: "—", format: (v) => v.toFixed(4) },
 	mach_out: { label: "Ma out", unit: "—", format: (v) => v.toFixed(4) },
@@ -25,6 +35,13 @@ export const QUANTITY_CATALOGUE: Record<
 	},
 	mach_throat: { label: "Ma throat", unit: "—", format: (v) => v.toFixed(4) },
 	zeta: { label: "ζ", unit: "—", format: (v) => v.toFixed(4) },
+	// A fraction loss on its zero-flow blend, no m_ref to anchor it (#1006)
+	fraction_unanchored: {
+		label: "Fraction loss unanchored",
+		cardLabel: "unanchored",
+		unit: "—",
+		format: (v) => (v > 0 ? "yes" : "no"),
+	},
 	sigma_norm: {
 		label: "σ/(R ṁ) (2nd law)",
 		unit: "—",
@@ -81,7 +98,7 @@ export const QUANTITY_CATALOGUE: Record<
 	m_dot_bypass: {
 		label: "Bypass ṁ",
 		unit: "kg/s",
-		format: (v) => v.toFixed(4),
+		format: formatMassFlow,
 	},
 	bypass_to_jet_flow: {
 		label: "Bypass / jets",
@@ -176,6 +193,22 @@ export const QUANTITY_CATALOGUE: Record<
 	},
 	// Effusion plate wall (#471)
 	T_wall_hot: { label: "T wall (hot)", unit: "K", format: (v) => v.toFixed(0) },
+	// The plate material's limit and the faces above it (#998/#1000)
+	T_wall_limit: {
+		label: "T wall limit",
+		unit: "K",
+		format: (v) => v.toFixed(0),
+	},
+	wall_above_limit: {
+		label: "Wall above limit",
+		unit: "—",
+		format: (v) => (v > 0 ? "yes" : "no"),
+	},
+	no_cooling_path: {
+		label: "No cooling path",
+		unit: "—",
+		format: (v) => (v > 0 ? "yes" : "no"),
+	},
 	T_wall_cold: {
 		label: "T wall (cold)",
 		unit: "K",
@@ -250,9 +283,9 @@ export const QUANTITY_CATALOGUE: Record<
 	nu: { label: "nu", unit: "m²/s", format: (v) => v.toExponential(2) },
 	u: { label: "u", unit: "J/kg", format: (v) => v.toFixed(0) },
 	// Tee junction diagnostics
-	m_dot_com: { label: "ṁ com", unit: "kg/s", format: (v) => v.toFixed(4) },
-	m_dot_straight: { label: "ṁ str", unit: "kg/s", format: (v) => v.toFixed(4) },
-	m_dot_branch: { label: "ṁ br", unit: "kg/s", format: (v) => v.toFixed(4) },
+	m_dot_com: { label: "ṁ com", unit: "kg/s", format: formatMassFlow },
+	m_dot_straight: { label: "ṁ str", unit: "kg/s", format: formatMassFlow },
+	m_dot_branch: { label: "ṁ br", unit: "kg/s", format: formatMassFlow },
 	mass_flow_ratio: {
 		// Every tee closure reports the BRANCH share of the common flow.
 		label: "ṁ br/ṁ com",
@@ -280,13 +313,13 @@ export const QUANTITY_CATALOGUE: Record<
 		label: "ṁ primary",
 		cardLabel: "ṁp",
 		unit: "kg/s",
-		format: (v) => v.toFixed(4),
+		format: formatMassFlow,
 	},
 	m_dot_secondary: {
 		label: "ṁ secondary",
 		cardLabel: "ṁs",
 		unit: "kg/s",
-		format: (v) => v.toFixed(4),
+		format: formatMassFlow,
 	},
 	n_reversed_ports: {
 		label: "reversed ports",
@@ -353,6 +386,16 @@ export function formatGeneric(v: number): string {
 	const a = Math.abs(v);
 	if (a >= 1e6 || a < 1e-3) return v.toExponential(3);
 	return String(Number.parseFloat(v.toPrecision(5)));
+}
+
+/**
+ * A value at `digits` significant figures, trailing zeros dropped
+ * (0.2284676518958348 -> "0.228468"). Display only: the field it labels
+ * keeps the exact value (NumericInput `format`).
+ */
+export function formatSignificant(v: number, digits = 6): string {
+	if (!Number.isFinite(v)) return String(v);
+	return String(Number(v.toPrecision(digits)));
 }
 
 export type QuantityMeta = {

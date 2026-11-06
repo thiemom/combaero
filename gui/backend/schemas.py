@@ -992,6 +992,12 @@ class IncompressibleFlag(BaseModel):
 
 class SolveResponse(BaseModel):
     success: bool
+    #: The two questions ``success`` conflates (NetworkSolver's
+    #: ``__converged__``/``__consistent__``/``__outcome__``): a refused root
+    #: (outcome "inconsistent") converged, a failed solve did not.
+    converged: bool = False
+    consistent: bool | None = None
+    outcome: str = ""
     message: str = ""
     final_norm: float | None = None
     node_results: dict[str, NodeResult] = {}

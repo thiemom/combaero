@@ -5637,8 +5637,14 @@ class NetworkSolver:
 
         primary_norm = sol.get("__final_norm__")
         primary_msg = str(sol.get("__message__", "")).strip()
+        # A primary that converged but was refused (outcome INCONSISTENT: a
+        # second-law root, no cooling path, ...) still gets the retry -- it can
+        # reach another root -- but its message already says "Converged, but
+        # ...": the retry's notes must not call it a failed solve.
+        primary_converged = bool(sol.get("__converged__", False))
+        primary_what = "converged to a refused root" if primary_converged else "solve failed"
         warnings.warn(
-            f"Cold '{init_strategy}' solve failed (|F|={primary_norm:.3e}); "
+            f"Cold '{init_strategy}' {primary_what} (|F|={primary_norm:.3e}); "
             + (
                 "auto-retrying from a compressible warm start"
                 if all_incompressible
@@ -5660,10 +5666,11 @@ class NetworkSolver:
             if seed_x0 is None:
                 if _primary_diag is not None:
                     self._diagnostic_data = _primary_diag
-                sol["__message__"] = (
-                    f"{primary_msg} [compressible warm-start auto-retry "
-                    "skipped: the compressible proxy solve did not converge]"
-                )
+                if not primary_converged:
+                    sol["__message__"] = (
+                        f"{primary_msg} [compressible warm-start auto-retry "
+                        "skipped: the compressible proxy solve did not converge]"
+                    )
                 return replay(retrying=False)
             _seed_kind = "compressible"
         else:
@@ -5683,11 +5690,15 @@ class NetworkSolver:
             # solves overwrote them, and we are returning the primary result.
             if _primary_diag is not None:
                 self._diagnostic_data = _primary_diag
-            sol["__message__"] = (
-                f"{primary_msg} [incompressible warm-start auto-retry "
-                "skipped: neither the outlet- nor the inlet-referenced "
-                "proxy solve converged]"
-            )
+            # Skipped only matters to a solve that did not converge; on a
+            # refused root it read as "did not converge" after "Converged,
+            # but ..." (the no-cooling-path refusal, #998).
+            if not primary_converged:
+                sol["__message__"] = (
+                    f"{primary_msg} [incompressible warm-start auto-retry "
+                    "skipped: neither the outlet- nor the inlet-referenced "
+                    "proxy solve converged]"
+                )
             return replay(retrying=False)
 
         remaining = None
@@ -5725,14 +5736,20 @@ class NetworkSolver:
             )
             retry_sol["__message__"] = (
                 f"Converged via {proxy} warm-start "
-                f"auto-retry after the '{init_strategy}' attempt failed "
+                f"auto-retry after the '{init_strategy}' attempt "
+                f"{'reached a refused root' if primary_converged else 'failed'} "
                 f"({primary_msg[:120]})."
             )
             return retry_sol
+        primary_end = (
+            "converged to a refused root"
+            if primary_converged
+            else f"failed at |F|={primary_norm:.3e}"
+        )
         retry_sol["__message__"] = (
             f"{str(retry_sol.get('__message__', '')).strip()} "
             f"[{_seed_kind} warm-start auto-retry; the primary "
-            f"'{init_strategy}' attempt failed at |F|={primary_norm:.3e} "
+            f"'{init_strategy}' attempt {primary_end} "
             f"with: {primary_msg[:120]}]"
         )
         # Neither attempt converged, so hand back whichever got closer. The
@@ -5751,6 +5768,9 @@ class NetworkSolver:
                 f"{primary_msg} [{_seed_kind} warm-start auto-retry also "
                 f"failed, at |F|={float(retry_norm):.3e}, so the closer "
                 f"primary result is returned]"
+                if not primary_converged
+                else f"{primary_msg} [{_seed_kind} warm-start auto-retry found "
+                f"no admissible root either (|F|={float(retry_norm):.3e})]"
             )
             return sol
         return retry_sol

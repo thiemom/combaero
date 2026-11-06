@@ -169,6 +169,10 @@ def test_a_stagnant_chamber_with_no_coolant_is_refused() -> None:
     assert MESSAGE in r["__message__"]
     assert r["__element_diag__"]["eff"]["no_cooling_path"] == 1.0
     assert r["__element_diag__"]["eff"]["gas_side_chamber"] == 1.0
+    # Converged, so nothing may call it unconverged: the auto-retry's
+    # "skipped: neither ... proxy solve converged" note was appended here.
+    assert r["__converged__"]
+    assert "converge" not in r["__message__"].replace("Converged, but", "")
 
 
 def _liner_net(P_cin: float, P_cout: float, P_gas_in: float) -> tuple[FlowNetwork, EffusionLiner]:
