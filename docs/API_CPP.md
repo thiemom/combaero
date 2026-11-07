@@ -354,10 +354,12 @@ struct Transport_Props {
 >
 > Smoothing (`smooth_phi0`, `smooth_phi1`, k0 = k1 = 20000): `smooth_phi1`
 > replaces min(1, r) with a softmin about 1/k1 wide at phi = 1;
-> `smooth_phi0` replaces the O2 demand a with a softplus shifted to 0 at
-> a = 0, so n_req = a - ln2/k0 away from zero fuel: 3.5e-5 mol O2 per mol
-> of mixture stays unburnt at EVERY lean phi (about -0.3 to -0.6 K on T_ad,
-> tested < 1 K) and half the fuel burns as phi -> 0.
+> `smooth_phi0` replaces the O2 demand a with
+> n_req = [ln(1 + e^(k0 a)) - ln2 sech(k0 a)] / k0, a transition about 1/k0
+> wide at zero fuel: n_req(0) = 0, half the fuel burns as phi -> 0, and
+> n_req = a to round-off once k0 a > ~40, so T_ad matches the unsmoothed
+> value there (#1037; the softplus before it left ln2/k0 = 3.5e-5 mol O2 per
+> mol unburnt at every phi, -0.3 to -0.6 K on T_ad).
 
 ### Stoichiometry & Equivalence Ratio
 ```cpp

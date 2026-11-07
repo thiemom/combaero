@@ -5,6 +5,7 @@
 #include "../include/composition.h"
 #include "../include/thermo_transport_data.h"
 #include "../include/input_validation.h"
+#include "../include/math_constants.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -326,12 +327,62 @@ std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double> &X,
 
 namespace {
 
+// Zero-fuel smoothing (#1037). With x = k0 a (a >= 0: nu_i X_i >= 0),
+//
+//   g(x) = ln(1 + e^x) - ln2 sech(x),   n_req = g(x) / k0.
+//
+// g(0) = 0 and g'(0) = 1/2 (as the softplus ln(1 + e^x) - ln2 it replaces:
+// half the fuel burns as phi -> 0), g is C-infinity and increasing, and
+// 0 <= g(x) <= x. Unlike that softplus, which tends to x - ln2 and left
+// ln2/k0 mol O2 per mol of mixture unburnt at every equivalence ratio,
+// g(x) - x = ln(1 + e^-x) - ln2 sech(x) ~ (1 - 2 ln2) e^-x: exact to
+// round-off once k0 a > ~40. The transition is about 1/k0 wide in a.
+//
+// Below x = 1e-3, s = g(x)/x is its series (odd in x after the 1/2, so the
+// next omitted term, about 0.06 x^5, is below 1e-16): the direct quotient
+// loses digits to the ln2 - ln2 cancellation there.
+struct ZeroFuelSmoothing {
+  double n_req = 0.0;
+  double dnreq_da = 0.0;
+  double s = 0.0;      // n_req / a
+  double ds_da = 0.0;
+};
+
+constexpr double ZERO_FUEL_SERIES_X = 1.0e-3;
+constexpr double ZERO_FUEL_C2 = 0.125 + 0.5 * M_LN2;              // g''(0) / 2
+constexpr double ZERO_FUEL_C4 = -1.0 / 192.0 - 5.0 * M_LN2 / 24.0;  // g''''(0) / 24
+
+ZeroFuelSmoothing zero_fuel_smoothing(double a, double k0) {
+  ZeroFuelSmoothing z;
+  const double x = k0 * std::max(a, 0.0);
+  if (x < ZERO_FUEL_SERIES_X) {
+    // s = 1/2 + C2 x + C4 x^3; at a = 0 these are the one-sided limits.
+    z.s = 0.5 + ZERO_FUEL_C2 * x + ZERO_FUEL_C4 * x * x * x;
+    const double ds_dx = ZERO_FUEL_C2 + 3.0 * ZERO_FUEL_C4 * x * x;
+    z.ds_da = k0 * ds_dx;
+    z.n_req = z.s * std::max(a, 0.0);
+    z.dnreq_da = z.s + x * ds_dx;
+    return z;
+  }
+  const double em = std::exp(-x);                   // x >= 1e-3: no overflow
+  const double em2 = em * em;
+  const double sech = 2.0 * em / (1.0 + em2);
+  const double th = (1.0 - em2) / (1.0 + em2);
+  const double sigma = 1.0 / (1.0 + em);           // d/dx ln(1 + e^x)
+  // n_req = a + (g(x) - x) / k0, so the tail is a to round-off.
+  z.n_req = std::max(0.0, a + (std::log1p(em) - M_LN2 * sech) / k0);
+  z.dnreq_da = sigma + M_LN2 * sech * th;
+  z.s = z.n_req / a;
+  z.ds_da = (z.dnreq_da * a - z.n_req) / (a * a);
+  return z;
+}
+
 // Complete combustion to CO2 and H2O on a 1 mol reactant basis, with the
 // analytic Jacobian of the product mole fractions in the reactant ones
 // (#716). One implementation for the value and its derivative:
 //
 //   a      = sum_i nu_i X_i, the O2 the fuels need (nu_i > 0 for C/H species);
-//   n_req  = a, or (smooth_phi0) the softplus (1/k0)[ln(1 + e^(k0 a)) - ln 2],
+//   n_req  = a, or (smooth_phi0) g(k0 a) / k0 (zero_fuel_smoothing above),
 //            so the heat release is smooth at zero fuel; s = n_req / a;
 //   r      = X_O2 / n_req;
 //   f      = min(1, r), or (smooth_phi1) its softmin -ln(e^-k1 + e^(-k1 r))/k1
@@ -392,26 +443,19 @@ CompleteCombustionCore complete_combustion_core(const std::vector<double> &X,
     return unchanged();  // no oxygen, no combustion
   }
 
-  // n_req(a) and its slope.
+  // n_req(a), its slope, s = n_req / a and ds/da.
   double n_req = a;
   double dnreq_da = 1.0;
+  double s = 1.0;
+  double ds_da = 0.0;
   if (smooth_phi0) {
-    if (a * k0 > 100.0) {
-      n_req = a - std::log(2.0) / k0;
-      dnreq_da = 1.0;
-    } else {
-      n_req = (std::log1p(std::exp(k0 * a)) - std::log(2.0)) / k0;
-      dnreq_da = 1.0 / (1.0 + std::exp(-k0 * a));
-    }
-    n_req = std::max(0.0, n_req);
+    const ZeroFuelSmoothing z = zero_fuel_smoothing(a, k0);
+    n_req = z.n_req;
+    dnreq_da = z.dnreq_da;
+    s = z.s;
+    ds_da = z.ds_da;
   } else if (n_req <= tol) {
     return unchanged();  // no fuel
-  }
-  double s = 0.0;
-  double ds_da = 0.0;
-  if (a > 1e-18) {
-    s = n_req / a;
-    ds_da = (dnreq_da * a - n_req) / (a * a);
   }
 
   // f(r) and its slope.
@@ -432,7 +476,8 @@ CompleteCombustionCore complete_combustion_core(const std::vector<double> &X,
     df_dr = 1.0;
   }
   const double f_eff = f * s;
-  out.burn_fraction = f_eff;
+  // Without fuel nothing burns; f_eff stays the a -> 0+ limit for the slope.
+  out.burn_fraction = (a > 0.0) ? f_eff : 0.0;
 
   // Products (moles, 1 mol reactant basis).
   std::vector<double> n = X;

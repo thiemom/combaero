@@ -11,7 +11,10 @@
 namespace combaero {
 
 // -----------------------------------------------------------------
-// Global smoothing constants for combustion (see combustion.cpp for rationale)
+// Global smoothing constants for combustion (see combustion.cpp for rationale).
+// k0: the zero-fuel smoothing (smooth_phi0) is about 1/k0 wide in the O2
+// demand a [mol O2/mol mixture] and exact once k0 a > ~40 (#1037).
+// k1: the softmin at Phi = 1 (smooth_phi1) is about 1/k1 wide in X_O2/n_req.
 // -----------------------------------------------------------------
 constexpr double SMOOTHING_K_PHI0 = 20000.0;
 constexpr double SMOOTHING_K_PHI1 = 20000.0;
