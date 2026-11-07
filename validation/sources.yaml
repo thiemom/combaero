@@ -2974,6 +2974,54 @@ documents:
   notes: 'Companion theory: Graves & Grobman, NACA Report 1373 (= RM E56I04), both registered. Fig. 17''s
     cylindrical-liner squares are unpublished NACA data with no geometry -- not usable. Figure scans are
     small; render at 300 dpi before digitising.'
+- file: sources/combustor_network/dittrich_1957_NACA_RM_E56I17_parallel_walled_combustor_loss.pdf
+  citation: Dittrich, R. T. (1957). Comparison of experimental with theoretical total-pressure loss in
+    parallel-walled turbojet combustors. NACA RM E56I17, Lewis Flight Propulsion Laboratory, January 9, 1957.
+  id: NACA RM E56I17, NTRS 19930089548
+  topic: [combustion, orifice, channel]
+  content: 'Scan with a poor OCR layer, 31 PDF pp. (PDF page = printed page + 1); read numbers from the
+    images. Rig (p. 3, Figs. 1-2, PDF 4/12-13): parallel-walled tubular combustor, liner 6.005 in OD, 0.031 in
+    wall, streamlined dome with NO dome holes, eight rings of six 1.375 in holes (t/d 0.023), rings 4 in apart,
+    the first about 2 in downstream of annulus-entry station 2 (Fig. 2, a dimensioned sketch, not a table);
+    liner and outer shell 35 in long; three outer shells 8.48/7.74/7.14 in (A_L/A_r 0.502/0.602/0.708); open
+    hole area varied by TAPING rings: 8/6/3/2 rings open, A_h,t 0.495/0.371/0.186/0.124 sq ft, A_h,t/A_r 0.32-1.78
+    -- 12 configurations, table p. 3, which rings are open shown by the inset sketch on each Fig. 4 panel. The
+    liner discharges into an 8.0 in pipe; outlet rake (station 3) 20 in downstream; inlet rake at station 1 in
+    an 8.0 in pipe, corrected to station 2 by the measured shell-dependent loss of Fig. 3. Air about 75 F,
+    nominal 4 lb/s (2 and 6 lb/s on some configurations), P 850-5600 psf, M_r about 0.03-0.21, Re_r 3e5-1e6.
+    MEASURED: cold-flow total-pressure-loss coefficient dP/q_r (station 2 to 3, q_r on the outer-shell area and
+    station-2 density) vs M_r, Fig. 4(a)-(l) (PDF 15-26), about 6-15 cleanly sampled points per panel, each
+    with the Graves-Grobman (RM E56I04 = Report 1373) calculated curves with and without annulus friction; Fig.
+    4(h) also three hole DISTRIBUTIONS at the same A_h,t/A_r 0.38 (two rings open upstream, downstream, or split;
+    downstream about 10% higher loss); Fig. 5 cross-plots at M_r 0.05 and 0.15; hot flow (propane, To/Ti 1-3,
+    A_L/A_r 0.602, A_h,t/A_r 1.14) Fig. 6 with flame-ejection points flagged; Fig. 7 a reprinted CALCULATED
+    pressure profile (Report 1373), "confirmed by unpublished data" not shown. NO airflow split, NO static
+    pressures, NO hole flows measured. No measurement uncertainty stated ("within experimental error").'
+  status: screened
+  verdict: 'Screened 2026-11-07 (was wanted, found via NREC 1968 ref. 74). LOSS case MOSTLY READY; flow-split
+    case NOT BUILDABLE (nothing measured inside the liner or annulus). It is the MEASURED counterpart of Report
+    1373 (constant annulus and liner areas, no dome flow -- exactly Report 1373''s model), where Grobman 1959
+    (held) is the tapered counterpart and the only one with a (Cd-derived) row split. Geometry is complete for
+    a combaero annulus + liner network: shell and liner diameters, wall thickness, hole size and count per
+    ring, ring pitch, which rings are open per panel; two items need a stated assumption -- the first-ring
+    position (about 2 in, read from the Fig. 2 sketch) and the outlet: dP/q_r runs to station 3, so the liner
+    exit dump into the 8.0 in pipe and 20 in of mixing are inside the measured loss and must be modelled
+    (a sudden expansion A_L -> pipe), as Report 1373 does. Best panels: Fig. 4(a)/(e)/(i) (8 rings, three
+    airflows, about 15 points each), then the A_h,t/A_r sweep 4(a)-(d) and the A_L/A_r sweep (a)/(e)/(i), and
+    4(h) for hole distribution. Labels: ACCURACY (cross-source) for combaero''s closures -- McGreehan-Schotsch
+    hole Cd under annulus crossflow, kappa stations, momentum chambers; the liner hole Cd is TN 3663''s thin-hole
+    regime (t/d 0.023), same lab, so a run with a TN 3663 Cd is still cross-study. Reproducing the dashed
+    Graves-Grobman curves is model-vs-model only. Within NACA the authors find the theory with annulus friction
+    up to 17% HIGH (p. 5); combaero landing between the two calculated curves would be unremarkable, the
+    measured curve is the target. Hot data (Fig. 6) is one configuration with flame ejection at low M_r: only the
+    points above M_r 0.06 are a heat-addition loss case, and the heat release is not resolved axially.'
+  read_for: ['#793 measured full-combustor total-pressure loss and liner airflow split with full geometry',
+    measured counterpart of Report 1373 (constant areas)]
+  issues: [793]
+  records: []
+  notes: 'Public NACA RM, fetched 2026-11-07 from NTRS 19930089548. Cites Graves-Grobman as RM E56I04 (1956),
+    held. NREC 1968 Figs. 29-31 reprint its faired curves on a different geometry. Digitising targets if scored:
+    Fig. 4(a)/(e)/(i) first; render at 200 dpi or more.'
 - file: sources/combustor_network/graves_grobman_1958_NACA_Report_1373.pdf
   citation: Graves, C. C., Grobman, J. S. (1958). Theoretical analysis of total-pressure loss and airflow distribution
     for tubular turbojet combustors with constant annulus and liner cross-sectional areas. NACA Report 1373.
@@ -3258,7 +3306,7 @@ documents:
   verdict: 'Screened 2026-11-07 for #793/#813/#807. A METHOD and CODE reference, not data: every combustor
     result is calculated, and the only measured combustor data (Figs. 29-31) are faired curves reprinted from
     Dittrich RM E56I17 and compared on a different (rectangular) geometry, so they score nothing here --
-    the primary is wanted. NO buildable measured worked example. Code-to-code only: overall Test Case 3
+    the primary is now held (dittrich_1957_NACA_RM_E56I17_..., screened 2026-11-07). NO buildable measured worked example. Code-to-code only: overall Test Case 3
     (Table II geometry, Table III options, Vol. 2 App. III station output) is fully specified but depends on
     library Cd for scoops/louvres and on the streamtube diffuser, so a combaero match would be model vs
     model and is not worth building before a measured case. What it gives combaero: (1) ANNULUS BLEED:
@@ -3291,7 +3339,7 @@ documents:
     lifting-surface load distributions; NASA CR-135298 is Wright et al. (1978), hydrogen turbine power
     conversion -- both recalled citations were wrong; "Mellor" in the combustor-network papers held is the
     editor of Design of Modern Gas Turbine Combustors (1990, Dodds-Bahr chapter). Figures worth a 300 dpi
-    render only if RM E56I17 cannot be obtained: Figs. 29-31 (PDF pp. 206-208).'
+    render: none, RM E56I17 (held) has the measured points behind Figs. 29-31 (PDF pp. 206-208).'
 - file: sources/combustor_network/nrec_1968_NASA_CR-72375_vol2_operating_manual.pdf
   citation: 'Northern Research and Engineering Corporation (1968). Computer program for the analysis of annular
     combustors. Volume II: Operating manual. NREC Report 1111-2, NASA CR-72375, Contract NAS3-9402, January 29,
@@ -3785,68 +3833,53 @@ documents:
   issues: [793]
   records: []
   notes: Arrived 2026-10-27 as docs/new/EJC96482.pdf.
-- file: sources/combustor_network/varol2015_reverse_flow_combustor_network.pdf
+- file: sources/combustor_network/varol2015_reverse_flow_combustor_network_rev2.pdf
   citation: 'Varol, G., Sarikaya, G., Tuncer, O. (2015). One dimensional network model for a reverse flow
     combustor. AIAA paper, Istanbul Technical University (venue and number not printed; filename suggests
     the 2015 AIAA Joint Propulsion Conference).'
   topic: [combustion, orifice, film]
-  content: 'Reverse-flow annular combustor for a 1000 hp turboshaft, 1/13 sector. Table 1 idle/cruise/take-off
-    conditions; Table 3 hole sets (positions, counts, diameters: 3 machined-ring film sets and 2 plain-hole
-    sets per liner); Table 4 per-set mass flow and fraction from isothermal CFD and from the 1-D code; Table
-    5 CFD and 1-D Cd. Norster Cd correlation (Eqs. 6-8, garbled in print), Odgers zone efficiency, Lefebvre
-    radiation, Rizk convection, Ballal-Lefebvre slot film (Eq. 31); liner temperatures plotted only (Fig.
-    11).'
+  content: 'Reverse-flow annular combustor for a 1000 hp turboshaft, 1/13 sector, 14 pp. Table 1 idle/cruise/
+    take-off conditions; Table 3 hole sets (positions, counts, diameters: 3 machined-ring film sets and 2
+    plain-hole sets per liner); Table 4 per-set mass flow and fraction from isothermal CFD and from the 1-D code;
+    Table 5 CFD and 1-D Cd. Approach: node/element network after Stuttaford-Rubini and Gouws (Fig. 4, both
+    liners of the sector as two parallel regions, mass-weighted), continuity at nodes (Eq. 1) and a dP = s H g f
+    flow law per element (Eq. 2); elements DC (duct with area change, annulus and flame tube), RL (restrictor
+    with loss coefficient), RD (restrictor with Cd); solved by the Greyvanstein-Laurie segregated pressure
+    correction (P = P* + P'', Q = Q* + Q'', rho = rho* + rho'', Eq. 3), incompressible hole law Eq. 4 m = Cd A (2
+    rho (P1 - pj))^0.5. Hole Cd after Norster (NREC 1980 design manual, ref. 9): Eq. 6 plain Cd = 1.25 (K -
+    1)/[4K^2 - K(2 - alpha)^2]^0.5, Eq. 7 plunged 1.65 (same denominator), Eq. 8 K = 1 + 0.64 [2 phi^2 + (phi^4
+    + 1.56 phi^2 (4 alpha - alpha^2))^0.5] with alpha = m_h/m_an, phi = alpha/A_r, A_r = A_h/A_an (Eqs. 9-11),
+    iterated on the hole flows (p. 6); jet angle Eqs. 12/13 sin theta = (K - 1)/(1.6 Cd K) plain, /(1.2 Cd K)
+    plunged. Machined-ring film holes use fixed Cd 0.600 (Table 5). Odgers zone efficiency, Lefebvre
+    radiation, Rizk convection, Ballal-Lefebvre slot film (Eq. 31); liner temperatures plotted only (Fig. 11).
+    No measured data.'
   status: screened
-  verdict: 'The simplest #793 example found, rated "mostly ready": checked 2026-10-27 that Table 4 is
-    a single-plenum parallel-orifice split -- with cruise inlet density (763 kPa, 564 K) every hole set''s
-    CFD flow and Cd give the same dp, 33.4-34.0 kPa (4.4% of P3), and the 1-D column is reproduced
-    to 0.5% by m_i proportional to Cd_i A_i with the code''s Cd 0.600/0.625. Needs one assumption: the swirler
-    area is not printed (back it out as 116.5 mm2 from its CFD Cd and flow). Reference values are CFD and
-    the authors'' own 1-D code, not measurement; matching the CFD column with the CFD Cd is near-tautological,
-    so the example demonstrates a flow split, not a Cd model. The heat-transfer half is not reproducible
-    (no liner geometry).'
-  read_for: ['#793 worked example candidate (combustor liner flow split)']
-  issues: [793]
-  records: []
-  notes: Arrived 2026-10-27 as docs/new/jpc_2015_sarikaya_varol_tuncer.pdf. The PDF has a damaged xref table (poppler reconstructs it); text extracts fine.
-    A second, intact revision of the same paper arrived 2026-11-07 (varol2015_reverse_flow_combustor_network_rev2.pdf,
-    registered next); its tables are identical and its Eqs. 6-8 are legible.
-- file: sources/combustor_network/varol2015_reverse_flow_combustor_network_rev2.pdf
-  citation: 'Varol, G., Sarikaya, G., Tuncer, O. (2015). One dimensional network model for a reverse flow
-    combustor. AIAA paper, Istanbul Technical University (venue and number not printed; filename suggests
-    the 2015 AIAA Joint Propulsion Conference). Second copy, different revision.'
-  topic: [combustion, orifice]
-  content: 'The SAME paper as varol2015_reverse_flow_combustor_network.pdf (registered), 14 pp., an intact
-    8 MB PDF with figures (the earlier copy has a damaged xref): abstract and introduction reworded, Tables 1-5
-    number for number identical. Approach: node/element network after Stuttaford-Rubini and Gouws (Fig. 4,
-    both liners of a 1/13 sector as two parallel regions, mass-weighted), continuity at nodes (Eq. 1) and a
-    dP = s H g f flow law per element (Eq. 2); elements DC (duct with area change, annulus and flame tube), RL
-    (restrictor with loss coefficient), RD (restrictor with Cd); solved by the Greyvanstein-Laurie segregated
-    pressure-correction (P = P* + P'', Q = Q* + Q'', rho = rho* + rho'', Eq. 3), incompressible hole law Eq. 4
-    m = Cd A (2 rho (P1 - pj))^0.5. Hole Cd after Norster (NREC 1980 design manual, ref. 9), legible here: Eq.
-    6 plain Cd = 1.25 (K - 1)/[4K^2 - K(2 - alpha)^2]^0.5, Eq. 7 plunged 1.65 (same denominator), Eq. 8 K = 1 +
-    0.64 [2 phi^2 + (phi^4 + 1.56 phi^2 (4 alpha - alpha^2))^0.5] with alpha = m_h/m_an, phi = alpha/A_r, A_r =
-    A_h/A_an (Eqs. 9-11), iterated on the hole flows (p. 6); jet angle Eqs. 12/13 sin theta = (K - 1)/(1.6 Cd K)
-    plain, /(1.2 Cd K) plunged. Machined-ring film holes use fixed Cd 0.600 (Table 5). No measured data.'
-  status: screened
-  verdict: 'Screened 2026-11-07 ("possibly useful, just for approach"). A duplicate of the registered paper, kept
-    because it is the intact copy (figures readable, Eqs. 6-8 not garbled); the verdict there stands (Table 4 is a
-    single-plenum parallel-orifice split vs CFD, a flow-split demonstration, not evidence). APPROACH: nothing to
-    adopt -- an incompressible node/element network with a segregated pressure-correction loop and Cd iterated by
+  verdict: 'The simplest #793 example found, rated "mostly ready": checked 2026-10-27 that Table 4 is a
+    single-plenum parallel-orifice split -- with cruise inlet density (763 kPa, 564 K) every hole set''s CFD flow
+    and Cd give the same dp, 33.4-34.0 kPa (4.4% of P3), and the 1-D column is reproduced to 0.5% by m_i
+    proportional to Cd_i A_i with the code''s Cd 0.600/0.625. Needs one assumption: the swirler area is not
+    printed (back it out as 116.5 mm2 from its CFD Cd and flow). Reference values are CFD and the authors'' own
+    1-D code, not measurement; matching the CFD column with the CFD Cd is near-tautological, so the example
+    demonstrates a flow split, not a Cd model. The heat-transfer half is not reproducible (no liner geometry).
+    APPROACH (re-screened 2026-11-07, "possibly useful, just for approach"): nothing to adopt -- an
+    incompressible node/element network with a segregated pressure-correction loop and Cd iterated by
     successive substitution; combaero already solves the same topology compressibly with Newton and analytic
     Jacobians. Eqs. 6/7 are Lefebvre & Ballal Eqs. 4.15/4.16 (Kaddah plain, Freeman plunged; the Kaddah primary
     is held), but with K computed from the bleed ratio by Eq. 8 (NREC 1980) where the book''s K is the jet to
     annulus dynamic-pressure ratio. Two pointers only: Eqs. 12/13 are a K-based jet-angle closure for #813 beside
     NREC 1968 Eq. 97 (= Lefebvre & Ballal Eq. 4.17) and Report 1373 Eq. 9, all scoreable on Kaddah''s measured
-    phi (#1014); and Eq. 7 (plunged, 1.65)
-    is the plunged-hole Cd combaero lacks, whose measured primaries (Freeman 1965, Venneman, Marshall) are not
-    held.'
-  read_for: ['#793 approach of a combustor flow network (solver, element formulation, unknowns)', '#813 jet entry
-      angle closure', '#807 plunged-hole Cd pointer']
+    phi (#1014); and Eq. 7 (plunged, 1.65) is the plunged-hole Cd combaero lacks, whose measured primaries
+    (Freeman 1965, Venneman, Marshall) are not held.'
+  read_for: ['#793 worked example candidate (combustor liner flow split)', '#793 approach of a combustor flow
+      network (solver, element formulation, unknowns)', '#813 jet entry angle closure', '#807 plunged-hole Cd
+      pointer']
   issues: [793, 813, 807]
   records: []
-  notes: Arrived 2026-11-07 as sources/new/jpc_2015_sarikaya_varol_tuncer.pdf (same name as the 2026-10-27 copy,
-    different bytes). The user decides whether one copy goes.
+  notes: 'First arrived 2026-10-27 as docs/new/jpc_2015_sarikaya_varol_tuncer.pdf (registered as
+    varol2015_reverse_flow_combustor_network.pdf, 466 kB, damaged xref table, Eqs. 6-8 garbled in its text
+    layer). This intact revision arrived 2026-11-07 under the same name (8 MB, figures readable; abstract and
+    introduction reworded, Tables 1-5 number for number identical). The damaged copy was deleted 2026-11-07
+    at the user''s request.'
 - file: sources/heat_transfer/panduranga2013_turbine_rotor_blade_thermal.pdf
   citation: 'Panduranga, B. P., Suresh, B., Purushotham, H. R. (2013). Thermal analysis of a turbine rotor
     blade. Int. Conf. on Advanced Materials, Manufacturing, Management and Thermal Sciences (AMMMT 2013),
@@ -5488,19 +5521,6 @@ documents:
     Marek 1973 NASA TM X-2809 (C_m at pressure), Claus 1981 NASA TP-1722.'
 
 wanted:
-- citation: Dittrich, R. T. (1957). Comparison of experimental with theoretical total-pressure loss in
-    parallel-walled turbojet combustors. NACA RM E56I17 (as cited by NREC 1968, CR-72374 ref. 74).
-  checked: true
-  issues: [793]
-  priority: now
-  question: 'The MEASURED counterpart of Graves-Grobman Report 1373 (constant annulus and liner areas; Grobman
-    1959, held, is the tapered one): dP/q_ref vs M_ref, vs A_hT/A_ref and vs temperature ratio on a 6.0 in liner
-    in a 7.75 in casing, 52 in long, 1.48 sq in holes in rows from 6 to 34 in (per NREC 1968 Vol. 1 p. 138).
-    NREC Figs. 29-31 reprint only its faired curves (Fig. 29, A_hT/A_ref 1.14: about 6.1 at M_ref -> 0 rising to 9 at 0.20). Would
-    give #793 a second measured full-combustor loss case with a simpler (parallel-walled) geometry; whether it
-    also has an airflow split and per-row geometry is unknown until read.'
-  where: 'NTRS 19930089548 (found 2026-11-07, public NACA) -- fetch with the direct api/citations/<acc>/downloads
-    route.'
 - citation: 'Venneman, W. F. (1959, 1960). Flow coefficients and jet deflection angles for combustor-liner air-entry
     holes, Parts I and II. General Electric Company, Schenectady, NY; and Marshall, L. A. (1958). Aerodynamic
     characteristics of combustor-liner air-entry passages. Rep. R58AGT558, Aircraft Gas Turbine Division, General
