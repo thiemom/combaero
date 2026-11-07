@@ -11,7 +11,7 @@
 # Options:
 #   --skip-frontend        Skip pnpm build if gui/frontend/dist/ already exists.
 #   --skip-combaero-build  Skip building the combaero core wheel (uv build --package combaero).
-#                          If dist/combaero-*.whl already exists it is used for the test;
+#                          If dist/combaero-*.whl already exists the newest one is used;
 #                          otherwise combaero is pulled from PyPI. Use this flag for fast
 #                          iteration when only the GUI changed and combaero is unchanged.
 
@@ -93,7 +93,7 @@ fi
 step "Step 2  Build combaero core wheel"
 
 if [ "$SKIP_COMBAERO_BUILD" = true ]; then
-    COMBAERO_WHEEL=$(ls "$ROOT_DIR/dist"/combaero-*.whl 2>/dev/null | head -1 || true)
+    COMBAERO_WHEEL=$(ls -t "$ROOT_DIR/dist"/combaero-*.whl 2>/dev/null | head -1 || true)
     if [ -n "$COMBAERO_WHEEL" ]; then
         info "Skipping build (--skip-combaero-build), using: $(basename "$COMBAERO_WHEEL")"
     else
@@ -102,7 +102,7 @@ if [ "$SKIP_COMBAERO_BUILD" = true ]; then
 else
     info "uv build --package combaero ..."
     uv build --package combaero
-    COMBAERO_WHEEL=$(ls "$ROOT_DIR/dist"/combaero-*.whl 2>/dev/null | head -1 || true)
+    COMBAERO_WHEEL=$(ls -t "$ROOT_DIR/dist"/combaero-*.whl 2>/dev/null | head -1 || true)
     if [ -z "$COMBAERO_WHEEL" ]; then
         fail "No combaero wheel found in dist/ after build"
         exit 1
@@ -119,7 +119,7 @@ rm -rf "$DIST_DIR"
 info "uv build --package combaero-gui ..."
 uv build --package combaero-gui --out-dir "$DIST_DIR"
 
-GUI_WHEEL=$(ls "$DIST_DIR"/combaero_gui-*.whl 2>/dev/null | head -1 || true)
+GUI_WHEEL=$(ls -t "$DIST_DIR"/combaero_gui-*.whl 2>/dev/null | head -1 || true)
 if [ -z "$GUI_WHEEL" ]; then
     fail "No .whl found in $DIST_DIR"
     exit 1
@@ -187,7 +187,7 @@ uv venv "$VENV_DIR" --python 3.12 --quiet
 
 # Resolve COMBAERO_WHEEL in case --skip-combaero-build set it (or left it empty)
 COMBAERO_WHEEL="${COMBAERO_WHEEL:-}"
-COMBAERO_WHEEL=$(ls "$ROOT_DIR/dist"/combaero-*.whl 2>/dev/null | head -1 || true)
+COMBAERO_WHEEL=$(ls -t "$ROOT_DIR/dist"/combaero-*.whl 2>/dev/null | head -1 || true)
 
 if [ -n "$COMBAERO_WHEEL" ]; then
     info "Installing: $(basename "$COMBAERO_WHEEL") + $(basename "$GUI_WHEEL") ..."
@@ -204,9 +204,12 @@ info "Starting combaero-gui on port $PORT ..."
 "$VENV_DIR/bin/combaero-gui" &
 SERVER_PID=$!
 
-# Wait for server to be ready — retry loop avoids a fixed sleep
+# Wait for server to be ready — retry loop avoids a fixed sleep.
+# 60 s, not 15: the venv is fresh every run, and on macOS the first import of
+# freshly written native libraries is slow (v0.11.0 rehearsal: 16.6 s wall,
+# 1.9 s CPU; 0.6 s on the second import).
 READY=false
-for i in $(seq 1 15); do
+for i in $(seq 1 60); do
     if curl -fsS "http://localhost:$PORT/health" >/dev/null 2>&1; then
         READY=true
         break
@@ -215,7 +218,7 @@ for i in $(seq 1 15); do
 done
 
 if [ "$READY" = false ]; then
-    fail "Server did not become ready within 15 s — check for import errors above"
+    fail "Server did not become ready within 60 s — check for import errors above"
     exit 1
 fi
 ok "Server is up"
