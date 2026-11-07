@@ -70,6 +70,9 @@ export interface PreviewItem {
 	// A warning the solve will issue, which does not stop it (#1023: a
 	// momentum chamber narrower than an adjoining pipe). Empty when none.
 	warning?: string;
+	// A resolved geometry the solver refuses at validate() (#1024): overlapping
+	// holes, a zero-area duct or node, a Dh no section of its area has.
+	refusal?: string;
 	fields: Record<string, PreviewField>;
 }
 

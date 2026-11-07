@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, MutableMapping
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, get_args
 
 from scipy.optimize import brentq as _brentq
 
@@ -2245,7 +2245,9 @@ class EnergyBoundary:
         return float(self.Q_solved) if self.is_target else float(self.Q)
 
     def check(self) -> None:
-        """Refuse an over-specified or meaningless target (ValueError)."""
+        """Refuse an over-specified or meaningless target, or a fraction that
+        removes all the sensible enthalpy or more (ValueError)."""
+        _check_sensible_fraction(f"EnergyBoundary '{self.id}'", float(self.fraction))
         if self.Tt_target is None:
             return
         T = float(self.Tt_target)
@@ -2281,6 +2283,12 @@ def validate_energy_boundaries(node: Any) -> None:
     ebs = getattr(node, "energy_boundaries", None) or []
     for eb in ebs:
         eb.check()
+    if len(ebs) > 1:
+        # The node's mixer takes their sum (#1024).
+        _check_sensible_fraction(
+            f"Node '{node.id}' ({', '.join(repr(eb.id) for eb in ebs)})",
+            sum(float(eb.fraction) for eb in ebs),
+        )
     targets = [eb for eb in ebs if eb.is_target]
     if not targets:
         return
@@ -2296,6 +2304,25 @@ def validate_energy_boundaries(node: Any) -> None:
             f"Node '{node.id}' has {len(targets)} EnergyBoundaries with Tt_target "
             f"({', '.join(repr(eb.id) for eb in targets)}): one node has one outlet "
             "temperature, so at most one boundary may set it."
+        )
+
+
+def _check_sensible_fraction(what: str, fraction: float) -> None:
+    """Refuse a sensible-enthalpy fraction at or below -1 (#1024).
+
+    -1 removes all the sensible enthalpy: the node lands on the 298.15 K
+    reference whatever it is fed (a set temperature, not a heat removal), and
+    a combustor's report divided by 1 + fraction = 0. Below -1 it removes
+    more than there is: below the reference temperature, and from a hot
+    enough inflow below 0 K, where the solve failed on a raw thermo error.
+    A set outlet temperature is EnergyBoundary(Tt_target=...)."""
+    if not (math.isfinite(fraction) and fraction > -1.0):
+        raise ValueError(
+            f"{what}: fraction {fraction!r} removes {-fraction:.0%} of the inflow's "
+            "sensible enthalpy (h - h(298.15 K)); at -1 or below that is all of it or "
+            "more, a fixed 298.15 K or a temperature below the reference, not a heat "
+            "removal. Use a fraction above -1, or Tt_target=... to set the outlet "
+            "temperature."
         )
 
 
@@ -2614,6 +2641,87 @@ _ORIFICE_SEED_CD = 0.6
 #: refused, as is an ejector mixing area above its outlet pipe, and a
 #: momentum chamber below an adjoining pipe is warned about.
 NEIGHBOUR_AREA_RTOL = ORIFICE_BORE_PIPE_RTOL
+
+#: Relative tolerance of the isoperimetric bound on a hydraulic diameter
+#: (#1024). Dh = 4 A / P, and no section of area A has a shorter perimeter
+#: than the circle, so Dh <= 2 sqrt(A / pi), the circle's diameter. A Dh above
+#: it by more than this is refused: no section has it. The band absorbs an
+#: area typed to three significant figures (a 20 mm circle as 3.14e-4 m^2 is
+#: 2.6e-4 over); an impossible Dh is off by tens of percent. Checked on
+#: MomentumChamberNode and CombustorNode, whose section is closed.
+ISOPERIMETRIC_DH_RTOL = 1e-3
+
+
+def _positive_finite(value: float | None) -> bool:
+    """True for a number that is finite and above zero."""
+    return value is not None and math.isfinite(value) and value > 0.0
+
+
+def _section_error(
+    what: str, area: float | None, area_given: bool, Dh: float | None, Dh_given: bool
+) -> str:
+    """Why a node's flow section cannot be built (#1024), or "".
+
+    ``what`` names the component. A given area must be positive and finite
+    (zero is no section; leave it unset to inherit one), a given Dh the same,
+    and with a positive area a given Dh must satisfy the isoperimetric bound
+    Dh <= 2 sqrt(A / pi) (ISOPERIMETRIC_DH_RTOL)."""
+    if area_given and not _positive_finite(area):
+        return (
+            f"{what}: area = {area!r} m^2. A flow section needs a positive, finite area; "
+            "leave it unset to inherit one from a neighbour."
+        )
+    if Dh_given and not _positive_finite(Dh):
+        return f"{what}: hydraulic diameter Dh = {Dh!r} m must be positive and finite."
+    if Dh_given and _positive_finite(area):
+        D_max = 2.0 * math.sqrt(float(area) / math.pi)
+        if float(Dh) > D_max * (1.0 + ISOPERIMETRIC_DH_RTOL):
+            return (
+                f"{what}: hydraulic diameter Dh = {float(Dh):.6g} m is larger than any "
+                f"section of area A = {float(area):.6g} m^2 allows, 2 sqrt(A/pi) = "
+                f"{D_max:.6g} m (Dh = 4A/P, and the circle has the shortest perimeter P "
+                "for its area). Lower Dh or enlarge the area."
+            )
+    return ""
+
+
+def _hole_spacing_error(
+    what: str,
+    d: float,
+    angle_deg: float,
+    spanwise: tuple[str, float],
+    streamwise: tuple[str, float] | None,
+) -> str:
+    """Why rows of holes of diameter ``d`` overlap at these pitches (#1024),
+    or "": INLINE rows, the arrangement assumed where none is given.
+
+    Holes must leave material between them: neighbours along a row are the
+    spanwise pitch apart and must clear d; consecutive rows are the
+    streamwise pitch apart and must clear the hole's footprint on the
+    surface, d / sin(angle) (an inclined hole's ellipse is that long).
+    Equal is refused: touching holes leave no plate. ``streamwise`` None:
+    one row, nothing to clear."""
+    name, pitch = spanwise
+    if not pitch > d:
+        return (
+            f"{what}: spanwise {name} = {pitch:.6g} m is not larger than the hole "
+            f"diameter d = {d:.6g} m, so neighbouring holes in a row touch or overlap "
+            f"and leave no material between them. {name} must exceed d."
+        )
+    if streamwise is None:
+        return ""
+    name, pitch = streamwise
+    footprint = d / math.sin(math.radians(angle_deg))
+    if not pitch > footprint:
+        return (
+            f"{what}: streamwise {name} = {pitch:.6g} m is not larger than the holes' "
+            f"footprint on the surface, d / sin(angle) = {footprint:.6g} m (d = {d:.6g} "
+            f"m at {angle_deg:g} deg), so consecutive rows touch or overlap and leave "
+            f"no material between them (rows taken inline). {name} must exceed "
+            f"{footprint:.6g} m."
+        )
+    return ""
+
 
 #: Mass flow [kg/s] over which a directional loss blends its forward and
 #: reverse forms, logistic in m_dot / scale (C++ ``sigmoid`` in
@@ -3852,7 +3960,20 @@ class MomentumChamberNode(NetworkNode):
                 self.area = DEFAULT_CHAMBER_AREA
                 self._area_source = "default"
 
+    def _geometry_error(self) -> str:
+        """Why this chamber's section cannot be built (#1024), or "": a given
+        area or Dh not positive, or a Dh above 2 sqrt(A/pi)."""
+        return _section_error(
+            f"MomentumChamberNode {self.id!r}",
+            self.area,
+            not self._auto_area,
+            self.Dh,
+            self._Dh_source == "user",
+        )
+
     def validate(self) -> None:
+        if error := self._geometry_error():
+            raise ValueError(error)
         if self.main_inlet is None:
             return
         ids = [e.id for e in self.upstream_elements]
@@ -4303,6 +4424,9 @@ class CombustorNode(NetworkNode):
         t_hot: float | None = None,
     ):
         super().__init__(id)
+        # Only "equilibrium" was tested, so any other string (a typo) ran as
+        # "complete" without a word (#1024).
+        _check_combustion_method(id, method)
         self.method = method
         self._auto_area = area is None
         self.area = area if area is not None else 0.0
@@ -4558,6 +4682,31 @@ class CombustorNode(NetworkNode):
                 self.area = DEFAULT_CHAMBER_AREA
                 self._area_source = "default"
 
+    def _geometry_error(self) -> str:
+        """Why this combustor's section cannot be built (#1024), or "": a
+        given area or Dh not positive, or a Dh above 2 sqrt(A/pi)."""
+        return _section_error(
+            f"CombustorNode {self.id!r}",
+            self.area,
+            not self._auto_area,
+            self.Dh,
+            self._Dh_source == "user",
+        )
+
+    def validate(self) -> None:
+        _check_combustion_method(self.id, self.method)
+        if error := self._geometry_error():
+            raise ValueError(error)
+
+
+def _check_combustion_method(node_id: str, method: object) -> None:
+    """Refuse a combustion method outside CombustionMethodLiteral (#1024)."""
+    allowed = get_args(CombustionMethodLiteral)
+    if method not in allowed:
+        raise ValueError(
+            f"CombustorNode {node_id!r}: method {method!r} is not one of {list(allowed)}."
+        )
+
 
 # The discharge-hole family: a hole in a wall, no pipe, no beta. 'fixed' and
 # the ISO 5167 metering correlations are deliberately not in this map.
@@ -4690,6 +4839,12 @@ _DM_DCD = "__dm_dCd__"
 
 #: ImpingementPlateElement's crossflow Cd laws (#800).
 _CD_CROSSFLOW_LAWS = ("rogers_hersh_1976", "florschuetz_metzger_su_1982", "none")
+
+
+def _is_closed_restriction(elem: object) -> bool:
+    """True for a restriction of zero area (OrificeElement.closed, #1024): a
+    wall in the flow path, through which every root carries no flow."""
+    return isinstance(elem, OrificeElement) and elem.closed
 
 
 class OrificeElement(NetworkElement):
@@ -4868,6 +5023,14 @@ class OrificeElement(NetworkElement):
         # as a side stream (#471). 90 = normal injection, no axial momentum.
         self.injection_angle_deg = float(injection_angle_deg)
 
+        # A bore of zero is a CLOSED restriction (#1024); a negative or
+        # non-finite one is no geometry.
+        for what, size in (("diameter", diameter), ("area", area)):
+            if size is not None and not (math.isfinite(size) and size >= 0.0):
+                raise ValueError(
+                    f"{type(self).__name__} {id!r}: {what} = {size!r} must be finite and "
+                    "non-negative (0 closes the restriction: no flow)."
+                )
         if diameter is not None:
             self.diameter: float | None = diameter
             self.area: float | None = math.pi * (diameter / 2.0) ** 2
@@ -5011,6 +5174,32 @@ class OrificeElement(NetworkElement):
         return abs(float(r.m_dot_calc))
 
     @property
+    def closed(self) -> bool:
+        """A bore of zero area: the restriction is CLOSED (#1024), a wall.
+
+        Its row is m = 0, exact and linear (constant Jacobian 1 in its own
+        flow); no kernel is evaluated, and the solved network carries no flow
+        through it in either direction. A part of the network that only
+        closed elements join to the rest keeps its own pressure boundaries;
+        one they cut off from every PressureBoundary is refused at
+        FlowNetwork.validate(), since nothing sets its pressure."""
+        return self.area is not None and self.area == 0.0
+
+    def _resolve_closed(self) -> None:
+        """Topology of a closed restriction (#1024): no pipe, no beta, no
+        recovery, no Cd geometry. Nothing flows, so nothing is discovered."""
+        self.beta = 0.0
+        self.beta_reverse = 0.0
+        self._orifice_geom = None
+        self._pass_through = False
+        self._recovery_fwd = False
+        self._recovery_rev = False
+        self._pipe_cd_ratio_fwd = 1.0
+        self._pipe_cd_ratio_rev = 1.0
+        self._reverse_pipe_diameter = None
+        self._reverse_pipe_source = ""
+
+    @property
     def residual_scale_kind(self) -> str:
         """RESIDUAL-ROW-SCALING: m - m_calc, kg/s (every orifice-family
         closure); a total-pressure equality, Pa, where the bore equals the
@@ -5107,6 +5296,9 @@ class OrificeElement(NetworkElement):
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         self._to_node_obj = graph.nodes.get(self.to_node)
         self._to_side_closed = self._side_is_closed(graph, self.to_node)
+        if self.closed:
+            self._resolve_closed()
+            return
         # Evaluate both sides of the node for geometry discovery
         upstream_elements = graph.get_upstream_elements(self.from_node)
         downstream_elements = graph.get_downstream_elements(self.to_node)
@@ -5552,6 +5744,11 @@ class OrificeElement(NetworkElement):
         flows: dict[str, float] | None = None,
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
 
+        if self.closed:
+            # Closed (#1024): a wall, m = 0. Exact and linear, so the Jacobian
+            # is the constant 1 in its own flow; no kernel sees A = 0.
+            return [float(state_in.m_dot)], {0: {f"{self.id}.m_dot": 1.0}}
+
         if self._pass_through:
             # Bore == pipe (#788): no orifice. Zero loss, the flow passes
             # unchanged; its rate is the network's. Exact and linear, so
@@ -5641,7 +5838,8 @@ class OrificeElement(NetworkElement):
             if node is None or getattr(node, "is_flow_boundary", False):
                 return False
             for elem in graph.get_upstream_elements(nid) + graph.get_downstream_elements(nid):
-                if elem is self:
+                # A closed restriction is a wall (#1024): nothing flows past it.
+                if elem is self or _is_closed_restriction(elem):
                     continue
                 for other in dict.fromkeys([*elem.all_source_nodes(), *elem.all_sink_nodes()]):
                     if other not in seen:
@@ -6097,6 +6295,20 @@ class OrificeElement(NetworkElement):
     ) -> dict[str, float | str]:
         if state_in.P <= 0 or state_in.Tt <= 0:
             return {}
+        if self.closed:
+            # Closed (#1024): no flow, no jet, no Cd. The pressures either side
+            # are reported; the drop across it is held by the wall.
+            return {
+                "m_dot": float(state_in.m_dot),
+                "closed": 1.0,
+                **_element_pressure_block(state_in, state_out, mach_in=0.0, mach_out=0.0),
+                "area": 0.0,
+                "velocity": 0.0,
+                "mach_throat": 0.0,
+                "diameter": 0.0,
+                "beta": 0.0,
+                "area_source": self._area_source,
+            }
         cs = cb.complete_state(state_in.T, state_in.P, state_in.X)
 
         # Throat Mach: isentropic pressure ratio from the UPSTREAM total to the
@@ -6708,6 +6920,8 @@ class EffusionPlateElement(OrificeElement):
                 "Use 'IdelchikThick' (plenum-fed), 'McGreehanSchotsch' "
                 "(channel-fed, with approach crossflow), or 'fixed'."
             )
+        if error := self._geometry_error():
+            raise ValueError(error)
         if self.porosity >= 1.0:
             raise ValueError(
                 f"EffusionPlateElement {self.id!r}: porosity is "
@@ -6719,6 +6933,21 @@ class EffusionPlateElement(OrificeElement):
                 "supply-side crossflow term, which only 'McGreehanSchotsch' has "
                 f"({self.correlation!r} would silently treat the duct as a plenum)."
             )
+
+    def _geometry_error(self) -> str:
+        """Why the holes cannot be drilled at this pitch (#1024), or "".
+
+        Holes must leave material between them. The panel's arrangement is
+        not given, so its rows are taken inline: the spanwise pitch must
+        exceed d, the streamwise one the hole's footprint on the surface,
+        d / sin(angle). Equal is refused too: touching holes leave no plate."""
+        return _hole_spacing_error(
+            f"EffusionPlateElement {self.id!r}",
+            self.hole_diameter,
+            self.angle_deg,
+            ("pitch_y", self.pitch_y),
+            ("pitch_x", self.pitch_x),
+        )
 
     def internal_heat_transfer(self, state_in: NetworkMixtureState) -> dict[str, float]:
         """Coolant-side heat transfer for this panel, Andrews 86-GT-225.
@@ -7317,6 +7546,24 @@ class FilmCoolingElement(OrificeElement):
                 "metering correlation for a plate in a pipe; film holes have no "
                 "pipe and no beta. Use 'IdelchikThick', 'McGreehanSchotsch' or 'fixed'."
             )
+        if error := self._geometry_error():
+            raise ValueError(error)
+
+    def _geometry_error(self) -> str:
+        """Why the holes cannot be drilled at these pitches (#1024), or "".
+
+        Holes must leave material between them: lateral_pitch > d, and with
+        more than one row row_pitch > d / sin(angle), the footprint on the
+        surface. The rows' stagger is not given, so they are taken inline (a
+        staggered design this refuses gets its own issue). d is the metering
+        diameter of a shaped hole."""
+        return _hole_spacing_error(
+            f"FilmCoolingElement {self.id!r}",
+            self.hole_diameter,
+            self.angle_deg,
+            ("lateral_pitch", self.lateral_pitch),
+            ("row_pitch", self.row_pitch) if self.n_rows > 1 else None,
+        )
 
     def film_span_average(
         self, x_start: float, x_end: float, M: float, density_ratio: float
@@ -8292,6 +8539,42 @@ class ImpingementPlateElement(OrificeElement):
                 "air leaves down the crossflow channel (Florschuetz et al. "
                 f"1981) only; {self._topology_error}"
             )
+        if error := self._geometry_error():
+            raise ValueError(error)
+
+    def _geometry_error(self) -> str:
+        """Why the jet holes cannot be drilled at these pitches (#1024), or "".
+
+        The holes' total area is below the plate's, pi/4 / (xn/d yn/d) < 1,
+        and holes leave material between them: yn/d > 1 along a row; between
+        rows the nearest neighbour, xn/d > 1 inline, and staggered (the
+        offset row half a spanwise pitch over, Florschuetz's pattern) both
+        sqrt((xn/d)^2 + (yn/(2d))^2) > 1 and 2 xn/d > 1 (the same column two
+        rows on). Equal is refused: touching holes leave no plate."""
+        name = f"ImpingementPlateElement {self.id!r}"
+        xn, yn, d = self.xn_d, self.yn_d, self.d_jet
+        open_area = math.pi / 4.0 / (xn * yn)
+        if not open_area < 1.0:
+            return (
+                f"{name}: the jet holes' area is {open_area:.3g} times the plate's, "
+                f"pi/4 / (xn_d yn_d) at xn_d = {xn:g}, yn_d = {yn:g}: the holes do not "
+                "fit in the plate. It must be below 1."
+            )
+        if self.pattern == "inline":
+            return _hole_spacing_error(
+                name, d, 90.0, ("yn_d * d_jet", yn * d), ("xn_d * d_jet", xn * d)
+            )
+        if error := _hole_spacing_error(name, d, 90.0, ("yn_d * d_jet", yn * d), None):
+            return error
+        nearest = min(math.hypot(xn, 0.5 * yn), 2.0 * xn)
+        if not nearest > 1.0:
+            return (
+                f"{name}: staggered at xn_d = {xn:g}, yn_d = {yn:g}, the nearest holes "
+                f"of neighbouring rows are {nearest * d:.6g} m apart (min(sqrt(xn^2 + "
+                f"(yn/2)^2), 2 xn) = {nearest:.4g} d), not more than the hole diameter "
+                f"d = {d:.6g} m: they touch or overlap and leave no material between them."
+            )
+        return ""
 
     def network_flow_inputs(self) -> list[tuple[str, str]]:
         """(element id, node id) of every flow ``htc_and_T`` reads besides its
@@ -8560,6 +8843,11 @@ class EffectiveAreaConnectionElement(OrificeElement):
             specify effective_area=0.01 m^2 (0.8 * 0.0125).
         """
 
+        if not (math.isfinite(effective_area) and effective_area >= 0.0):
+            raise ValueError(
+                f"EffectiveAreaConnectionElement {id!r}: effective_area = {effective_area!r} "
+                "must be finite and non-negative (0 closes the restriction: no flow)."
+            )
         diameter = math.sqrt(4.0 * effective_area / math.pi)
         super().__init__(id, from_node, to_node, Cd=1.0, diameter=diameter, correlation="fixed")
 
@@ -9075,6 +9363,12 @@ class TurbomachineElement(NetworkElement):
             raise ValueError(
                 f"{kind} '{id}': efficiency {eta} is outside (0, 1]: above 1 the "
                 "machine would destroy entropy"
+            )
+        if not math.isfinite(float(pressure_ratio)):
+            # An infinite ratio passed the >= 1 test and fixed no pressure (#1024).
+            raise ValueError(
+                f"{kind} '{id}': pressure_ratio {pressure_ratio} must be a finite number "
+                ">= 1 (it is Pt_out/Pt_in for a compressor, Pt_in/Pt_out for a turbine)"
             )
         if not (float(pressure_ratio) >= 1.0):
             raise ValueError(
@@ -11097,6 +11391,34 @@ class ChannelElement(NetworkElement):
     def _fill_convective_area(self) -> None:
         if self.surface and self.surface.area == 0.0:
             self.surface.area = self.default_convective_area()
+
+    def _geometry_error(self) -> str:
+        """Why this duct's section cannot be built (#1024), or "".
+
+        The diameter (the area's, given or inherited) must be positive and
+        finite: a duct of no area is no duct, and the Fanno kernel refused it
+        mid-solve. A zero-area restriction is a closed orifice instead. A
+        given Dh must be positive and finite.
+
+        NOT the isoperimetric bound the nodes check (Dh <= 2 sqrt(A/pi)): it
+        holds for a closed wetted perimeter only. A channel standing for a
+        share of a wider duct, its area a fraction of the duct's and only its
+        part of the wall wetted (a sector), keeps the duct's Dh = 4A/P above
+        it, as the C3X vane example's hole segments do (Dh = D, area f A)."""
+        name = f"{type(self).__name__} {self.id!r}"
+        if self.diameter is not None and not _positive_finite(self.diameter):
+            return (
+                f"{name}: diameter D = {self.diameter!r} m. A duct needs a positive, "
+                "finite diameter (area); to shut a path, close it with a zero-bore "
+                "OrificeElement instead."
+            )
+        if self._Dh_source == "user" and not _positive_finite(self.Dh):
+            return f"{name}: hydraulic diameter Dh = {self.Dh!r} m must be positive and finite."
+        return ""
+
+    def validate(self) -> None:
+        if error := self._geometry_error():
+            raise ValueError(error)
 
 
 class CrossflowSegmentElement(ChannelElement):

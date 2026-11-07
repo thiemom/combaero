@@ -157,8 +157,13 @@ class FlowNetwork:
         for element in self.elements.values():
             element.resolve_topology(self)
 
-    def _reachable_from(self, start_id: str) -> set[str]:
-        """BFS over undirected adjacency to find all node IDs reachable from start_id."""
+    def _reachable_from(self, start_id: str, through_closed: bool = True) -> set[str]:
+        """BFS over undirected adjacency to find all node IDs reachable from start_id.
+
+        ``through_closed=False`` does not cross a closed restriction (a zero
+        bore, #1024): what lies beyond one is reached only by another path."""
+        from .components import _is_closed_restriction
+
         visited: set[str] = set()
         queue = [start_id]
         while queue:
@@ -168,6 +173,8 @@ class FlowNetwork:
             visited.add(nid)
             for eid in self._upstream_of_node[nid] + self._downstream_of_node[nid]:
                 elem = self.elements[eid]
+                if not through_closed and _is_closed_restriction(elem):
+                    continue
                 if nid in elem.all_sink_nodes():
                     neighbours = elem.all_source_nodes()
                 else:
@@ -420,6 +427,34 @@ class FlowNetwork:
             raise ValueError(
                 f"FlowNetwork validation failed: isolated node(s) detected: {sorted(isolated)}. "
                 "Every node must be reachable from a PressureBoundary."
+            )
+
+        # A closed restriction (a zero bore, #1024) is a wall: its row is m = 0
+        # and reads no pressure. A part of the network that closed elements
+        # alone join to the rest keeps solving where it holds a
+        # PressureBoundary of its own; one they cut off from every boundary
+        # has no pressure level (its stagnant gas could be at any), so the
+        # problem has no unique root: refused, naming the closed elements.
+        open_from_bc: set[str] = set()
+        for nid, node in self.nodes.items():
+            if isinstance(node, PressureBoundary):
+                open_from_bc.update(self._reachable_from(nid, through_closed=False))
+        cut_off = [n for n in self.nodes if n not in open_from_bc]
+        if cut_off:
+            from .components import _is_closed_restriction
+
+            closing = sorted(
+                eid
+                for eid, e in self.elements.items()
+                if _is_closed_restriction(e) and (e.from_node in cut_off) != (e.to_node in cut_off)
+            )
+            raise ValueError(
+                f"FlowNetwork validation failed: node(s) {cut_off} reach a "
+                f"PressureBoundary only through closed restriction(s) {closing} (zero "
+                "area: a wall, no flow). Nothing sets the pressure of the gas trapped "
+                "beyond them, so the network has no unique solution. Open the "
+                "restriction (give it an area), remove the part it closes off, or give "
+                "that part a PressureBoundary of its own."
             )
 
         # Every interior node must have at least 2 connected elements to satisfy continuity (in and out)
