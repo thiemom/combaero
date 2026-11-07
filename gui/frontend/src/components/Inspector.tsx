@@ -1461,7 +1461,9 @@ const Inspector = () => {
 											{inheritedNote(geomPipe.source)}.
 										</span>
 									)}
-									{beta != null && E != null && (
+									{/* Only against a pipe: a chamber pass-through (#1016) also sets
+									    beta = 1, with no pipe and the "beta = 0" hint below. */}
+									{beta != null && E != null && pipeD != null && (
 										<>
 											<div className="flex justify-between">
 												<span className="text-stone-400">β = d / D</span>

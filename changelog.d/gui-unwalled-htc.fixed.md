@@ -1,0 +1,2 @@
+- A momentum chamber or combustor whose heat transfer is not evaluated (no convective surface, no flow, or a choked-bounded junction) reports `Nu`, `St`, `htc` and `T_aw` as NaN, which the GUI shows as no value. Since 0.11's #1022 this covers every chamber and combustor without a wall; before, they read 0 (zero heat transfer) and `T_aw` = Tt.
+- GUI: an orifice that is a pass-through against its chamber (#1016) no longer shows beta = 1 and E = 1 next to the "beta = 0" hint; beta and E show only against a pipe diameter.
