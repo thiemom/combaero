@@ -67,6 +67,9 @@ export interface PreviewField {
 export interface PreviewItem {
 	status: "resolved" | "unresolved";
 	reason: string;
+	// A warning the solve will issue, which does not stop it (#1023: a
+	// momentum chamber narrower than an adjoining pipe). Empty when none.
+	warning?: string;
 	fields: Record<string, PreviewField>;
 }
 

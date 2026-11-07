@@ -132,10 +132,12 @@ from combaero import _solver_tools
 from combaero.network._ejector_huang1999 import ANCHOR_CLOSURES, ETA_P, ETA_S, EjectorGeometry
 from combaero.network.components import (
     DEFAULT_REGIME,
+    NEIGHBOUR_AREA_RTOL,
     CompressibilityLiteral,
     MomentumChamberNode,
     MultiPortChamberBase,
     NetworkMixtureState,
+    _attached_pipe,
     _element_area_facing,
 )
 
@@ -377,6 +379,8 @@ class EjectorElement(MultiPortChamberBase):
             a3, ap1 = self.mixing_area, self.nozzle_exit_area
             self.port_areas = [ap1, a3 - ap1, a3]
             self._port_area_sources = ["user", self._mixing_source, self._mixing_source]
+        else:
+            self._check_mixing_against_outlet_pipe(graph)
         self._size_outlet_port_node(graph)
         super().resolve_topology(graph)
         self.seed_warm_start(graph)
@@ -669,6 +673,28 @@ class EjectorElement(MultiPortChamberBase):
         node.Dh = 2.0 * math.sqrt(node.area / math.pi)
         node._area_source = source
         node._Dh_source = source
+
+    def _check_mixing_against_outlet_pipe(self, graph: Any) -> None:
+        """An explicit mixing area wider than the outlet pipe is refused
+        (#1023): the mixed stream would contract into the pipe with no loss
+        at the diffuser exit. A wider pipe is a plausible diffuser exit and
+        stays accepted; equal (to NEIGHBOUR_AREA_RTOL on the equivalent
+        diameter) is the duct continuing. The pipe is the single channel at
+        the outlet node (_attached_pipe), through the port chamber."""
+        hit = _attached_pipe(graph, self.outlet_node, self)
+        if hit is None or self.mixing_area is None:
+            return
+        pipe, A_pipe = hit
+        if math.sqrt(self.mixing_area / A_pipe) <= 1.0 + NEIGHBOUR_AREA_RTOL:
+            return
+        raise ValueError(
+            f"EjectorElement '{self.id}': mixing_area {self.mixing_area:.6g} m^2 is larger "
+            f"than its outlet pipe, channel '{pipe.id}' at '{self.outlet_node}' "
+            f"(D = {pipe.diameter:.6g} m, A = {A_pipe:.6g} m^2): the mixed stream would "
+            "contract into the pipe with no loss. Make the outlet pipe at least the "
+            "mixing area (a wider pipe is a diffuser exit), or leave mixing_area unset "
+            "to inherit the pipe's."
+        )
 
     def _outlet_pipe_area(self, graph: Any) -> tuple[float | None, str]:
         """The area of the element on the outside of the outlet port, unless

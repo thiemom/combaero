@@ -405,6 +405,7 @@ def _resolve_preview_sync(schema: NetworkGraphSchema) -> dict:
         items[item_id] = {
             "status": res.status,
             "reason": res.reason,
+            "warning": res.warning,
             "fields": {
                 k: {"value": _json_number(fr.value), "source": fr.source}
                 for k, fr in res.fields.items()

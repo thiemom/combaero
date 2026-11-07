@@ -38,8 +38,10 @@ def test_a_pressure_balance_element_declares_pressure_rows(cls: type) -> None:
 
 
 def test_the_area_change_row_is_a_mass_flow() -> None:
-    """m - m_calc since #731: its row is in kg/s."""
-    assert AreaChangeElement.residual_scale_kind == "mdot"
+    """m - m_calc since #731: its row is in kg/s; Pt_in - Pt_out, Pa, for
+    equal faces, which are no area change (#1023)."""
+    assert AreaChangeElement("ac", "a", "b", F0=0.01, F1=0.04).residual_scale_kind == "mdot"
+    assert AreaChangeElement("ac", "a", "b", F0=0.01, F1=0.01).residual_scale_kind == "p"
 
 
 def _net() -> FlowNetwork:

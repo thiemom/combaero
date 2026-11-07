@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import warnings
 from collections import deque
 from typing import TYPE_CHECKING, Any, Self
 
@@ -368,6 +369,16 @@ class FlowNetwork:
             # declared, where the residual is defined (raises TypeError).
             declared_row_kinds(elem)
 
+        # A momentum chamber narrower than a pipe it adjoins (#1023): a
+        # contraction or expansion with no loss. Warned, not refused; someone
+        # may mean it.
+        from .components import MomentumChamberNode
+
+        for node in self.nodes.values():
+            if isinstance(node, MomentumChamberNode):
+                for message in node.pipe_area_warnings(self):
+                    warnings.warn(message, UserWarning, stacklevel=3)
+
         # A wall exchanges heat between two convective surfaces. A side without
         # one (a PlenumNode, an orifice; a combustor or chamber with no surface
         # area) gave no heat and no error: the wall was silently inert. Checked
@@ -563,6 +574,9 @@ def _flow_independent_dpt(element: NetworkElement) -> str | None:
     These are the edges of ``FlowNetwork._flow_independent_loop``: a closed
     loop made only of them has no solution or an undetermined split.
 
+    - A pass-through (#1023): an ``AreaChangeElement`` with equal faces, an
+      ``OrificeElement`` whose bore equals its pipe (#788): Pt_out = Pt_in.
+      Known once the topology is resolved.
     - ``LosslessConnectionElement``, ``VortexElement`` (a free vortex
       conserves Pt, #661) and a flow splitter's reference outlet (its valve
       open): Pt_out = Pt_in.
@@ -581,7 +595,9 @@ def _flow_independent_dpt(element: NetworkElement) -> str | None:
     other element, whose drop depends on its flow.
     """
     from .components import (
+        AreaChangeElement,
         LosslessConnectionElement,
+        OrificeElement,
         PressureLossElement,
         SplitterOutletElement,
         TurbomachineElement,
@@ -591,6 +607,8 @@ def _flow_independent_dpt(element: NetworkElement) -> str | None:
 
     if isinstance(element, LosslessConnectionElement):
         return "lossless"
+    if isinstance(element, (AreaChangeElement, OrificeElement)) and element._pass_through:
+        return "pass-through (area equal to its neighbour's), Pt conserved"
     if isinstance(element, VortexElement):
         return "free vortex, Pt conserved"
     if isinstance(element, SplitterOutletElement) and element.reference:

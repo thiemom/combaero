@@ -181,8 +181,10 @@ class _Layered:
         elif kind == "area":
             model = r.choice(["sharp", "conical"])
             if na.area == nb.area:
-                # Equal faces are no area change, and the element refuses them
-                # (#731): a lossless joint, after the same draw.
+                # Equal faces are no area change (#731): a lossless joint,
+                # after the same draw. Since #1023 the element would be the
+                # same pass-through; the joint stays, so these seeds keep
+                # the network they drew.
                 e = LosslessConnectionElement(eid, a, b)
             else:
                 e = AreaChangeElement(
@@ -656,7 +658,10 @@ def ejector(seed: int) -> tuple[FlowNetwork, list[str]]:
     A = math.pi * D * D / 4
     At = r.choice([1.5e-5, 3.14e-5, 6e-5])
     Ae = At * r.uniform(1.2, 4.0)
-    Am = Ae * r.uniform(3.0, 12.0)
+    # A mixing duct wider than its outlet pipe is refused (#1023): such a
+    # draw is fitted to the pipe, with no random draw, so every other seed
+    # draws what it drew before (of 0:100, ejector 1, 11, 68 and 93 change).
+    Am = min(Ae * r.uniform(3.0, 12.0), A)
     if regime == "compressible":
         Pp = r.choice([3e5, 7e5, 1.5e6])
         Ps = Pp * r.uniform(0.02, 0.2)

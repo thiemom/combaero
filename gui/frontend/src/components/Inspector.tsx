@@ -22,6 +22,7 @@ import { warningsFor } from "../utils/incompressible";
 import {
 	inheritedField,
 	inheritedNote,
+	previewWarning,
 	unresolvedReason,
 } from "../utils/inheritance";
 import { junctionGuessKey } from "../utils/legacyKeys";
@@ -2632,6 +2633,31 @@ const Inspector = () => {
 									) : null;
 								})()}
 
+								{(() => {
+									// #1023, from the solver's resolve pass: equal faces are no
+									// area change (zero loss); an explicit face that contradicts
+									// its pipe is refused.
+									const passThrough =
+										inheritedField(
+											previewItems,
+											selectedNode.id,
+											"pass_through",
+										)?.value === 1;
+									const reason = unresolvedReason(
+										previewItems,
+										selectedNode.id,
+									);
+									const faceRefusal = reason?.includes("contradicts") === true;
+									if (!passThrough && !faceRefusal) return null;
+									return (
+										<p className="text-[9px] text-amber-700">
+											{passThrough
+												? "F₀ = F₁: no area change — zero loss, the flow passes unchanged."
+												: `The solver refuses this geometry: ${reason}`}
+										</p>
+									);
+								})()}
+
 								{selectedNode.data.model_type === "conical" && (
 									<LengthInput
 										id={`length_${selectedNode.id}`}
@@ -3479,6 +3505,16 @@ const Inspector = () => {
 							}
 							defaultHint="No outlet pipe with a known diameter — the 8e-4 m² default is used. Connect a pipe, or untick Inherit to set A_3."
 						/>
+						{(() => {
+							// #1023: a mixing area wider than the outlet pipe is refused
+							// (a wider pipe is a diffuser exit and stays accepted).
+							const reason = unresolvedReason(previewItems, selectedNode.id);
+							return reason?.includes("outlet pipe") === true ? (
+								<p className="text-[9px] text-amber-700">
+									{`The solver refuses this geometry: ${reason}`}
+								</p>
+							) : null;
+						})()}
 						<div className="flex flex-col gap-1">
 							<label className="text-xs font-bold text-gray-500 uppercase">
 								Recovery Efficiency
@@ -4148,6 +4184,14 @@ const Inspector = () => {
 									}}
 									defaultHint="Nothing upstream to size the chamber from — the 0.1 m² default is used. Connect a channel, or untick Inherit to set the area or Dh."
 								/>
+								{(() => {
+									// #1023: narrower than an adjoining pipe, a contraction or
+									// expansion with no loss. The solve warns; it does not refuse.
+									const warning = previewWarning(previewItems, selectedNode.id);
+									return warning ? (
+										<p className="text-[9px] text-amber-700">{warning}</p>
+									) : null;
+								})()}
 								<div className="grid grid-cols-2 gap-3">
 									<div className="flex flex-col gap-2">
 										<label className="text-xs font-bold text-gray-500 uppercase">

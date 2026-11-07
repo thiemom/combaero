@@ -40,6 +40,19 @@ export function unresolvedReason(
 }
 
 /**
+ * A warning the solver will issue about a node's geometry without refusing it
+ * (#1023: a momentum chamber narrower than an adjoining pipe). `undefined`
+ * when there is none or the node is not in the preview.
+ */
+export function previewWarning(
+	preview: PreviewItems | null | undefined,
+	nodeId: string,
+): string | undefined {
+	const w = preview?.[nodeId]?.warning;
+	return w ? w : undefined;
+}
+
+/**
  * The note shown under an inherited value, as a complete phrase. Sources come
  * in three shapes -- "channel 'x'" (or "<Element> 'x'", "node 'x'"),
  * "inherited from x", and "derived from ..." -- so the phrase is built per

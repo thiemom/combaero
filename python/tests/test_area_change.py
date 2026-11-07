@@ -348,12 +348,15 @@ def test_the_element_flow_is_c1_through_zero_drive(case: str) -> None:
     assert np.all(np.diff(m) > 0.0)
 
 
-def test_equal_areas_are_refused() -> None:
+def test_equal_areas_are_refused_by_the_kernel_and_a_pass_through_in_the_element() -> None:
+    """The closure has no loss to set a flow at n = 1; the element never runs
+    it there: equal faces are no area change, a pass-through (#1023,
+    test_neighbour_areas_1023.py)."""
     with pytest.raises(ValueError, match="no area change"):
         cb.area_change_flow(2e5, 300.0, Y_AIR, 1.9e5, 1e-3, 1e-3)
     el = cb.network.AreaChangeElement("ac", "a", "b", F0=0.01, F1=0.01)
-    with pytest.raises(ValueError, match="no area change"):
-        el.validate()
+    el.validate()
+    assert el._pass_through and el.residual_scale_kind == "p"
 
 
 # ---------------------------------------------------------------------------
