@@ -135,8 +135,29 @@ jobs:
           # install wheel (combaero is a dependency, pulled from PyPI).
           # --refresh-package: belt and braces against uv reusing a cached
           # index listing that predates the combaero release we just waited for.
-          uv pip install --python .test-venv --refresh-package combaero \
-            dist/combaero_gui-*.whl
+          #
+          # Retried, because one "found" from the wait step above does not mean
+          # uv sees it: on v0.11.0 the wait step found combaero==0.11.0 14 s
+          # after publish.yml finished, and this install failed one second
+          # later with "only combaero<=0.10.0 is available". A rerun 1.5 min
+          # later failed the same way, and one about 12 min after the publish
+          # passed; a cache-free resolve from elsewhere already saw 0.11.0.
+          # The runner was served a stale /simple/ listing by its CDN edge.
+          # Retrying an unresolvable pin for 10 min covers that window; any
+          # other install error fails at once.
+          for i in $(seq 1 20); do
+            if uv pip install --python .test-venv --refresh-package combaero \
+                 dist/combaero_gui-*.whl 2> install.err; then
+              break
+            fi
+            cat install.err
+            if ! grep -q "No solution found" install.err || [ "$i" -eq 20 ]; then
+              echo "FAIL: could not install the combaero-gui wheel"
+              exit 1
+            fi
+            echo "combaero pin not resolvable yet (attempt $i/20); retrying in 30 s"
+            sleep 30
+          done
           .test-venv/bin/combaero-gui &
           SERVER_PID=$!
           # poll instead of a fixed sleep -- a fixed 4s sleep flaked on the
