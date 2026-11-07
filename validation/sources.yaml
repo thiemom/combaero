@@ -3321,11 +3321,9 @@ documents:
     Eq. 124 (m_j u_j cos phi) is the same form as combaero''s injection_momentum hook. (3) Cd convention:
     Eqs. 75-77 confirm the TN 3663 Phi/total-pressure convention and the 0.75 + 0.25 p_an/p_ft correction the
     registered TN 3663 entry describes -- no new Cd closure. (4) Penetration Eq. 98 and the mixing models are
-    jet_mixing method, not network; nothing to adopt for the flow split. It does NOT cite McNaughton and Page
-    (1966), Tacina and Grobman or Mellor (see notes).'
+    jet_mixing method, not network; nothing to adopt for the flow split.'
   read_for: ['#793 liner hole flow split and jets: a buildable annular combustor case or method', '#813 jet
-      axial momentum / entry angle closure', '#807 liner-hole Cd under annulus crossflow', 'whether it cites
-      McNaughton & Page, Tacina & Grobman or Mellor (wanted-list correction)']
+      axial momentum / entry angle closure', '#807 liner-hole Cd under annulus crossflow']
   issues: [793, 813, 807]
   records: []
   code: ['python/combaero/network/components.py: CrossflowSegmentElement (station kappa; Eq. 88 at M -> 0 = kappa
@@ -3334,12 +3332,7 @@ documents:
     154-159): Graves-Grobman Report 1373 (ref. 1), Grobman Memo 11-26-58E (2), Samuel ASME 61-WA-305 (3),
     Lefebvre-Herbert 1960 (4), Venneman GE 1959/1960 (28, 29), Marshall GE R58AGT558 (30), Kaddah 1964 (31),
     TN 3663 (32), TN 3924 (33), Knight-Walker R&M 2987 (34), Rosenthal ARL ME Note 235 (35), Dittrich RM
-    E56I17 (74). NOT cited: McNaughton and Page (1966), any Tacina and Grobman, any Mellor -- and dated January
-    1968 it cannot cite a 1969 or 1977 report. NTRS check 2026-11-07: NASA TN D-5335 is Blackwell (1969),
-    lifting-surface load distributions; NASA CR-135298 is Wright et al. (1978), hydrogen turbine power
-    conversion -- both recalled citations were wrong; "Mellor" in the combustor-network papers held is the
-    editor of Design of Modern Gas Turbine Combustors (1990, Dodds-Bahr chapter). Figures worth a 300 dpi
-    render: none, RM E56I17 (held) has the measured points behind Figs. 29-31 (PDF pp. 206-208).'
+    E56I17 (74). Figures worth a 300 dpi render: none, RM E56I17 (held) has the measured points behind Figs. 29-31 (PDF pp. 206-208).'
 - file: sources/combustor_network/nrec_1968_NASA_CR-72375_vol2_operating_manual.pdf
   citation: 'Northern Research and Engineering Corporation (1968). Computer program for the analysis of annular
     combustors. Volume II: Operating manual. NREC Report 1111-2, NASA CR-72375, Contract NAS3-9402, January 29,
@@ -4277,6 +4270,75 @@ documents:
   records: [validation/junction/data/bajura1976/README.md]
   notes: Arrived 2026-10-28 as docs/new/654_1_Bajura_1976.pdf (moved here from the wanted list). Scan with an
     OCR layer (garbled in the equations); read from the page images.
+- file: sources/junction/acrivos_babcock_pigford_1959.pdf
+  citation: Acrivos, A., Babcock, B. D., Pigford, R. L. (1959). Flow distributions in manifolds. Chemical
+    Engineering Science 10(1-2), 112-124.
+  id: DOI 10.1016/0009-2509(59)80030-0
+  topic: [junction, channel]
+  content: 'Constant-area dividing ("blowing") and combining ("sucking") manifolds with equally spaced side
+    ports, incompressible. STATION REGAIN: momentum over a port with the side stream losing all its axial
+    velocity gives p2 - p1 = rho (V1^2 - V2^2) (Eq. 0.1); the measured rise is a fraction k of it (Eq. 0.2).
+    In combaero''s station form (include/side_stream_momentum.h, q = V2/V1) that is kappa = (1 - k)(1 + q),
+    i.e. Eq. 0.1 is kappa = 0 and Bassett''s kappa 0.75 is k = 1 - 0.75/(1 + q). Friction: Fanning between ports
+    (Eq. 1.1), wall friction measured unchanged by the branching. Discrete difference equations Eqs. 1.8-1.11
+    (port flow from the orifice equation on the mean of the up/downstream pressures, coefficient C), the
+    continuous limit Eq. 1.16 (blowing) and Eq. 1.23 (sucking) in two groups M0 (entrance pressure / momentum)
+    and F0 (friction); design charts Figs. 6-11 are CALCULATED. MEASURED (air, Univ. of Delaware, Babcock''s
+    thesis ref. 1): 6 ft of 1.025 in i.d. brass pipe, 24 side ports at 3 in pitch, each a 1/4 in hole in the
+    wall under a 9 in length of 0.317 in i.d. copper tube (port/pipe area ratio 0.059), 32 wall taps at 3 in,
+    sharp-edged inlet and outlet orifices calibrated on a wet-test meter, port flow by a calibrated Pitot in
+    the side tube. Fig. 2 (p. 114): one port, V1 46.7 -> V2 37.6 ft/s, static rise 0.2218 in water; Fig. 4 (p.
+    115): two ports, 28.5 / 23.2 / 16.7 ft/s, rises 0.1119 and 0.0868 in water; Fig. 3 (p. 115): k against
+    (V1 - V2)/V1 = 0.1-0.5 for single ports (open circles, roughly ten) and the average per hole of pairs
+    at six spacings (filled), with Soucek-Zelnick/Rouse water lines for a 6 in square channel (secondary).
+    Fig. 12 (p. 123): ONE full measured distribution -- 24 open ports, closed end, entrance velocity 47.2 ft/s,
+    flow through each port (24 points) and the wall static pressure (about 30 taps, in water gauge) along the
+    pipe. Table 1 (p. 123): seven runs (8-32 ports, M0 0.77-2.79, F0 0.50-2.60), observed vs predicted range of
+    side flow and dimensionless length; three runs open at the downstream end, extrapolated. No measurement
+    uncertainty stated beyond the +- on Table 1 ranges; air temperature and absolute pressure not given.'
+  status: screened
+  verdict: 'Screened 2026-11-07 for the annulus-bleed question behind #793/#813 (CrossflowSegmentElement
+    stations feeding liner holes). PLUGS A GAP: the shipped bleed kappa 0.75 rests on Bassett''s pipe-tee
+    straight-run fit (a ''selected''-role dataset, not independent accuracy), and NREC CR-72374 (kappa 1 at M ->
+    0) and Bajura-Jones (theta1 1.05, a distributed coefficient fitted to header pressures) are not measured
+    per-port regain. This paper MEASURES the station static rise over a small wall port (area ratio 0.059 --
+    liner-hole-like, not a tee) against the bleed ratio, which converts one-to-one to kappa. First reads (not
+    yet digitised): Fig. 2 gives k = 0.645 at bleed 0.195 (air at about 0.075 lb/ft^3 assumed), i.e. kappa
+    0.64, where Bassett''s 0.75 would give a rise 9% low (0.201 vs 0.222 in water); Fig. 3''s single ports
+    scatter about k 0.6-0.75 over bleed 0.1-0.5, kappa roughly 0.45-0.65, so the shipped 0.75 sits at or above
+    the top of the band (predicts less regain). Fig. 4''s first port reads k 0.91 (kappa about 0.16), the
+    second 0.75; the authors note pair values fall higher and average them. As an accuracy set for
+    STATION_KAPPA_BLEED_BASSETT this is CROSS-SOURCE (different lab, geometry and fluid from Bassett), and
+    a station-regain score needs only the wall pressures and the port flows -- not the lateral Cd. BUILDABLE
+    distribution case: Fig. 12 (= Table 1 row 6, range 38%) has full geometry (pipe, pitch, hole, side tube,
+    closed end, entrance velocity) and measured port flows plus wall pressures, so a 24-station
+    CrossflowSegmentElement chain with 24 lateral restrictions can be scored on both (accuracy, cross-source).
+    Caveats: the lateral resistance (1/4 in hole into a 0.317 in tube, 9 in long, to atmosphere) is not
+    measured separately -- the authors use C = k = 0.6 -- so the distribution score carries the lateral
+    closure inside it unless C is taken from Fig. 12''s own pressure/flow pairs (then say so); Fig. 12''s flow
+    axis reads "cu ft/sec x 10^4", but 47.2 ft/s through 1.025 in is 0.270 cu ft/s and the 24 plotted port
+    flows sum to about 0.027 at that scale, so the axis is x 10^-3 (with 10^-4 the port velocity would be
+    about 3 ft/s against a 0.5 in water drive; read it as a misprint by mass balance). The ODE/charts (Figs.
+    6-11) are model output, combaero captures the same physics discretely: method reference only.'
+  read_for: ['#793/#813 annulus bleed: a measured static-pressure regain (kappa) per side port vs bleed ratio',
+    'a measured dividing-manifold outlet distribution buildable as a CrossflowSegmentElement chain', 'user
+      request: register the Babcock paper']
+  issues: [793, 813]
+  records: []
+  code: ['include/side_stream_momentum.h: STATION_KAPPA_BLEED_BASSETT (cross-source check, not used)',
+    'python/combaero/network/components.py: CrossflowSegmentElement']
+  notes: 'Arrived 2026-11-07 as sources/new/1-s2.0-0009250959800300-main.pdf (Elsevier PDF; text layer with
+    OCR errors in equations and figure labels -- read from the page images; the running header''s "1969" is an
+    OCR slip for 1959). Weissberg (Oak Ridge K-1187, 1955, porous-wall pipe) gives k 0.88 and 0.69 (p. 115),
+    not held. Screened and DELETED with it 2026-11-07, both citing it: Yazici, Karadag, Gokluberk, Kibar
+    (2024), JAFM 17(5) 989-1001 (DOI 10.47176/jafm.17.05.2302) -- CFD-led study of a 4-outlet water
+    distributor block, the only measurement 8 outlet flows in a bar chart (Fig. 9, straight bore, 9.70 and
+    12.38 l/min) behind barbed hose nipples of unstated internal geometry, outlets 1.1 bore diameters apart
+    behind a 20 -> 28 mm inlet jet, no pressures, so neither a regain nor a buildable 1-D case; Amara,
+    Carvalho (2022), Larhyss J. 50, 95-107 -- friction-only analytic dividing-manifold solution (Eqs. 11,
+    15, 21) that drops the momentum regain combaero''s kappa carries, verified only against other models
+    (irrigation lateral), no data. Worth a 300 dpi render and digitisation: Fig. 3 (k vs bleed ratio, both series) and Fig. 12 (port
+    flows and wall pressures).'
 - file: sources/heat_transfer/turbulence/VanFossen_Ching_1994_NASA_TM-106503_stagnation_length_scale.pdf
   citation: Van Fossen, G. J., Ching, C. Y. (1994). Measurements of the influence of integral length scale
     on stagnation region heat transfer. NASA TM-106503 (prepared for the 5th Symposium on Transport Phenomena
