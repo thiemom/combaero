@@ -1544,7 +1544,7 @@ bookkeeping keys. Five of them say what happened:
 **Boundary-condition ramp retry (#642), opt-in.** `solver.bc_ramp_retry = True` (the GUI backend, `NetworkRunner` and the stress harness set it) runs after the homotopy, in the time the timeout leaves:
 - **The ramp:** at λ every `PressureBoundary` sits at Pm + λ (Pt − Pm), with Pm the mean of their Pt, and every `MassFlowBoundary` flow and user `EnergyBoundary` heat at λ times its own. The gentle end (`BC_RAMP_LAM0` = 0.05, halved down to `BC_RAMP_LAM_MIN` until it solves cold) is solved with the usual retries. λ then rises, each solve warm-started from the last root, and the λ = 1 solve is a plain solve with every check. The boundaries are restored whatever happens.
 - **Starts cold:** a cold start drops the Fanno kernels' warm-start guesses (`_last_G`, `_last_M_exit`) left by the failed attempts. One kept a draw's gentle end from solving.
-- **Budget:** with the ramp on, an uncapped homotopy (`homotopy_budget = None`) takes half of the time left instead of all of it.
+- **Budget:** with the ramp on, an uncapped homotopy (`homotopy_budget = None`) takes half of the time left instead of all of it, and a capped one at most `NEWTON_HOMOTOPY_BUDGET_BEFORE_RAMP` = 3 s (#1018). Its stress rescues (random 60, 91, 136) take under 2 s; the 5 s it spent on the draws it did not rescue was the time the ramp then lacked (random 119). Not 2 s: each homotopy step's timeout is what the cap leaves, and a solve runs its LM fallback only with more than 2 s left.
 - **What it gives:** it rescues 3 of the 21 stress random draws the homotopy left unsolved (31, 34, 35), in 13-46 s. In the 20 s harness that is random 34, plus legacy_tee 15. Draws that still fail now use more of their budget. Since the compressible seed (#971), random 34 converges cold; random 35 is the draw the ramp still rescues.
 
 **Resistance-network cold start, on by default.** `solver.resistance_seed = True` replaces the cold start's node pressures and element flows with the root of the network as quadratic resistances:
@@ -1666,6 +1666,9 @@ solver = NetworkSolver(graph)
 # A cold solve of a network with walls that still fails is then
 # retried from the same network solved WITHOUT its walls -- the
 # message says "Converged from the wall-free flow solution ...".
+# A network whose prefers_warm_start start failed retries from the
+# inlet-referenced seed, not from the outlet-referenced one it just tried
+# (#1018).
 # An iterate the model refuses (an exception, NaN/inf) is answered with a
 # residual ten times the last physical one, so the trust region rejects
 # the step and shrinks; a failed solve lists the rejected probes in its

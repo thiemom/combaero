@@ -147,6 +147,13 @@ _WITHHELD_RTOL = 1e-12
 #: solve that does not converge pays it -- unbounded, a junction scorecard with
 #: expected failures went from 8 s to 106 s (10 s: 87 s).
 NEWTON_HOMOTOPY_BUDGET = 5.0
+#: Its cap when the boundary-condition ramp follows (#1018). Its stress
+#: rescues take under 2 s (random 60, 91, 136: 0.5-1.8 s for the whole
+#: solve); the 5 s it spent on draws it did not rescue was what the ramp then
+#: lacked to finish random 119 within the harness's 20 s. Not 2 s: a step's
+#: timeout is the cap's remainder, and a solve runs its LM fallback only with
+#: more than 2 s left, which random 91's last step needs.
+NEWTON_HOMOTOPY_BUDGET_BEFORE_RAMP = 3.0
 
 #: Boundary-condition ramp retry (#642, ``NetworkSolver.bc_ramp_retry``): the
 #: gentle end it first solves cold, halved down to BC_RAMP_LAM_MIN until one
@@ -4860,6 +4867,8 @@ class NetworkSolver:
                 cap = self.homotopy_budget
                 if cap is None and self.bc_ramp_retry and timeout is not None:
                     self.homotopy_budget = 0.5 * max(timeout - (time.time() - _h0), 0.0)
+                elif cap is not None and self.bc_ramp_retry:
+                    self.homotopy_budget = min(cap, NEWTON_HOMOTOPY_BUDGET_BEFORE_RAMP)
                 try:
                     sol = self._newton_homotopy_retry(sol, method, timeout, options, use_jac, _h0)
                 finally:
@@ -5565,6 +5574,7 @@ class NetworkSolver:
             )
 
         _t0 = time.time()
+        warm_seeded = False
         if (
             init_strategy == "default"
             and has_compressible
@@ -5590,6 +5600,9 @@ class NetworkSolver:
                 for w in warm_warnings:
                     warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
                 return warm
+            # Its proxy converged: the outlet-referenced retry below would
+            # solve from that same seed again (#1018: 7 s of a 25 s solve).
+            warm_seeded = bool(getattr(self, "_outletref_seeded", False))
             if timeout is not None:
                 timeout = max(timeout - (time.time() - _t0), 0.0)
             _t0 = time.time()
@@ -5668,6 +5681,8 @@ class NetworkSolver:
                     )
                 return replay(retrying=False)
             _seed_kind = "compressible"
+        elif warm_seeded:
+            seed_x0 = None  # tried first, above: on to the inlet-referenced seed
         else:
             seed_x0 = self._outlet_ref_incompressible_seed(use_jac=use_jac, timeout=proxy_timeout)
             _seed_kind = "outlet-referenced"
@@ -5679,7 +5694,11 @@ class NetworkSolver:
             seed_x0 = self._outlet_ref_incompressible_seed(
                 use_jac=use_jac, timeout=proxy_timeout, p_ref="inlet"
             )
-            _seed_kind = "inlet-referenced (outlet-ref proxy did not converge)"
+            _seed_kind = (
+                "inlet-referenced (the outlet-referenced warm start ran first)"
+                if warm_seeded
+                else "inlet-referenced (outlet-ref proxy did not converge)"
+            )
         if seed_x0 is None:
             # Restore the primary attempt's diagnostics -- the failed proxy
             # solves overwrote them, and we are returning the primary result.
@@ -5689,9 +5708,11 @@ class NetworkSolver:
             # refused root it read as "did not converge" after "Converged,
             # but ..." (the no-cooling-path refusal, #998).
             if not primary_converged:
-                sol["__message__"] = (
-                    f"{primary_msg} [incompressible warm-start auto-retry "
-                    "skipped: neither the outlet- nor the inlet-referenced "
+                sol["__message__"] = f"{primary_msg} [incompressible warm-start auto-retry " + (
+                    "skipped: the outlet-referenced warm start ran first and "
+                    "the inlet-referenced proxy solve did not converge]"
+                    if warm_seeded
+                    else "skipped: neither the outlet- nor the inlet-referenced "
                     "proxy solve converged]"
                 )
             return replay(retrying=False)
@@ -6075,6 +6096,7 @@ class NetworkSolver:
             warmstart_x0 = self._outlet_ref_incompressible_seed(
                 use_jac=use_jac, timeout=_proxy_timeout
             )
+            self._outletref_seeded = warmstart_x0 is not None
             if warmstart_x0 is None:
                 warnings.warn(
                     "Outlet-referenced incompressible proxy did not converge. "
