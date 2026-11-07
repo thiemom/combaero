@@ -3863,10 +3863,13 @@ class MomentumChamberNode(NetworkNode):
         mach = u / cs.thermo.a if cs.thermo.a > 0 else 0.0
         Tt, Pt = (state.Tt, state.Pt)
 
-        nu_val = 0.0
-        st_val = 0.0
-        htc_val = 0.0
-        t_aw_val = float(state.Tt)
+        # Not evaluated (no convective surface, no flow, or a choked-bounded
+        # junction): NaN, which the GUI shows as no value. A 0 read as zero
+        # heat transfer, and T_aw = Tt as a real recovery temperature.
+        nu_val = math.nan
+        st_val = math.nan
+        htc_val = math.nan
+        t_aw_val = math.nan
         # A choked-bounded junction has no surface state of its area: its
         # surface correlation is not evaluated (and no wall may read it, or
         # the junction is refused, #788).
@@ -4566,10 +4569,13 @@ class CombustorNode(NetworkNode):
         mach = u / cs.thermo.a if cs.thermo.a > 0 else 0.0
         Tt, Pt = (state.Tt, state.Pt)
 
-        nu_val = 0.0
-        st_val = 0.0
-        htc_val = 0.0
-        t_aw_val = float(state.Tt)
+        # Not evaluated (no convective surface, no flow, or a choked-bounded
+        # junction): NaN, which the GUI shows as no value. A 0 read as zero
+        # heat transfer, and T_aw = Tt as a real recovery temperature.
+        nu_val = math.nan
+        st_val = math.nan
+        htc_val = math.nan
+        t_aw_val = math.nan
         if self.has_convective_surface:
             h_res = self.htc_and_T(state)
             if h_res is not None:
