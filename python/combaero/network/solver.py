@@ -4705,6 +4705,14 @@ class NetworkSolver:
         their first iterates (an impingement crossflow chain: 23 s cold, 4.7 s
         staged).
 
+        A cold solve of a network with a jet plate under CR-3630's Table 4.1
+        Cd (``cd_crossflow='florschuetz_metzger_su_1982'``) also runs in two
+        stages: every crossflow-Cd plate at its own constant Cd first (60% of
+        the budget), then the exact problem from that root; the plain cold
+        chain only if that fails (#1021: B(5,4,1) at mc/mj 0.99, 25 s through
+        the retries, staged a few s). Under the default Rogers-Hersh law the
+        constant-Cd stage stays a retry after a failed cold chain.
+
         A numerical exception while evaluating an attempt's STARTING point
         (a property or closure refusing a physical-but-extreme state) does not
         abort the solve: that attempt ends with outcome ERROR and the retries
@@ -4888,6 +4896,33 @@ class NetworkSolver:
                 if timeout is not None:
                     kw["timeout"] = max(timeout - (time.time() - _t0), 1.0)
                     timeout = kw["timeout"]
+        cd_first = False
+        if x0 is None and auto_retry and not getattr(self, "_in_constant_cd_stage", False):
+            # A plate under CR-3630's Table 4.1 Cd (#1021): its stagnant rows'
+            # flow goes as dP^1.07, with no slope at dP = 0 to pull a backwards
+            # cold seed round, and the root's basin is narrow (B(5,4,1) at
+            # mc/mj 0.99: 1 of 3 starts at the root +/-1% converge). The
+            # constant-Cd root is a start inside it, so that stage runs FIRST
+            # and the plain cold chain only if it fails. Rogers-Hersh solves
+            # cold and keeps its path.
+            plates = self._crossflow_cd_plates()
+            if any(el.cd_crossflow == "florschuetz_metzger_su_1982" for el in plates):
+                cd_first = True
+                _t0 = time.time()
+                staged = self._solve_constant_cd_staged(
+                    plates,
+                    {"__message__": ""},
+                    method,
+                    None if timeout is None else 0.6 * timeout,
+                    options,
+                    use_jac,
+                    _t0,
+                )
+                if staged is not None:
+                    return self._with_caught(staged)
+                if timeout is not None:
+                    kw["timeout"] = max(timeout - (time.time() - _t0), 1.0)
+                    timeout = kw["timeout"]
         self._caught_exceptions = []
         self._caught_count = 0
         _t0 = time.time()
@@ -4915,7 +4950,7 @@ class NetworkSolver:
                 )
                 if staged is not None:
                     return self._with_caught(staged)
-        if not getattr(self, "_in_constant_cd_stage", False):
+        if not cd_first and not getattr(self, "_in_constant_cd_stage", False):
             plates = self._crossflow_cd_plates()
             if plates:
                 staged = self._solve_constant_cd_staged(
@@ -5084,6 +5119,11 @@ class NetworkSolver:
         heated bypass stalled cold at |F| 1.8e-2 (Jacobian exact there to
         3e-7); from the constant-Cd root, whose flows differ only at the
         crossflow-dominated rows, it converged in 1.1 s.
+
+        The exception is a network with a plate under Table 4.1
+        (``'florschuetz_metzger_su_1982'``, #1021): ``solve`` runs this stage
+        first there, with 60% of the budget, and the cold chain only if it
+        fails. ``failed`` is then empty.
         """
 
         def left() -> float | None:
@@ -5113,10 +5153,14 @@ class NetworkSolver:
         if not sol.get("__success__", False):
             return None
         primary_msg = str(failed.get("__message__", "")).strip()
+        why = (
+            f"the primary attempt failed with: {primary_msg}"
+            if primary_msg
+            else "run first for the Table 4.1 Cd"
+        )
         sol["__message__"] = (
             f"{str(sol.get('__message__', '')).strip()} [from the constant-Cd solution: "
-            "jet plates solved with their own Cd, then with the crossflow Cd; the "
-            f"primary attempt failed with: {primary_msg}]"
+            f"jet plates solved with their own Cd, then with the crossflow Cd; {why}]"
         )
         return sol
 

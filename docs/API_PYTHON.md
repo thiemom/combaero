@@ -3361,7 +3361,9 @@ are crossflow.
   linear resistance) instead of sqrt(dP), which removed the alternating-sign
   stagnant rows of CR-3630 B(5,4,1) (#799). Diagnostics add `Cd` (the one
   used) beside `Cd_own`. A cold solve that fails is retried once from the
-  constant-Cd root (`NetworkSolver`, "[from the constant-Cd solution]").
+  constant-Cd root (`NetworkSolver`, "[from the constant-Cd solution]"). With
+  a `'florschuetz_metzger_su_1982'` plate that stage runs first (#1021): the
+  law's root has a narrow basin the cold seed misses.
 - Diagnostics: `n_holes`, `Re_j`, `Gc_Gj`, `Nu`, `St`, `htc`, `T_aw`, `eta_r`,
   `bypass_fraction`, `eta_r_extrapolated`, `surface_extrapolated`, and
   `Gc_Gj_closed_form` (Eq. 8) when `row` is given.
