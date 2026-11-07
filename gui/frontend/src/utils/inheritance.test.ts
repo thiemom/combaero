@@ -3,6 +3,7 @@ import type { PreviewItem } from "../api";
 import {
 	inheritedField,
 	inheritedNote,
+	orificePipeNote,
 	type PreviewItems,
 	unresolvedReason,
 } from "./inheritance";
@@ -66,5 +67,88 @@ describe("inheritedNote", () => {
 		expect(inheritedNote("default")).toBe("");
 		expect(inheritedNote("")).toBe("");
 		expect(inheritedNote(undefined)).toBe("");
+	});
+});
+
+// #1039: an in-pipe orifice whose bore is wider than its DOWNSTREAM pipe (the
+// to-side channel that sets beta in reverse, #788) is refused by the resolve
+// pass, though the upstream pipe is wider than the bore. The note follows the
+// preview's verdict, not the upstream diameter alone.
+describe("orificePipeNote", () => {
+	const downstreamRefusal =
+		"OrificeElement 'orf': bore 0.12 m is larger than the pipe it sits in " +
+		"(channel 'c_out', D = 0.1 m). There is no such geometry. A bore equal " +
+		"to the pipe is no orifice (zero loss); for a lumped Cd*A restriction " +
+		"set in_pipe=False (no pipe diameter, beta = 0).";
+	const preview = (
+		status: "resolved" | "unresolved",
+		reason = "",
+	): PreviewItems => ({
+		orf: {
+			status,
+			reason,
+			fields: { pipe_diameter: { value: 0.2, source: "channel 'c_in'" } },
+		},
+	});
+	const base = {
+		nodeId: "orf",
+		inPipe: true,
+		pipeD: 0.2,
+		passThrough: false,
+		boreDiameter: 0.12,
+	};
+
+	it("shows the refusal against the downstream pipe", () => {
+		expect(
+			orificePipeNote({
+				...base,
+				preview: preview("unresolved", downstreamRefusal),
+			}),
+		).toEqual({ kind: "refused", reason: downstreamRefusal });
+	});
+
+	it("shows the upstream refusal once, as the solver's reason", () => {
+		const upstream = downstreamRefusal.replace("c_out", "c_in");
+		expect(
+			orificePipeNote({
+				...base,
+				pipeD: 0.1,
+				preview: preview("unresolved", upstream),
+			}),
+		).toEqual({ kind: "refused", reason: upstream });
+	});
+
+	it("leaves a chamber refusal to the orifice-family note", () => {
+		expect(
+			orificePipeNote({
+				...base,
+				preview: preview(
+					"unresolved",
+					"OrificeElement 'orf': bore 0.01 m^2 is larger than the momentum chamber it feeds",
+				),
+			}),
+		).toBeNull();
+	});
+
+	it("flags a bore wider than the upstream pipe before the preview has", () => {
+		expect(orificePipeNote({ ...base, pipeD: 0.1, preview: null })).toEqual({
+			kind: "larger",
+		});
+	});
+
+	it("reports the pass-through and says nothing for a fitting bore", () => {
+		expect(
+			orificePipeNote({
+				...base,
+				passThrough: true,
+				preview: preview("resolved"),
+			}),
+		).toEqual({ kind: "equal" });
+		expect(orificePipeNote({ ...base, preview: preview("resolved") })).toBe(
+			null,
+		);
+		expect(
+			orificePipeNote({ ...base, inPipe: false, preview: preview("resolved") }),
+		).toBe(null);
 	});
 });

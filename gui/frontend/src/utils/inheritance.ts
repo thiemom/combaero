@@ -40,6 +40,43 @@ export function unresolvedReason(
 }
 
 /**
+ * The note an in-pipe orifice's Inspector shows about its bore against its
+ * pipes (#788, #1039):
+ * - "refused": the resolve pass refused the orifice, with the solver's own
+ *   reason, whichever pipe caused it -- the upstream one or the downstream
+ *   one that sets beta in reverse. A refusal against a momentum chamber
+ *   (#1016) is left out: the orifice-family note shows it.
+ * - "equal": the bore equals the upstream pipe (the solver's pass-through).
+ * - "larger": the bore exceeds the upstream pipe, before the preview has
+ *   said so (it then says "refused").
+ * - null: nothing to say.
+ */
+export type OrificePipeNote =
+	| { kind: "refused"; reason: string }
+	| { kind: "equal" }
+	| { kind: "larger" }
+	| null;
+
+export function orificePipeNote(args: {
+	preview: PreviewItems | null | undefined;
+	nodeId: string;
+	inPipe: boolean;
+	/** The upstream pipe's diameter from the preview, null when none. */
+	pipeD: number | null;
+	/** The pipe's pass-through verdict (not a chamber's). */
+	passThrough: boolean;
+	boreDiameter: number;
+}): OrificePipeNote {
+	const reason = unresolvedReason(args.preview, args.nodeId);
+	if (reason && !reason.includes("momentum chamber"))
+		return { kind: "refused", reason };
+	if (!args.inPipe || args.pipeD == null) return null;
+	if (args.passThrough) return { kind: "equal" };
+	if (args.boreDiameter > args.pipeD) return { kind: "larger" };
+	return null;
+}
+
+/**
  * A warning the solver will issue about a node's geometry without refusing it
  * (#1023: a momentum chamber narrower than an adjoining pipe). `undefined`
  * when there is none or the node is not in the preview.

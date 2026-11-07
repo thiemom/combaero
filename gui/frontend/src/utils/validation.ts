@@ -9,6 +9,24 @@
 import type { Node } from "reactflow";
 import { validateSplitter } from "./splitter";
 
+// Fields the backend schema types as a plain float with a default: an absent
+// key takes the default, an explicit null is refused ("Input should be a valid
+// number"). The checks below read an absent field as that default, so an
+// explicit null is refused here first, as the backend would (#1038).
+// Fields typed `float | None` (null = inherit / default) are not listed.
+const NULL_REFUSED: Record<string, Record<string, string>> = {
+	compressor: { pressure_ratio: "Pressure ratio", efficiency: "Efficiency" },
+	turbine: { pressure_ratio: "Pressure ratio", efficiency: "Efficiency" },
+	mpce_tee: {
+		theta_deg: "Tee branch angle",
+		loss_factor: "Tee loss factor",
+		design_branch_share: "Tee design branch share",
+		psi: "Tee area ratio psi",
+	},
+	ejector: { recovery_efficiency: "Ejector recovery_efficiency" },
+	discrete_loss: { zeta: "Discrete loss zeta", zeta0: "Discrete loss zeta0" },
+};
+
 export function validateNetwork(nodes: Node[]): string[] {
 	const errors: string[] = [];
 
@@ -18,6 +36,13 @@ export function validateNetwork(nodes: Node[]): string[] {
 	}
 
 	for (const node of nodes) {
+		const nullRefused = NULL_REFUSED[node.type ?? ""] ?? {};
+		for (const [key, label] of Object.entries(nullRefused)) {
+			if (node.data?.[key] === null)
+				errors.push(
+					`${node.id}: ${label} is null; set a number (the solver refuses null)`,
+				);
+		}
 		if (node.type === "fuel_boundary") {
 			const comb = nodes.find((n) => n.id === node.data.combustor_id);
 			if (comb?.type !== "combustor")
