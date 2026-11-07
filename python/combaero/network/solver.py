@@ -6346,7 +6346,9 @@ class NetworkSolver:
         def _jac_for(m: str) -> Any:
             if not use_jac or m not in ("hybr", "lm"):
                 return False
-            return lm_jacobian_wrapper if m == "lm" else jacobian_wrapper
+            # Both MINPACK drivers get the trace-flushed Jacobian: see
+            # flushed_jacobian_wrapper (#1020 for lmder, #1027 for hybrj).
+            return flushed_jacobian_wrapper
 
         n_rejected = [0]
 
@@ -6518,19 +6520,26 @@ class NetworkSolver:
                 self._record_exception(e, "probe_jacobian")
                 return last_ok[1] if last_ok[1] is not None else np.eye(len(x_scaled))
 
-        def lm_jacobian_wrapper(x_scaled: np.ndarray) -> np.ndarray:
-            """The scaled Jacobian for MINPACK lmder, trace entries flushed to 0.
+        def flushed_jacobian_wrapper(x_scaled: np.ndarray) -> np.ndarray:
+            """The scaled Jacobian for MINPACK, trace entries flushed to 0.
 
             lmder detects a singular Jacobian by an EXACT zero on R's diagonal
             (lmpar's nsing test) and otherwise divides by that pivot. A column
             that is singular but for an entry at the underflow level passes
             the test with a pivot of ~1e-308; Q^T F / R_jj overflows to inf,
             the step to NaN, and the trust radius it updates (delta = pnorm /
-            0.5) becomes NaN for good: every later iterate is NaN (#1020). An
-            entry below eps times its column's largest is below the column's
-            own Householder rounding (QR is backward stable column by column),
-            so zeroing it changes nothing QR can resolve and lets lmpar take
-            its rank-deficient branch. The case: an effusion plate whose
+            0.5) becomes NaN for good: every later iterate is NaN (#1020).
+            hybrj's dogleg has the same guard: it replaces only an exactly
+            zero R_jj (by eps times the column's largest R entry), so the
+            Gauss-Newton step Q^T F / 7.6e-309 overflowed, alpha = delta /
+            inf = 0 times inf gave a NaN step, delta went NaN, and the last 8
+            of hybr's 56 evaluations on stress effusion 105 were NaN (#1027).
+            The pivot was in the Jacobian hybrj had just requested, not in a
+            Broyden-updated R. An entry below eps times its column's largest
+            is below the column's own Householder rounding (QR is backward
+            stable column by column), so zeroing it changes nothing QR can
+            resolve and lets lmpar take its rank-deficient branch and dogleg
+            its zero-pivot guard. The case: an effusion plate whose
             McGreehan-Schotsch crossflow Cd = exp(-Rv^n) underflows at a far
             iterate, so the only row that sets a chamber's pressure level
             carries derivatives of 1e-308.
