@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-07
+
+**Upgrading from 0.10.** No public function or argument was removed or renamed. 0.11 adds `FannoChannelFlow::M_exit_root`, `OrificeElement.closed` and `MomentumChamberNode.pipe_area_warnings()`, and it is stricter about geometry:
+
+- **Now refused**, each with a message naming the input:
+  - a bore or hole area wider than its pipe or chamber;
+  - an explicit area-change, tee or ejector area that contradicts its pipe;
+  - overlapping holes;
+  - a zero or negative duct or node area;
+  - a Dh larger than the area allows;
+  - an infinite pressure ratio;
+  - an unknown combustor `method`;
+  - an energy fraction at or below -1;
+  - a `ThermalWall` on a node with no wetted surface.
+- **Now accepted:**
+  - an area change with F0 == F1, as a pass-through;
+  - a zero-area restriction, as a closed valve.
+- **Results that change:**
+  - a node with no surface no longer takes its flow area as one, so it reports no htc (NaN, "—" in the GUI);
+  - Mach below the 1 Pa drive floor is now the flow's;
+  - a chamber narrower than its pipe now warns.
+- **sympy** is no longer installed with `combaero`.
+
+### Changed
+
+- **An orifice bore against the momentum chamber it opens into (#1016).** #788's rule, applied to an adjacent `MomentumChamberNode` with areas: the bore's own geometric area (a plate's total hole area for the effusion, film, slot and impingement elements; never Cd A).
+  - **Before:** a bore wider than the chamber was accepted silently. The solve then found a root where the orifice created total pressure (refused by the second-law check), left the chamber with no subsonic state, or stalled. Of the stress `random` family's 200 draws, 13 of the 19 with such a pair failed.
+  - **Now:** a wider bore is refused at `resolve_topology` with a message naming the element, the chamber and both areas. A bore equal to the chamber's area (to `ORIFICE_BORE_PIPE_RTOL` on the equivalent diameter) is no orifice: zero loss, a `Pt_in - Pt_out` row. A smaller bore is unchanged. Only a chamber area that states the geometry is compared. The `DEFAULT_CHAMBER_AREA` placeholder is not, nor is an area a merge chamber inherits from an orifice main inlet, nor (with `in_pipe=False`) an area inherited from a channel.
+  - **GUI:** the Inspector shows the solver's verdict for an orifice, effusion plate, film row or slot next to a momentum chamber, the pass-through or the refusal, from the resolve preview.
+
+- **An element's explicit area against the pipe or chamber it adjoins (#1023).** The rule of #788 (bore vs pipe), for the other area-bearing elements. Equal means within `NEIGHBOUR_AREA_RTOL` (1e-6, #788's band) on the equivalent diameter.
+  - **Equal is a pass-through.** An `AreaChangeElement` with F0 == F1 was refused ("use a LosslessConnectionElement"). It is now no area change: zero loss, the row `Pt_in - Pt_out`, the constant Jacobian of a lossless connection. The resolve preview reports `pass_through = 1`. A loop of such pass-throughs (or of #788's pass-through orifices) is refused at validate, as a loop of lossless connections is.
+  - **Refused (BREAKING):** an explicit `AreaChangeElement` F0/F1, or a `TeeJunctionElement` F_C/F_branch, that contradicts the single pipe attached at its face. The `ValueError` names both. Before, the loss was computed for an area ratio the network does not contain. Also refused: an `EjectorElement` `mixing_area` larger than its outlet pipe, which was a contraction with no loss at the diffuser exit. A wider outlet pipe stays accepted.
+  - **Warned:** a `MomentumChamberNode` smaller than an adjoining pipe is a contraction or expansion with no loss. `FlowNetwork.validate` issues a `UserWarning` naming the chamber, the pipe and both areas, and suggests an explicit `AreaChangeElement`. Never for the `DEFAULT_CHAMBER_AREA` placeholder.
+  - **Unchanged:** a tee branch wider than the main (psi < 1).
+  - **GUI:** the Inspector shows the resolve preview's verdict: an area change's pass-through or refusal, an ejector's refused mixing area, and a momentum chamber's warning.
+  - **Stress harness:** the `ejector` family fits a mixing duct drawn wider than its outlet pipe to the pipe, with no new random draw. Of seeds 0:100, ejector 1, 11, 68 and 93 change.
+
+- **A restriction with zero area is closed (#1024).** An `OrificeElement` with bore 0 (`diameter=0` or `area=0`), an `EffectiveAreaConnectionElement` with `effective_area=0` and a `DiameterDischargeCoefficientConnectionElement` with `diameter=0` are walls: the row is `m_dot = 0` with the constant Jacobian 1, and no kernel is evaluated.
+  - **Before:** they passed `validate()` and the solve stopped at the starting point with "nozzle_flow: A_eff must be positive".
+  - **Now:** they solve with no flow through them. The diagnostics report `closed = 1`, and the GUI's resolve preview reports a `closed` field. The start guess seeds a closed element's flow at zero.
+  - **Topology:** a part of the network joined to the rest only by closed elements keeps solving when it has a `PressureBoundary` of its own. A part they cut off from every `PressureBoundary` is refused at `FlowNetwork.validate()`, with the closed elements named, because nothing sets the pressure of the gas trapped there. The #1004 fraction-loss check and an orifice's dead-end test treat a closed element as a wall.
+  - A negative or non-finite bore, area or effective area is refused at construction. In the GUI an orifice diameter of 0 is no longer flagged before Solve.
+
+- **Geometry and input checks refuse what cannot be built (#1024).** Each refusal names the element or node, the input and the limit. Before this change, each of these inputs was accepted. Some then failed mid-solve with a kernel message, and others solved as something else.
+  - **Holes leave material between them** (`validate()`). `EffusionPlateElement` needs `pitch_y > d` and `pitch_x > d / sin(angle_deg)`, the hole's footprint on the surface. `FilmCoolingElement` needs `lateral_pitch > d`, and with more than one row `row_pitch > d / sin(angle_deg)`. `ImpingementPlateElement` needs `pi/4 / (xn_d yn_d) < 1` and `yn_d > 1`. Between rows it needs `xn_d > 1` when inline. When `pattern="staggered"` it uses the true nearest neighbour, half a spanwise pitch over: `min(sqrt(xn_d^2 + (yn_d/2)^2), 2 xn_d) > 1`. Equal is refused too. Effusion and film rows have no stated arrangement, so they are taken inline.
+  - **Ducts and nodes need an area** (`validate()`). A `ChannelElement` diameter and a given Dh, and a given `MomentumChamberNode` or `CombustorNode` area or Dh, must be positive and finite. A duct of no area was refused only mid-solve ("fanno: L and D must be positive"), and a chamber of area 0 or -1 reported Mach and Re as 0. To shut a path, use a closed (zero-bore) restriction.
+  - **Hydraulic diameter: Dh <= 2 sqrt(A/pi)** (`validate()`), the isoperimetric bound, for a chamber or combustor whose Dh is given (`ISOPERIMETRIC_DH_RTOL`, 1e-3 relative, absorbs an area typed to three figures). The message gives both numbers. A `ChannelElement` is not bounded: a channel that stands for a share of a wider duct, with only its part of the wall wetted, keeps the duct's Dh above the bound (the C3X example's hole segments). Its Dh must be positive.
+  - **`CompressorElement` / `TurbineElement`: `pressure_ratio` must be finite.** `inf` passed the `>= 1` test. The GUI schema refuses it too.
+  - **`CombustorNode(method=...)` is checked against `"complete"` / `"equilibrium"`**, at construction and at `validate()`. A typo such as `"equilibirum"` ran as `"complete"`.
+  - **`EnergyBoundary(fraction=...)` must be above -1**, per boundary and summed over a node's boundaries. At -1 the node landed on the 298.15 K reference whatever it was fed, and on a combustor the solve raised a bare `ZeroDivisionError`. Below -1 the node went below the reference temperature, and from a 1000 K inflow below 0 K, where the solve failed with "thermo_state: temperature must be positive". To set an outlet temperature, use `Tt_target=...`.
+  - **GUI:** the resolve preview carries each item's `refusal`, the message its `validate()` would raise, and the Inspector shows it before Solve.
+
+- `sympy` is no longer a runtime dependency of `combaero`: `pip install combaero` needs only numpy and scipy. Nothing in the package used it at runtime since the MPCE Jacobian moved to C++ (#271). Its one importer, the sympy cross-check of that Jacobian, moved from `combaero.network._mpce_jacobian` to the test suite (`python/tests/_mpce_jacobian.py`). `sympy` is now in the `dev` dependency group, with the derivation scripts under `scripts/` that use it. A test now imports every module of the package in a fresh interpreter and checks that neither sympy nor mpmath is loaded.
+
+### Fixed
+
+- **Duct Mach below the 1 Pa drive floor (#1017).** `fanno_channel_flow` and `fanno_rayleigh_channel_flow` blend the flux below `FANNO_FLOW_DRIVE_FLOOR`, but returned the floor's `M_in` and `M_exit`.
+  - **Before:** at a 0.035 Pa drive on 20.8 bar the reported Mach was 23x the flow's (80x at 0.01 Pa on 1 bar). A `ChannelElement`'s `mach_in` / `mach_out`, `M_in_duct` / `M_exit_duct`, its end states (`rho_ref` 1.05 against 24.2 kg/m^3) and the second-law heat band all read it. The heat band then refused a converged root (stress random 99).
+  - **Now:** `M_in` comes from the isentropic inlet at the blended flux, and `M_exit` keeps the floor's exit-to-inlet ratio. `G` and its derivatives are unchanged, so residuals and Jacobians are bit-identical. The new field `FannoChannelFlow.M_exit_root` carries the solved root's exit Mach, which is the floor's when below it. `ChannelElement` warm-starts from it.
+
+- Retry chain at a fixed budget (#1018): with the boundary-condition ramp to follow (the GUI, `NetworkRunner`, the stress harness), a capped Newton homotopy now gets at most `NEWTON_HOMOTOPY_BUDGET_BEFORE_RAMP` = 3 s instead of its 5 s, so the ramp, which is what solves those draws, starts in time; the homotopy's own stress rescues take under 2 s. A network whose preferred outlet-referenced warm start (#706) failed no longer solves from that same seed a second time in the auto-retry; it tries the inlet-referenced seed instead. Stress random 0:200 at 20 s, serial: random 119 now converges, no draw is lost.
+
+- `fanno_channel_flow`'s choked derivatives are now exact for very short ducts. This fixes the compressible `CrossflowSegmentElement` station Jacobian at near-zero segment length (#1019). A choked duct a few microns long carries a flux within ~1e-6 of the sonic one. The choked branch differenced L*(G; Pt0, Tt0, Y) through a re-solved inlet Mach, and its steps crossed sonic. dG/dTt0 came out 17% high at L = 1 um, so the station rows' columns that move the station temperature (the segments' flows and a hot injection's flow) were 7-17% off. The branch now takes the inlet-Mach limit exactly (Leibniz), as the unchoked branch already did. Flows and residuals are unchanged; only the Jacobian moves.
+
+- **The Levenberg-Marquardt fallback no longer turns a nearly singular Jacobian into NaN iterates (#1020).** MINPACK's LM detects a singular Jacobian only when a pivot is exactly zero.
+  - **Before:** at an iterate far from the root, an effusion plate's McGreehan-Schotsch crossflow Cd underflowed to ~1e-308. The plate's row was the only one that set a chamber's pressure level, so the pivot was 1e-308 instead of 0. The step overflowed, the trust radius became NaN, and every later LM iterate was NaN. Stress effusion 34 failed with no_progress at any budget.
+  - **Now:** the Jacobian given to LM has its entries below machine epsilon times their column's largest set to zero. QR cannot resolve entries that small anyway. LM then takes its rank-deficient step, and effusion 34 converges cold. hybr's Jacobian and every residual are unchanged.
+
+- A cold `NetworkSolver.solve` of a network with an `ImpingementPlateElement` under `cd_crossflow='florschuetz_metzger_su_1982'` (CR-3630 Table 4.1) now runs the constant-Cd stage first: every crossflow-Cd plate at its own Cd, then the exact problem from that root, and the plain cold chain only if that fails (#1021). The cold seed put the stagnant rows' jets backwards in a basin too narrow for the primary attempt: CR-3630 B(5,4,1) at mc/mj 0.99 went through the failed primary and outlet-referenced attempts before the constant-Cd retry found the root (25.5 s); it now solves in 5.5 s to the same root (7e-8 relative). Cases that solved cold before reach the same root (below 1e-7 relative) but take the two stages (B(5,4,1) mc/mj 0 and 0.51: about 1.7 s before, 4 s now). Networks under the default Rogers-Hersh law, or `'none'`, keep their path unchanged.
+
+- **A node's wetted surface area is never its flow area (#1022).** When a `MomentumChamberNode` or `CombustorNode` inherited its flow area, `resolve_topology` wrote the cross-section into `surface.area`, which is the A in a wall's h A.
+  - **Before:** a given `ConvectiveSurface(area=0.7)` on a node fed by a 0.05 m pipe became 0.00196 m^2, giving 356x less wall heat with no warning. An unset surface (0) became the cross-section, so every node with an inherited area gained a convective surface. The same write was in the tee and MPCE port sizing, the ejector's outlet sizing and `PressureLossElement`'s area inheritance.
+  - **Now:** resolve never writes `surface.area`. A given wetted area is kept and an unset one stays 0 (no convective surface), so a `ThermalWall` on such a node is refused by name. Set the wetted area to put a wall on it.
+  - **Effusion gas side:** an `EffusionPlateElement` discharging into a chamber reads the chamber's h whether or not the chamber has a wetted area of its own. The plate owns the wall, and its wall temperatures used to rely on the inherited cross-section.
+  - **GUI:** combustors, momentum chambers and discrete losses have no wetted-area field. Their surface used to be the flow area. Now a wall drawn to one gives that side its area (the side's `area_a`/`area_b`, else the wall's area). The coupling already used that area, so wall results do not change. An unwalled one no longer reports h, Nu or T_aw.
+
+- A momentum chamber or combustor whose heat transfer is not evaluated (no convective surface, no flow, or a choked-bounded junction) reports `Nu`, `St`, `htc` and `T_aw` as NaN, which the GUI shows as no value. Since 0.11's #1022 this covers every chamber and combustor without a wall; before, they read 0 (zero heat transfer) and `T_aw` = Tt.
+- GUI: an orifice that is a pass-through against its chamber (#1016) no longer shows beta = 1 and E = 1 next to the "beta = 0" hint; beta and E show only against a pipe diameter.
+
 ## [0.10.0] - 2026-11-06
 
 ### Added
@@ -6596,7 +6676,8 @@ continuation retries; geometry inheritance and autosave in the GUI.
 - State property units mismatch in example runner
 - Solver stability under degenerate initial conditions
 
-[Unreleased]: https://github.com/thirox-lab/combaero/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/thirox-lab/combaero/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/thirox-lab/combaero/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/thirox-lab/combaero/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/thirox-lab/combaero/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/thirox-lab/combaero/compare/v0.7.1...v0.8.0
