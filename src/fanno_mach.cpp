@@ -588,28 +588,63 @@ FannoChannelFlow raw_flow(const FlowProblem& pb) {
     if (!pb.with_derivatives) {
       return out;
     }
-    // L*(G; Pt0, Tt0) = L, differentiated implicitly.
-    auto Lstar = [&](double G, double Pt0, double Tt0) {
-      const double Mi = fanno_inlet_mach(Pt0, Tt0, G, X);
-      return fanno_length_between(G, Tt0, Mi, 1.0, X, pb.D, pb.rough, *pb.model, pb.fmult);
-    };
-    const double hG = 1e-6 * out.G, hP = 1e-6 * pb.Pt0, hT = 1e-6 * pb.Tt0;
-    const double LG = (Lstar(out.G + hG, pb.Pt0, pb.Tt0) - Lstar(out.G - hG, pb.Pt0, pb.Tt0)) / (2 * hG);
-    const double LP = (Lstar(out.G, pb.Pt0 + hP, pb.Tt0) - Lstar(out.G, pb.Pt0 - hP, pb.Tt0)) / (2 * hP);
-    const double LT = (Lstar(out.G, pb.Pt0, pb.Tt0 + hT) - Lstar(out.G, pb.Pt0, pb.Tt0 - hT)) / (2 * hT);
-    out.dG_dPt0 = -LP / LG;
-    out.dG_dTt0 = -LT / LG;
     out.dG_dP_target = 0.0;
+    const double G = out.G;
+    const double Mi = out.M_in;
+    const FluxSlopes fs = isentropic_flux_slopes(pb.Pt0, pb.Tt0, Mi, X);
+    if (!(Mi < 1.0) || !(fs.dM > 0.0)) {
+      // The duct is too short to hold any friction at all: the flux is the
+      // sonic one of the inlet state, G_max(Pt0, Tt0, Y).
+      out.dG_dPt0 = G / pb.Pt0;
+      out.dG_dTt0 = isentropic_flux_slopes(pb.Pt0, pb.Tt0, 1.0, X).dTt;
+      if (!pb.dirs->empty()) {
+        out.dG_ddir = d_ddir(X, *pb.dirs, [&](const std::vector<double>& Xk) {
+          return fanno_sonic_mass_flux(pb.Pt0, pb.Tt0, Xk);
+        });
+      }
+      return out;
+    }
+    // Lam = L*(G; Pt0, Tt0, Y) - L = 0, differentiated implicitly the same way
+    // as the unchoked psi below (Leibniz): the inlet limit M_in(G, Pt0, Tt0, Y)
+    // of the length to sonic is taken exactly, -dx/dM(M_in) dM_in/d(.), with
+    // dM_in/d(.) from the isentropic inlet flux(Pt0, Tt0, M_in, Y) = G, and
+    // only the length at FIXED limits is differenced (in G, Tt0, Y).
+    //
+    // Differencing L* through a re-solved M_in instead (#1019) broke on a
+    // short duct: there the choked flux sits within ~1e-6 of the sonic one
+    // (1 - M_in ~ sqrt(f L / D)), so a 1e-6 step in G, Tt0 or Y took the
+    // stencil past sonic, where M_in clamps to 1 and L* to 0. At L = 1 um
+    // dG/dTt0 came out 17% high and dG/dY up to 65%.
+    const std::string& model = *pb.model;
+    auto ell = [&](double Gx, double Ttx, const std::vector<double>& Xx) {
+      return fanno_length_between(Gx, Ttx, Mi, 1.0, Xx, pb.D, pb.rough, model, pb.fmult);
+    };
+    const double hG = 1e-6 * G;
+    const double hT = 1e-6 * pb.Tt0;
+    const double dx_Mi = fanno_dx_dmach(G, pb.Tt0, Mi, X, pb.D, pb.rough, model, pb.fmult);
+    // flux is proportional to Pt0 at fixed (Tt0, M), so flux_Pt = G / Pt0.
+    const double dMi_dG = 1.0 / fs.dM;
+    const double dMi_dPt = -(G / pb.Pt0) / fs.dM;
+    const double dMi_dT = -fs.dTt / fs.dM;
+    const double Lam_G =
+        (ell(G + hG, pb.Tt0, X) - ell(G - hG, pb.Tt0, X)) / (2.0 * hG) - dx_Mi * dMi_dG;
+    const double Lam_T = (ell(G, pb.Tt0 + hT, X) - ell(G, pb.Tt0 - hT, X)) / (2.0 * hT) -
+                         dx_Mi * dMi_dT;
+    const double Lam_Pt = -dx_Mi * dMi_dPt;
+    out.dG_dPt0 = -Lam_Pt / Lam_G;
+    out.dG_dTt0 = -Lam_T / Lam_G;
     if (pb.dirs->empty()) {
       return out;
     }
-    out.dG_ddir = d_ddir(X, *pb.dirs, [&](const std::vector<double>& Xk) {
-      const double Mi = fanno_inlet_mach(pb.Pt0, pb.Tt0, out.G, Xk);
-      return fanno_length_between(out.G, pb.Tt0, Mi, 1.0, Xk, pb.D, pb.rough, *pb.model,
-                                  pb.fmult);
+    // Along each direction v: Lam_v = ell_v + dx/dM(M_in) flux_v / flux_M.
+    const std::vector<std::vector<double>>& dirs = *pb.dirs;
+    const auto ell_v = d_ddir(X, dirs, [&](const std::vector<double>& Xk) { return ell(G, pb.Tt0, Xk); });
+    const auto flux_v = d_ddir(X, dirs, [&](const std::vector<double>& Xk) {
+      return isentropic_flux(pb.Pt0, pb.Tt0, Mi, Xk);
     });
-    for (double& d : out.dG_ddir) {
-      d = -d / LG;
+    out.dG_ddir.assign(dirs.size(), 0.0);
+    for (std::size_t i = 0; i < dirs.size(); ++i) {
+      out.dG_ddir[i] = -(ell_v[i] + dx_Mi * flux_v[i] / fs.dM) / Lam_G;
     }
     return out;
   }
@@ -813,8 +848,13 @@ FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<do
   out.G = at.G * h;
   blend_end_states(out, at, Pt0, Tt0, X);
   // d/dP_target through t only; d/dPt0 through t and through G0, whose own
-  // target Pt0 - floor moves with Pt0. sigma is held fixed: its own
-  // variation is second order within the floor.
+  // target Pt0 - floor moves with Pt0. sigma(Pt0, Tt0, Y) is held fixed. Its
+  // own term, G0 (t^3 - t)/2 dsigma, is first order in sigma's variation, not
+  // second, but that variation is small: sigma moves only as f does with Re.
+  // Measured (#1019), it left dG/dTt0 0.6% off at t = 0.5 on a 5 cm duct and
+  // dG/dPt0 below 1e-6. Differencing sigma would cost 4 + 2 n_dirs raw solves
+  // per derivative evaluation (3x the Jacobian of a short-segment network),
+  // and slowed bleed_station solves 2-3x; so it stays fixed.
   out.dG_dP_target = -at.G * dh / kFannoFlowDriveFloor;
   out.dG_dPt0 = at.G * dh / kFannoFlowDriveFloor + h * (at.dG_dPt0 + at.dG_dP_target);
   out.dG_dTt0 = h * at.dG_dTt0;
