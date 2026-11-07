@@ -1696,6 +1696,7 @@ inline constexpr Entry function_units[] = {
     {"FannoChannelFlow::choked", "-", "-"},
     {"FannoChannelFlow::M_in", "-", "-"},
     {"FannoChannelFlow::M_exit", "-", "-"},
+    {"FannoChannelFlow::M_exit_root", "-", "-"},
     {"FannoChannelFlow::dG_dPt0", "-", "kg/(m^2*s*Pa)"},
     {"FannoChannelFlow::dG_dTt0", "-", "kg/(m^2*s*K)"},
     {"FannoChannelFlow::dG_dP_target", "-", "kg/(m^2*s*Pa)"},

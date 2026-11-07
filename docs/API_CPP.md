@@ -757,7 +757,9 @@ double fanno_choked_mass_flux(double Pt, double Tt, const std::vector<double>& X
 // pressure if exit_total, else its exit static -- with dG/dPt0, dG/dTt0,
 // dG/dP_target. Monotone in P_target, saturating exactly at the choked flux
 // (choked = true, dG/dP_target = 0); 0 at or below zero drive, and blended C1
-// to a finite slope below kFannoFlowDriveFloor = 1 Pa. Unchoked it solves for
+// to a finite slope below kFannoFlowDriveFloor = 1 Pa, where M_in and M_exit
+// are re-evaluated at the blended G (#1017) and M_exit_root keeps the floor
+// root's exit Mach (the warm start for M_exit_guess). Unchoked it solves for
 // the exit Mach (P_exit is linear in G at fixed M, so G(M_exit) is explicit)
 // and differentiates implicitly, well conditioned up to the choke.
 // dY_directions: mass-fraction directions v; dG_ddir returns dG/ds along each

@@ -10116,9 +10116,11 @@ class ChannelElement(NetworkElement):
                 [list(v) for v in dirs],
                 derivatives,
             )
-            # Warm start only: the flow does not depend on it.
+            # Warm start only: the flow does not depend on it. The root's exit
+            # Mach, which below the drive floor is the floor's, not the
+            # reported M_exit at the blended flux (#1017).
             if not flow.choked:
-                self._last_M_exit = float(flow.M_exit)
+                self._last_M_exit = float(flow.M_exit_root)
         sign = 1.0 if forward else -1.0
         if not derivatives:
             return sign * A * flow.G, {}, flow
