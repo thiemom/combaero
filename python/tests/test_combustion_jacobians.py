@@ -206,7 +206,19 @@ def test_the_combustor_derivatives_match_central_differences(method: str, phi: f
         (r.dY_mix_d_stream[ico][1].d_mdot, lambda d: burn(1.0, mf + d).Y_mix[ico], h),
         (r.dY_mix_d_stream[ico][0].d_Tt, lambda d: burn(1.0, mf, 700.0 + d).Y_mix[ico], hT),
     ]
-    for an, f, step in checks:
+    # The equilibrium path runs its complete-combustion step without the
+    # phi = 1 softmin, and its T has a kink at the stoichiometric peak (no
+    # O2-side dissociation): at phi = 1 exactly (since #1037 removed the
+    # ln2/k0 offset that put it near phi = 1.00018) a flow derivative is a
+    # subgradient, between the one-sided slopes.
+    at_kink = method == "equilibrium" and phi == 1.0
+    for i, (an, f, step) in enumerate(checks):
+        if at_kink and i in (0, 1, 3):
+            f0 = f(0.0)
+            one_sided = sorted(((f(step) - f0) / step, (f0 - f(-step)) / step))
+            tol = 2e-6 * max(abs(s) for s in one_sided)
+            assert one_sided[0] - tol <= an <= one_sided[1] + tol, (an, one_sided)
+            continue
         fd = (f(step) - f(-step)) / (2 * step)
         assert an == pytest.approx(fd, rel=2e-6, abs=1e-9 * max(1.0, abs(fd))), (an, fd)
 

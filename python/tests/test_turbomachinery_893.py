@@ -187,10 +187,13 @@ def test_the_jacobian_is_exact(fn, T1, PR, mode: str, gas: str) -> None:
             f"{attr}/eta",
         )
         grad = np.asarray(getattr(r, f"{d}_dY"))
+        # Step 1e-5: at 1e-7 the round-off of dh (~1e5-1e6 J/kg) is ~1e-2,
+        # above the 2e-6 band when a direction's slope is small (#1037's
+        # products: 0.014 on -2546); 1e-5 is truncation-limited at ~2e-5.
         for v in dirs:
             _check(
                 float(grad @ v),
-                _fd(lambda t, a=attr, v=v: getattr(at(Y_=Y + t * v), a), 0.0, 1e-7),
+                _fd(lambda t, a=attr, v=v: getattr(at(Y_=Y + t * v), a), 0.0, 1e-5),
                 scale,
                 f"{attr}/Y",
             )
