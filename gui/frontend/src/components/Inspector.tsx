@@ -22,6 +22,7 @@ import { warningsFor } from "../utils/incompressible";
 import {
 	inheritedField,
 	inheritedNote,
+	orificePipeNote,
 	previewWarning,
 	unresolvedReason,
 } from "../utils/inheritance";
@@ -1425,14 +1426,16 @@ const Inspector = () => {
 						const passThrough =
 							field("pass_through")?.value === 1 &&
 							!field("pass_through")?.source.includes("chamber");
-						const boreVsPipe =
-							!inPipe || pipeD == null
-								? null
-								: passThrough
-									? "equal"
-									: boreDiameter > pipeD
-										? "larger"
-										: null;
+						// The solver's refusal from the resolve pass, whichever pipe
+						// caused it: the downstream one sets beta in reverse (#1039).
+						const pipeNote = orificePipeNote({
+							preview: previewItems,
+							nodeId: selectedNode.id,
+							inPipe,
+							pipeD,
+							passThrough,
+							boreDiameter,
+						});
 						return (
 							<>
 								<GeometryFields
@@ -1528,13 +1531,18 @@ const Inspector = () => {
 									/>
 									In a pipe (the adjoining channel sets β)
 								</label>
-								{boreVsPipe === "equal" && (
+								{pipeNote?.kind === "refused" && (
+									<p className="text-[9px] text-amber-700">
+										The solver refuses this geometry: {pipeNote.reason}
+									</p>
+								)}
+								{pipeNote?.kind === "equal" && (
 									<p className="text-[9px] text-amber-700">
 										Bore = pipe D: no orifice — zero loss, the flow passes
 										unchanged. Untick "In a pipe" for a lumped Cd·A restriction.
 									</p>
 								)}
-								{boreVsPipe === "larger" && (
+								{pipeNote?.kind === "larger" && (
 									<p className="text-[9px] text-amber-700">
 										Bore larger than the pipe it sits in: the solver refuses
 										this geometry. Untick "In a pipe" for a lumped Cd·A

@@ -108,7 +108,9 @@ const NumericInput: React.FC<NumericInputProps> = ({
 			return;
 		}
 		const parsed = Number.parseFloat(localValue);
-		if (Number.isNaN(parsed)) {
+		// parseFloat reads "Infinity" and "1e999" as Infinity: not a value a
+		// field can hold or a file can save (#1038). Snap back, as for text.
+		if (!Number.isFinite(parsed)) {
 			setLocalValue(value != null ? (format ?? String)(value) : "");
 		} else {
 			const clamped =

@@ -22,6 +22,7 @@ import {
 	migrateNodePositions,
 	NETWORK_FILE_VERSION,
 } from "../utils/nodeOrigin";
+import { describeNonFinite, findNonFinite } from "../utils/nonFinite";
 import {
 	DISPLAY_ONLY_KINDS,
 	isProbeTarget,
@@ -135,7 +136,8 @@ export interface RFState {
 	setRotSpeedUnit: (unit: "rpm" | "Hz") => void;
 	saveNetwork: (filename?: string) => void | Promise<void>;
 	loadNetwork: (data: any) => void;
-	// What a load had to change in the file, shown once above the canvas.
+	// What a load had to change in the file, shown once above the canvas;
+	// also why a load or a save was refused (#1038).
 	loadNotice: string | null;
 	dismissLoadNotice: () => void;
 	// A worked example's description (#793), from the file's `example` key:
@@ -544,6 +546,15 @@ const useStore = create<RFState>((set, get) => ({
 
 	saveNetwork: async (filename?: string) => {
 		const { nodes, edges, solverSettings } = get();
+		// JSON writes Infinity and NaN as null, which the backend refuses for
+		// a number: never write a file that would not load and solve (#1038).
+		const nonFinite = findNonFinite({ nodes, edges, solverSettings });
+		if (nonFinite.length > 0) {
+			set({
+				loadNotice: `Not saved: JSON cannot hold a non-finite number, and it would be written as null (${describeNonFinite(nonFinite)}). Set a finite value and save again.`,
+			});
+			return;
+		}
 		const data = {
 			nodes,
 			edges,
@@ -612,6 +623,16 @@ const useStore = create<RFState>((set, get) => ({
 
 	loadNetwork: (data: any) => {
 		if (data.nodes && data.edges) {
+			// An overflowing literal (1e999) parses as Infinity; carried into
+			// the canvas it would be saved as null and refused (#1038). The
+			// canvas stays as it was.
+			const nonFinite = findNonFinite(data);
+			if (nonFinite.length > 0) {
+				set({
+					loadNotice: `Not loaded: the file has a non-finite number (${describeNonFinite(nonFinite)}). Every numeric field must be finite; edit the file and load it again.`,
+				});
+				return;
+			}
 			// Keys renamed since the file was saved (#773: omega_rpm).
 			const loadedSettings = migrateSolverSettings(
 				data.solverSettings || get().solverSettings,
