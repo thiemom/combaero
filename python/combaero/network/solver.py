@@ -6267,7 +6267,9 @@ class NetworkSolver:
         # evaluations on a 36-case mixing study. Returning (F, J) from one
         # callback (scipy's MemoizeJac) assembled J on every evaluation.
         def _jac_for(m: str) -> Any:
-            return jacobian_wrapper if (use_jac and m in ("hybr", "lm")) else False
+            if not use_jac or m not in ("hybr", "lm"):
+                return False
+            return lm_jacobian_wrapper if m == "lm" else jacobian_wrapper
 
         n_rejected = [0]
 
@@ -6438,6 +6440,30 @@ class NetworkSolver:
                 # for the rejected-probe residual above.
                 self._record_exception(e, "probe_jacobian")
                 return last_ok[1] if last_ok[1] is not None else np.eye(len(x_scaled))
+
+        def lm_jacobian_wrapper(x_scaled: np.ndarray) -> np.ndarray:
+            """The scaled Jacobian for MINPACK lmder, trace entries flushed to 0.
+
+            lmder detects a singular Jacobian by an EXACT zero on R's diagonal
+            (lmpar's nsing test) and otherwise divides by that pivot. A column
+            that is singular but for an entry at the underflow level passes
+            the test with a pivot of ~1e-308; Q^T F / R_jj overflows to inf,
+            the step to NaN, and the trust radius it updates (delta = pnorm /
+            0.5) becomes NaN for good: every later iterate is NaN (#1020). An
+            entry below eps times its column's largest is below the column's
+            own Householder rounding (QR is backward stable column by column),
+            so zeroing it changes nothing QR can resolve and lets lmpar take
+            its rank-deficient branch. The case: an effusion plate whose
+            McGreehan-Schotsch crossflow Cd = exp(-Rv^n) underflows at a far
+            iterate, so the only row that sets a chamber's pressure level
+            carries derivatives of 1e-308.
+            """
+            jac = jacobian_wrapper(x_scaled)
+            col_max = np.max(np.abs(jac), axis=0)
+            trace = np.abs(jac) < np.finfo(float).eps * col_max[None, :]
+            if np.any(trace & (jac != 0.0)):
+                jac = np.where(trace, 0.0, jac)
+            return jac
 
         # Solve with timing
         _RESIDUAL_TOL = 1e-3
