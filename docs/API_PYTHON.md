@@ -1831,6 +1831,19 @@ fluid. Three modes:
   - A junction's reference head (`MultiPortChamberElement`'s constant K) follows its port chamber's regime.
   - A script that validates the compressible closure must ask for it: `MomentumChamberNode(..., regime="compressible")`.
 
+#### Areas against their neighbours (0.11)
+
+One rule, applied wherever an element's area meets a pipe or chamber. Equal means within the 1e-6 band on the equivalent diameter.
+
+| the area is ... | then | where |
+|---|---|---|
+| equal to its neighbour | a pass-through: zero loss, the row `Pt_in - Pt_out` | orifice bore vs pipe (#788) or chamber (#1016); `AreaChangeElement` F0 == F1 (#1023) |
+| larger than a geometry allows | refused, naming both areas | bore above its pipe or chamber; explicit F0/F1, F_C/F_branch against the attached pipe; ejector `mixing_area` above its outlet pipe (#1023) |
+| a contraction with no loss | a `UserWarning` from `validate()` | a `MomentumChamberNode` narrower than an adjoining pipe (#1023) |
+| zero on a restriction | closed: no flow, `closed = 1` | orifice, effective-area and Cd D connections (#1024) |
+
+Buildable but unusual geometry stays accepted, for example a tee branch wider than its main. A zero area on a duct or node is refused (below).
+
 #### Geometry the network refuses (#1024)
 
 Each refusal names the element or node, the input and the limit, and raises `ValueError` at `FlowNetwork.validate()` unless noted. Every check is a method `_geometry_error()` on its class, which returns the message or "". The GUI's resolve preview reports that message as the item's `refusal` before Solve.
