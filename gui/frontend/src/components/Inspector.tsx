@@ -19,7 +19,11 @@ import {
 	heatedNodeId,
 } from "../utils/heatSource";
 import { warningsFor } from "../utils/incompressible";
-import { inheritedField, inheritedNote } from "../utils/inheritance";
+import {
+	inheritedField,
+	inheritedNote,
+	unresolvedReason,
+} from "../utils/inheritance";
 import { junctionGuessKey } from "../utils/legacyKeys";
 import { nodeTypeLabel } from "../utils/nodeUtils";
 import { withPortArm } from "../utils/portArms";
@@ -56,6 +60,16 @@ import PlateMaterialSelect from "./PlateMaterialSelect";
 import SurfaceEnhancementInspector from "./SurfaceEnhancementInspector";
 import UnitInput from "./UnitInput";
 import WallLayersEditor from "./WallLayersEditor";
+
+// The canvas types built as one OrificeElement (or a plate subclass) under
+// their own id, whose bore the solver checks against an adjacent momentum
+// chamber (#1016).
+const ORIFICE_FAMILY_TYPES = new Set([
+	"orifice",
+	"effusion_plate",
+	"film_cooling",
+	"slot_film",
+]);
 
 const Inspector = () => {
 	const {
@@ -1300,6 +1314,32 @@ const Inspector = () => {
 						);
 					})()}
 
+				{selectedNode.type != null &&
+					ORIFICE_FAMILY_TYPES.has(selectedNode.type) &&
+					(() => {
+						// #1016: the bore's own area (a plate's total hole area)
+						// against an adjacent momentum chamber, the solver's verdict
+						// from the resolve pass: equal is no orifice, larger refused.
+						const pt = inheritedField(
+							previewItems,
+							selectedNode.id,
+							"pass_through",
+						);
+						const chamberPassThrough =
+							pt?.value === 1 && pt.source.includes("chamber");
+						const reason = unresolvedReason(previewItems, selectedNode.id);
+						const chamberRefusal =
+							reason?.includes("momentum chamber") === true;
+						if (!chamberPassThrough && !chamberRefusal) return null;
+						return (
+							<p className="text-[9px] text-amber-700">
+								{chamberPassThrough
+									? `${pt.source.charAt(0).toUpperCase()}${pt.source.slice(1)} — zero loss, the flow passes unchanged.`
+									: `The solver refuses this geometry: ${reason}`}
+							</p>
+						);
+					})()}
+
 				{selectedNode.type === "orifice" &&
 					(() => {
 						// Bore and pipe diameter from the solver's resolve pass
@@ -1354,7 +1394,10 @@ const Inspector = () => {
 						// orifice (the solver's pass_through verdict); a larger one is
 						// refused, and the resolve pass reports it unresolved.
 						const inPipe = selectedNode.data.in_pipe !== false;
-						const passThrough = field("pass_through")?.value === 1;
+						// The pipe's verdict only: a chamber's (#1016) has its own note.
+						const passThrough =
+							field("pass_through")?.value === 1 &&
+							!field("pass_through")?.source.includes("chamber");
 						const boreVsPipe =
 							!inPipe || pipeD == null
 								? null

@@ -202,8 +202,17 @@ def test_step_4_adding_bypass():
 
     # Main series elements (now attach to port-face MCNs at mc1, mc2).
     p1 = ChannelElement("p1", "inlet", "n1", length=2.0, diameter=D_main, roughness=1e-4)
+    # The same lumped Cd*A as o2's (0.6 at d = 0.100925), on a bore inside the
+    # port-face chamber it opens into: a bore wider than its momentum chamber
+    # is refused (#1016). The flow reads Cd*A only ('fixed', beta = 0).
     o1 = OrificeElement(
-        "o1", "n1", "mc1_com", Cd=0.6, diameter=0.100925, correlation="fixed", in_pipe=False
+        "o1",
+        "n1",
+        "mc1_com",
+        Cd=0.6 * (0.100925 / 0.0999) ** 2,
+        diameter=0.0999,
+        correlation="fixed",
+        in_pipe=False,
     )
     p2 = ChannelElement("p2", "mc1_str", "n2", length=2.0, diameter=D_main, roughness=1e-4)
     o2 = OrificeElement(
