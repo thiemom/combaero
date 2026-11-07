@@ -79,7 +79,11 @@ def test_a_chamber_discharge_takes_its_gas_side_from_the_chamber() -> None:
     ch = s.network.nodes["ch"]
     T, P = s._derived_states["ch"][0], r["ch.P"]
     state = NetworkMixtureState(P=P, Pt=r["ch.Pt"], Tt=T, m_dot=0.0, Y=Y_AIR)
-    gas = ch.htc_and_T(state)
+    # The plate owns the wall; the chamber supplies only its h per unit area,
+    # with or without a wetted area of its own (#1022: this chamber has none,
+    # so its own htc_and_T, gated on surface.area, returns None).
+    assert ch.surface.area == 0.0
+    gas = ch._gas_side_htc_and_T(state)
     assert d["gas_side_chamber"] == 1.0
     assert d["h_gas_unblown"] == pytest.approx(gas.h, rel=1e-6)
     assert 600.0 < d["T_wall_cold"] < d["T_wall_hot"] < d["T_gas"]

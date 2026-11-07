@@ -857,7 +857,8 @@
 			"palette",
 			"constant_head",
 			"linear_theta_fraction",
-			"linear_theta_head"
+			"linear_theta_head",
+			"thermal wall"
 		],
 		"effusion_liner": [
 			"palette",

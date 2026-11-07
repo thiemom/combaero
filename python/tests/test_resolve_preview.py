@@ -243,7 +243,9 @@ def test_gui_momentum_chamber_with_null_area_inherits_it() -> None:
     assert area.source == "channel 'ch_u'"
     assert rep["mc"].fields["Dh"].source == "channel 'ch_u'"
     assert abs(area.value - 0.25 * 3.141592653589793 * 0.1**2) < 1e-12
-    assert net.nodes["mc"].surface.area == area.value
+    # The flow area is not a wetted area (#1022): an unwalled GUI chamber has
+    # no convective surface. This used to assert the cross-section here.
+    assert net.nodes["mc"].surface.area == 0.0
 
     # A user Dh: the area is derived from it, and says so.
     graph["nodes"][2]["data"]["Dh"] = 0.2

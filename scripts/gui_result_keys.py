@@ -132,6 +132,28 @@ def _heated_pair() -> dict:
     }
 
 
+def _walled_loss(graph: dict) -> dict:
+    """A discrete loss walled to a warm channel: its convective diagnostics.
+
+    The GUI's loss has no wetted-area field; the wall gives it one (#1022),
+    so only a walled loss reports h, Nu and T_aw.
+    """
+    pb = "pressure_boundary"
+    graph["nodes"][0] = _node("in", "mass_boundary", {"m_dot": 0.05, "Tt": 300.0})
+    graph["nodes"] += [
+        _node("win", pb, {"Pt": 1.05e5, "Tt": 500.0}),
+        _node("wout", pb, {"Pt": 1.0e5, "Tt": 500.0}),
+        _node("cw", "channel", {"L": 0.5, "D": 0.05}),
+    ]
+    wall = {"type": "thermal", "thickness": 0.003, "conductivity": 20.0, "area": 0.01}
+    graph["edges"] += [
+        _edge("w1", "win", "cw"),
+        _edge("w2", "cw", "wout"),
+        _edge("w", "x", "cw", data=wall),
+    ]
+    return graph
+
+
 def _orifice_in_pipe(data: dict) -> dict:
     """An orifice with an approach pipe: beta > 0, the ISO 5167 taps."""
     pb = "pressure_boundary"
@@ -218,6 +240,7 @@ def networks() -> Iterator[tuple[str, str, dict]]:
         graph = http._palette_network("discrete_loss")
         graph["nodes"][0] = _node("in", "mass_boundary", {"m_dot": 0.05, "Tt": 300.0})
         yield "discrete_loss", corr, _with(graph, "x", correlation_type=corr)
+    yield "discrete_loss", "thermal wall", _walled_loss(http._palette_network("discrete_loss"))
     yield (
         "heat_source",
         "outlet Tt (total)",
